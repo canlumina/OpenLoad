@@ -205,5 +205,13 @@ flowchart TD
 
 
 ## 许可证
-
 Apache License 2.0 - 允许商业使用和修改
+
+本项目中使用了以下第三方组件：
+RT-Thread fal库
+项目名称: fal
+功能: 用于存储管理和分区管理
+来源: 基于RT-Thread官方fal组件开发
+LICENSE: RT-ThreadfalLICENSE
+版权声明
+本项目基于RT-Thread fal组件进行开发和优化，版权归RT-Thread所有。如需使用本项目中的fal相关功能，请遵守RT-Thread的LICENSE协议。
