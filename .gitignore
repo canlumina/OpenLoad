@@ -54,44 +54,10 @@ dkms.conf
 # debug information files
 *.dwo
 
-# Ignore Keil project files
-/*.uvprojx
-/*.uvoptx
-/*.uvproj
-/*.dep
-/*.depend
-/*.depend.*
-
-# Ignore Keil workspace settings
-/*.uvmpw
-/*.uvopt
-/*.lst
-/*.bak
-
-# Ignore generated files
+# Ignore Keil project files and workspace settings
 example/keil/Output/
+example/keil/Projects/MDK-ARM/DebugConfig/
+example/keil/Projects/MDK-ARM/RTE/
+example/keil/Projects/MDK-ARM/*.uvguix.*
+example/keil/Projects/MDK-ARM/*.uvoptx
 !example/keil/Projects/MDK-ARM/*.uvprojx
-/*.axf
-/*.map
-/*.hex
-/*.bin
-/*.out
-
-# Ignore Keil temporary files
-*.bak
-*.chm
-*.crf
-*.crp
-*.crw
-*.dap
-*.dip
-*.dsu
-*.inf
-*.opt
-*.rep
-*.sct
-*.sfr
-*.trc
-*.trm
-*.tpt
-*.wrn
