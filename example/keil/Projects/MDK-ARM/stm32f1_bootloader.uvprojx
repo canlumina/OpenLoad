@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F103xE</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\Drivers\CMSIS\Device\ST\STM32F1xx\Include;..\..\Drivers\STM32F1xx_HAL_Driver\Inc;..\..\Drivers\CMSIS\Include;..\..\User;..\..\Middlewares;..\..\Drivers\SYSTEM\delay;..\..\Drivers\SYSTEM\sys;..\..\Drivers\SYSTEM\usart;..\..\Drivers\BSP</IncludePath>
+              <IncludePath>..\..\..\platform\stm32\CMSIS\Device\ST\STM32F1xx\Include;..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Inc;..\..\..\platform\stm32\CMSIS\Include;..\..\User;..\..\Middlewares;..\..\Drivers\SYSTEM\delay;..\..\Drivers\SYSTEM\sys;..\..\Drivers\SYSTEM\usart;..\..\Drivers\BSP</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -387,7 +387,12 @@
             <File>
               <FileName>startup_stm32f103xe.s</FileName>
               <FileType>2</FileType>
-              <FilePath>..\..\Drivers\CMSIS\Device\ST\STM32F1xx\Source\Templates\arm\startup_stm32f103xe.s</FilePath>
+              <FilePath>..\..\..\platform\stm32\CMSIS\Device\ST\STM32F1xx\Source\Templates\arm\startup_stm32f103xe.s</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_nor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_nor.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -400,11 +405,6 @@
               <FilePath>..\..\User\main.c</FilePath>
             </File>
             <File>
-              <FileName>system_stm32f1xx.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\CMSIS\Device\ST\STM32F1xx\Source\Templates\system_stm32f1xx.c</FilePath>
-            </File>
-            <File>
               <FileName>stm32f1xx_it.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\User\stm32f1xx_it.c</FilePath>
@@ -413,6 +413,11 @@
               <FileName>boot.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\User\boot.c</FilePath>
+            </File>
+            <File>
+              <FileName>system_stm32f1xx.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\CMSIS\Device\ST\STM32F1xx\Source\Templates\system_stm32f1xx.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -452,77 +457,72 @@
             <File>
               <FileName>stm32f1xx_hal.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal.c</FilePath>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal.c</FilePath>
             </File>
             <File>
               <FileName>stm32f1xx_hal_cortex.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_cortex.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_dma.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_dma.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_gpio.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_gpio.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_gpio_ex.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_gpio_ex.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_pwr.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_pwr.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_rcc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_rcc.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_rcc_ex.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_rcc_ex.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_uart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_uart.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_usart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_usart.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_hal_sram.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_sram.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f1xx_ll_fsmc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_ll_fsmc.c</FilePath>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_cortex.c</FilePath>
             </File>
             <File>
               <FileName>stm32f1xx_hal_flash.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_flash.c</FilePath>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_flash.c</FilePath>
             </File>
             <File>
               <FileName>stm32f1xx_hal_flash_ex.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_flash_ex.c</FilePath>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_flash_ex.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_gpio.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_gpio.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_rcc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_rcc.c</FilePath>
             </File>
             <File>
               <FileName>stm32f1xx_hal_spi.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\Drivers\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_spi.c</FilePath>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_sram.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_sram.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_tim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_tim.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_usart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_usart.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_dma.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_dma.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_hal_tim_ex.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_hal_tim_ex.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f1xx_ll_fsmc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Src\stm32f1xx_ll_fsmc.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -553,16 +553,6 @@
               <FileName>bsp_spi.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\Drivers\BSP\bsp_spi.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Readme</GroupName>
-          <Files>
-            <File>
-              <FileName>readme.txt</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\..\readme.txt</FilePath>
             </File>
           </Files>
         </Group>

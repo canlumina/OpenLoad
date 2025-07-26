@@ -70,7 +70,7 @@ dkms.conf
 
 # Ignore generated files
 example/keil/Output/
-example/keil/Listing/
+!example/keil/Projects/MDK-ARM/*.uvprojx
 /*.axf
 /*.map
 /*.hex
