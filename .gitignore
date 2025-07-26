@@ -67,7 +67,6 @@ dkms.conf
 /*.uvopt
 /*.lst
 /*.bak
-/Objects
 
 # Ignore generated files
 example/keil/Output/
