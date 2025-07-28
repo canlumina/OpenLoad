@@ -61,4 +61,5 @@ example/keil/Projects/MDK-ARM/DebugConfig/
 example/keil/Projects/MDK-ARM/RTE/
 example/keil/Projects/MDK-ARM/*.uvguix.*
 example/keil/Projects/MDK-ARM/*.uvoptx
+example/keil/Projects/MDK-ARM/*.scvd
 !example/keil/Projects/MDK-ARM/*.uvprojx
