@@ -229,8 +229,8 @@ static const struct fal_flash_dev *flash_device_find_by_part(const struct fal_pa
  */
 const struct fal_partition *fal_get_partition_table(size_t *len)
 {
-    assert(init_ok);
-    assert(len);
+   assert(init_ok);
+   assert(len);
 
     *len = partition_table_len;
 
@@ -280,7 +280,7 @@ int fal_partition_read(const struct fal_partition *part, uint32_t addr, uint8_t 
         return -1;
     }
 
-    flash_dev = flash_device_find_by_part(part);
+    flash_dev = fal_flash_device_find(part->flash_name);
     if (flash_dev == NULL)
     {
         log_e("Partition read error! Don't found flash device(%s) of the partition(%s).", part->flash_name, part->name);
@@ -321,7 +321,7 @@ int fal_partition_write(const struct fal_partition *part, uint32_t addr, const u
         return -1;
     }
 
-    flash_dev = flash_device_find_by_part(part);
+    flash_dev = fal_flash_device_find(part->flash_name);
     if (flash_dev == NULL)
     {
         log_e("Partition write error!  Don't found flash device(%s) of the partition(%s).", part->flash_name, part->name);
@@ -360,7 +360,8 @@ int fal_partition_erase(const struct fal_partition *part, uint32_t addr, size_t 
         return -1;
     }
 
-    flash_dev = flash_device_find_by_part(part);
+    //flash_dev = fal_flash_device_find(part->flash_name);
+		flash_dev = flash_device_find_by_part(part);
     if (flash_dev == NULL)
     {
         log_e("Partition erase error! Don't found flash device(%s) of the partition(%s).", part->flash_name, part->name);

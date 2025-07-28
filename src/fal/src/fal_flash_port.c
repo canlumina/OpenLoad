@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2020, Armink, <armink.ztl@gmail.com>
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <string.h>
 #include <fal.h>
 #include <stm32f1xx.h>

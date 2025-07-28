@@ -77,7 +77,8 @@
  */
 
 /* backup area start address */
-#define EF_START_ADDR                  (FLASH_BASE + 64 * 1024) /* from the chip position: 64KB */
+// #define EF_START_ADDR                  (FLASH_BASE + 64 * 1024) /* from the chip position: 64KB */
+#define EF_START_ADDR                  (FLASH_BASE + (512 - 64 - 4) * 1024) /* from the chip position: 64KB */
 /* ENV area size. It's at least one empty sector for GC. So it's definination must more then or equal 2 flash sector size. */
 #define ENV_AREA_SIZE                  (2 * EF_ERASE_MIN_SIZE)      /* 8K */
 /* saved log area size */
