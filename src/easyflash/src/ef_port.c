@@ -94,42 +94,29 @@ EfErrCode ef_port_read(uint32_t addr, uint32_t *buf, size_t size) {
  * @return result
  */
 EfErrCode ef_port_erase(uint32_t addr, size_t size) {
-    
-	uint32_t PAGEError = 0;
-    HAL_StatusTypeDef flash_status;
-    size_t erase_pages, i;
-    
-    /* make sure the start address is a multiple of FLASH_ERASE_MIN_SIZE */
+    EfErrCode result = EF_NO_ERR;
+
+    /* make sure the start address is a multiple of EF_ERASE_MIN_SIZE */
     EF_ASSERT(addr % EF_ERASE_MIN_SIZE == 0);
-    
-    /* calculate pages */
-    erase_pages = size / PAGE_SIZE;
-    if (size % PAGE_SIZE != 0) {
-        erase_pages++;
-    }
 
-	FLASH_EraseInitTypeDef EraseInitStruct;
-    EraseInitStruct.TypeErase   = FLASH_TYPEERASE_PAGES;
-    EraseInitStruct.NbPages     = 1; 
-    /* start erase */
-    HAL_FLASH_Unlock();
-
-    for (i = 0; i < erase_pages; i++) {
-		EraseInitStruct.PageAddress = addr + (FLASH_PAGE_SIZE * i);
-        flash_status = HAL_FLASHEx_Erase(&EraseInitStruct, &PAGEError);
-        if (flash_status != HAL_OK) {
-            HAL_FLASH_Lock();
-            return -1;
-        }
-        else{
-            //FLash操作可能非常耗时，如果有看门狗需要喂狗，以下代码由用户实现
-            //feed_dog();
-        }
-    }
+    /* You can add your code under here. */
+		HAL_FLASH_Unlock();
 		
-    HAL_FLASH_Lock();
+		__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPERR);
+	
+    /* Erase FLASH*/
+    FLASH_EraseInitTypeDef FlashSet;
+    FlashSet.TypeErase = FLASH_TYPEERASE_PAGES;
+    FlashSet.PageAddress = addr;
+    FlashSet.NbPages = (size + EF_ERASE_MIN_SIZE -1)/ EF_ERASE_MIN_SIZE;
 
-    return size;
+    /*Set PageError and call the erase function*/
+    uint32_t PageError = 0;
+    if (HAL_FLASHEx_Erase(&FlashSet, &PageError) != HAL_OK)
+			result = EF_ERASE_ERR;
+
+    HAL_FLASH_Lock();
+    return result;
 }
 
 
@@ -146,29 +133,24 @@ EfErrCode ef_port_erase(uint32_t addr, size_t size) {
  */
 EfErrCode ef_port_write(uint32_t addr, const uint32_t *buf, size_t size) {
     EfErrCode result = EF_NO_ERR;
-    size_t i;
-    // uint32_t read_data;
-    __ALIGN_BEGIN uint32_t write_data __ALIGN_END;
-    __ALIGN_BEGIN uint32_t read_data  __ALIGN_END; 
+    
+    /* You can add your code under here. */
+		size_t i;
+    uint32_t read_data;
 
     HAL_FLASH_Unlock();
-    //FLASH_ClearFlag(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPRTERR);
-    for (i = 0; i < size; i += 4, buf+=4, addr += 4) {
-        memcpy(&write_data, buf, 4); //用以保证HAL_FLASH_Program的第三个参数是内存首地址对齐
-        HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr, write_data);
+    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPERR);
+    for (i = 0; i < size; i += 4, buf++, addr += 4) {
+        /* write data */
+        HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr, (uint64_t)*buf);
         read_data = *(uint32_t *)addr;
-        /* You can add your code under here. */
-        if (read_data != write_data) {
-            HAL_FLASH_Lock(); 
-            return -1;
-        }
-        else{
-			//FLash操作可能非常耗时，如果有看门狗需要喂狗，以下代码由用户实现
-           //feed_dog();
+        /* check data */
+        if (read_data != *buf) {
+            result = EF_WRITE_ERR;
+            break;
         }
     }
     HAL_FLASH_Lock();
-
     return result;
 }
 
