@@ -1,13 +1,3 @@
-/*
- * Copyright (c) 2006-2018, RT-Thread Development Team
- *
- * SPDX-License-Identifier: Apache-2.0
- *
- * Change Logs:
- * Date           Author       Notes
- * 2018-05-17     armink       the first version
- */
-
 #include <fal.h>
 #include <string.h>
 
@@ -15,6 +5,12 @@
 #if !defined(FAL_FLASH_DEV_TABLE)
 #error "You must defined flash device table (FAL_FLASH_DEV_TABLE) on 'fal_cfg.h'"
 #endif
+
+/* Partition table, must defined by user */
+#if !defined(FAL_PART_HAS_TABLE_CFG)
+#error "You must defined flash device table (FAL_PART_HAS_TABLE_CFG) on 'fal_cfg.h'"
+#endif
+
 
 static const struct fal_flash_dev * const device_table[] = FAL_FLASH_DEV_TABLE;
 static const size_t device_table_len = sizeof(device_table) / sizeof(device_table[0]);

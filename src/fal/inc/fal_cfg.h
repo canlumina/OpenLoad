@@ -1,9 +1,3 @@
-/*
- * Copyright (c) 2020, Armink, <armink.ztl@gmail.com>
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #ifndef _FAL_CFG_H_
 #define _FAL_CFG_H_
 

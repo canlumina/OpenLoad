@@ -1,32 +1,10 @@
-/*
- * Copyright (c) 2006-2018, RT-Thread Development Team
- *
- * SPDX-License-Identifier: Apache-2.0
- *
- * Change Logs:
- * Date           Author       Notes
- * 2018-05-17     armink       the first version
- */
-
 #ifndef _FAL_DEF_H_
 #define _FAL_DEF_H_
 
 #include <stdint.h>
 #include <stdio.h>
-#ifdef FDB_USING_NATIVE_ASSERT
-#include <assert.h>
-#endif
 
 #define FAL_SW_VERSION                 "0.5.99"
-
-#ifdef __RTTHREAD__ /* for RT-Thread platform */
-#include <rtthread.h>
-#define FAL_PRINTF      rt_kprintf
-#define FAL_MALLOC      rt_malloc
-#define FAL_CALLOC      rt_calloc
-#define FAL_REALLOC     rt_realloc
-#define FAL_FREE        rt_free
-#endif
 
 #ifndef FAL_MALLOC
 #define FAL_MALLOC                     malloc
