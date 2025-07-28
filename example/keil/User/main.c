@@ -9,11 +9,12 @@
 #include "boot.h"
 #include <fal.h>
 #include <string.h>
-
+#include "easyflash.h"
+#include <stdlib.h>
 
 #define BUF_SIZE 1024
 static int fal_test(const char *partiton_name);
-
+static void test_env(void);
 int main(void)
 {
     HAL_Init();                         /* 初始化HAL库 */
@@ -23,16 +24,16 @@ int main(void)
     led_init();                         /* 初始化LED */
     key_init();                         /* 初始化按键 */
     W25QXX_Init();                      // W25QXX初始化();
-    fal_init();
+//    fal_init();
 //	
-    if (fal_test("app") == 0)
-    {
-        log_i("Fal partition (%s) test success!", "app");
-    }
-    else
-    {
-        log_e("Fal partition (%s) test failed!", "app");
-    }
+//    if (fal_test("app") == 0)
+//    {
+//        log_i("Fal partition (%s) test success!", "app");
+//    }
+//    else
+//    {
+//        log_e("Fal partition (%s) test failed!", "app");
+//    }
 
 //    if (fal_test("download") == 0)
 //    {
@@ -42,12 +43,34 @@ int main(void)
 //    {
 //        log_e("Fal partition (%s) test failed!", "download");
 //    }
-		
+    if (easyflash_init() == EF_NO_ERR) {
+        /* test Env demo */
+        test_env();
+    } 		
 		while(1)
 		{
 			delay_ms(500);
 		}
     return 0;
+}
+
+
+static void test_env(void) {
+    uint32_t i_boot_times = NULL;
+    char *c_old_boot_times, c_new_boot_times[11] = {0};
+
+    /* get the boot count number from Env */
+    c_old_boot_times = ef_get_env("boot_times");
+    assert_param(c_old_boot_times);
+    i_boot_times = atol(c_old_boot_times);
+    /* boot count +1 */
+    i_boot_times ++;
+    printf("The system now boot %d times\n\r", i_boot_times);
+    /* interger to string */
+    sprintf(c_new_boot_times,"%d", i_boot_times);
+    /* set and store the boot count number to Env */
+    ef_set_env("boot_times", c_new_boot_times);
+    ef_save_env();
 }
 
 
