@@ -197,7 +197,7 @@ _exit:
  */
 const struct fal_partition *fal_partition_find(const char *name)
 {
-    //assert(init_ok);
+    assert(init_ok);
 
     size_t i;
 

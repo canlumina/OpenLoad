@@ -66,7 +66,7 @@ int fputc(int ch, FILE *f)
 
 /* 接收缓冲, 最大USART_REC_LEN个字节. */
 #if (__ARMCC_VERSION >= 6010050)
-uint8_t g_usart_rx_buf[USART_REC_LEN] __attribute__((section(".bss.ARM.__at_0x20001000")));
+uint8_t g_usart_rx_buf[USART_REC_LEN];// __attribute__((section(".bss.ARM.__at_0x20001000")));
 #else
 uint8_t g_usart_rx_buf[USART_REC_LEN] __attribute__((at(0X20001000)));
 #endif

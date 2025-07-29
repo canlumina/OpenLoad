@@ -12,7 +12,7 @@
 #include "easyflash.h"
 #include <stdlib.h>
 
-#define BUF_SIZE 1024
+#define BUF_SIZE 512
 static int fal_test(const char *partiton_name);
 static void test_env(void);
 
@@ -40,19 +40,19 @@ int main(void)
         log_e("Fal partition (%s) test failed!", "app");
     }
 
-//    if (fal_test("env") == 0)
-//    {
-//        log_i("Fal partition (%s) test success!", "env");
-//    }
-//    else
-//    {
-//        log_e("Fal partition (%s) test failed!", "env");
-//    }
-//			delay_ms(2000);
-//    if (easyflash_init() == EF_NO_ERR) {
-//        /* test Env demo */
-//        test_env();
-//    } 
+    if (fal_test("env") == 0)
+    {
+        log_i("Fal partition (%s) test success!", "env");
+    }
+    else
+    {
+        log_e("Fal partition (%s) test failed!", "env");
+    }
+
+    if (easyflash_init() == EF_NO_ERR) {
+        /* test Env demo */
+        test_env();
+    } 
 		
 		while(1)
 		{
