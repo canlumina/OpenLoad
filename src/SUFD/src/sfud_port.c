@@ -126,16 +126,16 @@ sfud_err sfud_spi_port_init(sfud_flash *flash) {
     if (!strcmp(flash->spi.name, "SPI2"))
     {
         GPIO_InitTypeDef GPIO_Initure;
-        /* SPI �����ʼ��? */
+
         spi_configuration(&spi2);
-        /* ��ʼ�� CS ���� */
+
         GPIO_Initure.Pin = spi2.cs_gpio_pin;
         GPIO_Initure.Mode = GPIO_MODE_OUTPUT_PP;
         GPIO_Initure.Pull = GPIO_PULLUP;
         GPIO_Initure.Speed = GPIO_SPEED_FREQ_HIGH;
         HAL_GPIO_Init(spi2.cs_gpiox, &GPIO_Initure);
         HAL_GPIO_WritePin(spi2.cs_gpiox, spi2.cs_gpio_pin, GPIO_PIN_SET);
-        /* ͬ�� Flash ��ֲ����Ľӿڼ�����? */
+
         flash->spi.wr = spi_write_read;
         flash->spi.lock = spi_lock;
         flash->spi.unlock = spi_unlock;

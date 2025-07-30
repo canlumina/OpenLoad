@@ -26,11 +26,11 @@ int main(void)
     usart_init(115200);                 /* 串口初始化为115200 */
     led_init();                         /* 初始化LED */
     key_init();                         /* 初始化按键 */
-    //W25QXX_Init();                      // W25QXX初始化();
-		spi2_init();
+                                        // W25QXX_Init();                      // W25QXX初始化();
+    spi2_init();
     fal_init();
-		spi_flash_init();
-		
+    spi_flash_init();
+
     if (fal_test("env") == 0)
     {
         // log_i("Fal partition (%s) test success!", "app");
@@ -51,20 +51,21 @@ int main(void)
         log_e("Fal partition (%s) test failed!", "easyflash");
     }
 
-    if (easyflash_init() == EF_NO_ERR) {
+    if (easyflash_init() == EF_NO_ERR)
+    {
         /* test Env demo */
         test_env();
-    } 
-		
-		while(1)
-		{
-			delay_ms(500);
-		}
+    }
+
+    while (1)
+    {
+        delay_ms(500);
+    }
     return 0;
 }
 
-
-static void test_env(void) {
+static void test_env(void)
+{
     uint32_t i_boot_times = NULL;
     char *c_old_boot_times, c_new_boot_times[11] = {0};
 
@@ -73,15 +74,14 @@ static void test_env(void) {
     assert_param(c_old_boot_times);
     i_boot_times = atol(c_old_boot_times);
     /* boot count +1 */
-    i_boot_times ++;
+    i_boot_times++;
     printf("The system now boot %d times\n\r", i_boot_times);
     /* interger to string */
-    sprintf(c_new_boot_times,"%d", i_boot_times);
+    sprintf(c_new_boot_times, "%d", i_boot_times);
     /* set and store the boot count number to Env */
     ef_set_env("boot_times", c_new_boot_times);
     ef_save_env();
 }
-
 
 static int fal_test(const char *partiton_name)
 {
@@ -116,11 +116,11 @@ static int fal_test(const char *partiton_name)
     log_i("Flash device : %s   "
           "Flash size : %dK   "
           "Partition : %s   "
-          "Partition size: %dK", 
-           partition->flash_name, 
-           flash_dev->len/1024,
-           partition->name,
-           partition->len/1024);
+          "Partition size: %dK",
+          partition->flash_name,
+          flash_dev->len / 1024,
+          partition->name,
+          partition->len / 1024);
 
     /* 擦除 `partition` 分区上的全部数据 */
     ret = fal_partition_erase_all(partition);
@@ -146,7 +146,7 @@ static int fal_test(const char *partiton_name)
             ret = -1;
             return ret;
         }
-        for(j = 0; j < len; j++)
+        for (j = 0; j < len; j++)
         {
             /* 校验数据内容是否为 0xFF */
             if (buf[j] != 0xFF)
@@ -193,7 +193,7 @@ static int fal_test(const char *partiton_name)
             ret = -1;
             return ret;
         }
-        for(j = 0; j < len; j++)
+        for (j = 0; j < len; j++)
         {
             /* 校验读取的数据是否为步骤 3 中写入的数据 0x00 */
             if (buf[j] != 0x00)
