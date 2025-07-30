@@ -59,7 +59,7 @@ int fal_flash_init(void)
  */
 const struct fal_flash_dev *fal_flash_device_find(const char *name)
 {
-    //assert(init_ok);
+    assert(init_ok);
     assert(name);
 
     size_t i;

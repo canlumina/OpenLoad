@@ -11,6 +11,7 @@
 #include <string.h>
 #include "easyflash.h"
 #include <stdlib.h>
+#include "sfud_cfg.h"
 
 #define BUF_SIZE 512
 static int fal_test(const char *partiton_name);
@@ -24,29 +25,29 @@ int main(void)
     usart_init(115200);                 /* 串口初始化为115200 */
     led_init();                         /* 初始化LED */
     key_init();                         /* 初始化按键 */
-    W25QXX_Init();                      // W25QXX初始化();
-	
+    //W25QXX_Init();                      // W25QXX初始化();
+		//spi_flash_init();
     fal_init();
 
 		
-    if (fal_test("app") == 0)
-    {
-        // log_i("Fal partition (%s) test success!", "app");
-        log_i("Fal partition (%s) test success!", "app");
-    }
-    else
-    {
-        // log_e("Fal partition (%s) test failed!", "app");
-        log_e("Fal partition (%s) test failed!", "app");
-    }
-
     if (fal_test("env") == 0)
     {
+        // log_i("Fal partition (%s) test success!", "app");
         log_i("Fal partition (%s) test success!", "env");
     }
     else
     {
+        // log_e("Fal partition (%s) test failed!", "app");
         log_e("Fal partition (%s) test failed!", "env");
+    }
+
+    if (fal_test("easyflash") == 0)
+    {
+        log_i("Fal partition (%s) test success!", "easyflash");
+    }
+    else
+    {
+        log_e("Fal partition (%s) test failed!", "easyflash");
     }
 
     if (easyflash_init() == EF_NO_ERR) {

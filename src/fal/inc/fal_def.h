@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
-
+#include "fal_cfg.h"
 #define FAL_SW_VERSION                 "0.5.99"
 
 #ifndef FAL_MALLOC
