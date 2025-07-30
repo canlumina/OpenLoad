@@ -12,6 +12,7 @@
 #include "easyflash.h"
 #include <stdlib.h>
 #include "sfud_cfg.h"
+#include "bsp_spi.h"
 
 #define BUF_SIZE 512
 static int fal_test(const char *partiton_name);
@@ -26,9 +27,9 @@ int main(void)
     led_init();                         /* 初始化LED */
     key_init();                         /* 初始化按键 */
     //W25QXX_Init();                      // W25QXX初始化();
-		//spi_flash_init();
+		spi2_init();
     fal_init();
-
+		spi_flash_init();
 		
     if (fal_test("env") == 0)
     {
