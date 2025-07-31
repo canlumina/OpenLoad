@@ -405,11 +405,6 @@
               <FilePath>..\..\User\stm32f1xx_it.c</FilePath>
             </File>
             <File>
-              <FileName>boot.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\User\boot.c</FilePath>
-            </File>
-            <File>
               <FileName>system_stm32f1xx.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\platform\stm32\CMSIS\Device\ST\STM32F1xx\Source\Templates\system_stm32f1xx.c</FilePath>
@@ -418,13 +413,6 @@
         </Group>
         <Group>
           <GroupName>User/IAP</GroupName>
-          <Files>
-            <File>
-              <FileName>bsp_iap.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\BSP\bsp_iap.c</FilePath>
-            </File>
-          </Files>
         </Group>
         <Group>
           <GroupName>Drivers/SYSTEM</GroupName>
@@ -533,16 +521,6 @@
               <FileName>bsp_led.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\Drivers\BSP\bsp_led.c</FilePath>
-            </File>
-            <File>
-              <FileName>bsp_stmflash.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\BSP\bsp_stmflash.c</FilePath>
-            </File>
-            <File>
-              <FileName>bsp_norflash.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\BSP\bsp_norflash.c</FilePath>
             </File>
             <File>
               <FileName>bsp_spi.c</FileName>

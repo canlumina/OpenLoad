@@ -1,12 +1,8 @@
-#include "bsp_iap.h"
 #include "bsp_key.h"
 #include "bsp_led.h"
-#include "bsp_norflash.h"
-#include "bsp_stmflash.h"
 #include "delay.h"
 #include "sys.h"
 #include "usart.h"
-#include "boot.h"
 #include <fal.h>
 #include <string.h>
 #include "easyflash.h"
