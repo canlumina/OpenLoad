@@ -12,10 +12,6 @@
 #include <sfud.h>
 
 #ifdef FAL_USING_SFUD_PORT
-#ifdef RT_USING_SFUD
-#include <spi_flash_sfud.h>
-#endif
-
 #ifndef FAL_USING_NOR_FLASH_DEV_NAME
 #define FAL_USING_NOR_FLASH_DEV_NAME             "norflash0"
 #endif
@@ -38,15 +34,9 @@ struct fal_flash_dev nor_flash0 =
 
 static int init(void)
 {
-
-#ifdef RT_USING_SFUD
-    /* RT-Thread RTOS platform */
-    sfud_dev = rt_sfud_flash_find_by_dev_name(FAL_USING_NOR_FLASH_DEV_NAME);
-#else
     /* bare metal platform */
     extern sfud_flash sfud_norflash0;
     sfud_dev = &sfud_norflash0;
-#endif
 
     if (NULL == sfud_dev)
     {
