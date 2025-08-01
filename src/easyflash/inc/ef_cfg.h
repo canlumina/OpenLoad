@@ -36,7 +36,7 @@
 #define EF_USING_ENV
 
 /* using IAP function */
-#define EF_USING_IAP
+//#define EF_USING_IAP
 
 /* using save log function */
 /* #define EF_USING_LOG */

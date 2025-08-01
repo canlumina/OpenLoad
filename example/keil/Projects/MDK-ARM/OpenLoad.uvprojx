@@ -573,11 +573,6 @@
               <FilePath>..\..\..\..\src\easyflash\src\ef_env.c</FilePath>
             </File>
             <File>
-              <FileName>ef_iap.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\easyflash\src\ef_iap.c</FilePath>
-            </File>
-            <File>
               <FileName>ef_port.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\..\src\easyflash\src\ef_port.c</FilePath>
