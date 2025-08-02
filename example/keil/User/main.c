@@ -27,25 +27,25 @@ int main(void)
     fal_init();
     spi_flash_init();
 
+	  if (fal_test("app") == 0)
+    {
+        log_i("Fal partition (%s) test success!", "app");
+    }
+    else
+    {
+        log_e("Fal partition (%s) test failed!", "app");
+    }
+	
     if (fal_test("env") == 0)
     {
-        // log_i("Fal partition (%s) test success!", "app");
         log_i("Fal partition (%s) test success!", "env");
     }
     else
     {
-        // log_e("Fal partition (%s) test failed!", "app");
         log_e("Fal partition (%s) test failed!", "env");
     }
 
-    if (fal_test("easyflash") == 0)
-    {
-        log_i("Fal partition (%s) test success!", "easyflash");
-    }
-    else
-    {
-        log_e("Fal partition (%s) test failed!", "easyflash");
-    }
+
 
     if (easyflash_init() == EF_NO_ERR)
     {
