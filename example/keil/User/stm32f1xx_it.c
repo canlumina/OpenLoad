@@ -23,7 +23,8 @@
 #include "stm32f1xx_hal.h"
 #include "stm32f1xx_it.h"
 #include "sys.h"
-   
+#include "usart.h"
+
 /** @addtogroup STM32F1xx_HAL_Examples
   * @{
   */
@@ -123,7 +124,7 @@ void DebugMon_Handler(void)
 {
 }
 
-/*******************OS »áÖØ¶¨ÒåPendSV_Handler£¬delay.cÖÐÎÒÃÇ¶¨ÒåÁËSysTick_Handler£¬±ÜÃâÖØ¸´¶¨Òå£¬×¢ÊÍÒÔÏÂÁ½¸öº¯Êý****************************************/
+/*******************OS ï¿½ï¿½ï¿½Ø¶ï¿½ï¿½ï¿½PendSV_Handlerï¿½ï¿½delay.cï¿½ï¿½ï¿½ï¿½ï¿½Ç¶ï¿½ï¿½ï¿½ï¿½ï¿½SysTick_Handlerï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø¸ï¿½ï¿½ï¿½ï¿½å£¬×¢ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½****************************************/
 ///**
 //  * @brief  This function handles PendSVC exception.
 //  * @param  None
@@ -149,7 +150,17 @@ void DebugMon_Handler(void)
 /*  available peripheral interrupt handler's name please refer to the startup */
 /*  file (startup_stm32f1xx.s).                                               */
 /******************************************************************************/
+void USART1_IRQHandler(void)
+{
+  HAL_UART_IRQHandler(&uart1.uart);
 
+  if (__HAL_UART_GET_FLAG(&uart1.uart, UART_FLAG_IDLE))
+  {
+    __HAL_UART_CLEAR_IDLEFLAG(&uart1.uart);
+    uart1.RxCounter += (U1_RX_MAX - __HAL_DMA_GET_COUNTER(&uart1.dmarx));
+    HAL_UART_AbortReceive_IT(&uart1.uart);
+  }
+}
 /**
   * @brief  This function handles PPP interrupt request.
   * @param  None

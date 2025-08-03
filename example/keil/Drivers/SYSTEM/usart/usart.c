@@ -1,10 +1,6 @@
+#include "stm32f1xx_hal.h"
 #include "usart.h"
-#include "sys.h"
-
-/* 如果使用os,则包括下面的头文件即可. */
-#if SYS_SUPPORT_OS
-#include "includes.h" /* os 使用 */
-#endif
+#include "stdio.h"
 
 /******************************************************************************************/
 /* 加入以下代码, 支持printf函数, 而不需要选择use MicroLIB */
@@ -19,8 +15,7 @@ __asm(".global __ARM_use_no_argv \n\t"); /* AC6下需要声明main函数为无�
 /* 使用AC5编译器时, 要在这里定义__FILE 和 不使用半主机模式 */
 #pragma import(__use_no_semihosting)
 
-struct __FILE
-{
+struct __FILE {
     int handle;
     /* Whatever you require here. If the only file you are using is */
     /* standard output using printf() for debugging, no file handling */
@@ -60,127 +55,454 @@ int fputc(int ch, FILE *f)
     return ch;
 }
 #endif
-/******************************************************************************************/
 
-#if USART_EN_RX /*如果使能了接收*/
 
-/* 接收缓冲, 最大USART_REC_LEN个字节. */
-#if (__ARMCC_VERSION >= 6010050)
-uint8_t g_usart_rx_buf[USART_REC_LEN];// __attribute__((section(".bss.ARM.__at_0x20001000")));
-#else
-uint8_t g_usart_rx_buf[USART_REC_LEN] __attribute__((at(0X20001000)));
-#endif
+UCB uart1;
+//UCB uart2;
+//UCB uart3;
 
-/*  接收状态
- *  bit15，      接收完成标志
- *  bit14，      接收到0x0d
- *  bit13~0，    接收到的有效字节数目
- */
-uint16_t g_usart_rx_sta = 0;
+uint8_t U1_RxBuff[U1_RX_SIZE];
+uint8_t U1_TxBuff[U1_TX_SIZE];
 
-uint8_t g_rx_buffer[RXBUFFERSIZE]; /* HAL库使用的串口接收缓冲 */
+//uint8_t U2_RxBuff[U2_RX_SIZE];
+//uint8_t U2_TxBuff[U2_TX_SIZE];
 
-UART_HandleTypeDef g_uart1_handle; /* UART句柄 */
+//uint8_t U3_RxBuff[U3_RX_SIZE];
+//uint8_t U3_TxBuff[U3_TX_SIZE];
 
-/* 接收的字节数 */
-uint32_t g_usart_rx_cnt = 0;
-
-/**
- * @brief       串口X初始化函数
- * @param       baudrate: 波特率, 根据自己需要设置波特率值
- * @note        注意: 必须设置正确的时钟源, 否则串口波特率就会设置异常.
- *              这里的USART的时钟源在sys_stm32_clock_init()函数中已经设置过了.
- * @retval      无
- */
-void usart_init(uint32_t baudrate)
+void u1_init(uint32_t bandrate)
 {
-    /*UART 初始化设置*/
-    g_uart1_handle.Instance = USART_UX;                  /* USART_UX */
-    g_uart1_handle.Init.BaudRate = baudrate;             /* 波特率 */
-    g_uart1_handle.Init.WordLength = UART_WORDLENGTH_8B; /* 字长为8位数据格式 */
-    g_uart1_handle.Init.StopBits = UART_STOPBITS_1;      /* 一个停止位 */
-    g_uart1_handle.Init.Parity = UART_PARITY_NONE;       /* 无奇偶校验位 */
-    g_uart1_handle.Init.HwFlowCtl = UART_HWCONTROL_NONE; /* 无硬件流控 */
-    g_uart1_handle.Init.Mode = UART_MODE_TX_RX;          /* 收发模式 */
-    HAL_UART_Init(&g_uart1_handle);                      /* HAL_UART_Init()会使能UART1 */
-
-    /* 该函数会开启接收中断：标志位UART_IT_RXNE，并且设置接收缓冲以及接收缓冲接收最大数据量 */
-    HAL_UART_Receive_IT(&g_uart1_handle, (uint8_t *)g_rx_buffer, RXBUFFERSIZE);
+	uart1.uart.Instance = USART1;
+	uart1.uart.Init.BaudRate = bandrate;
+	uart1.uart.Init.WordLength = UART_WORDLENGTH_8B;
+	uart1.uart.Init.StopBits = UART_STOPBITS_1;
+	uart1.uart.Init.Parity = UART_PARITY_NONE;
+	uart1.uart.Init.Mode = UART_MODE_TX_RX;
+	uart1.uart.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	HAL_UART_Init(&uart1.uart);
+	u1_ptrinit();
 }
+void u1_ptrinit(void)
+{
+	uart1.RxInPtr = &uart1.RxLocation[0];
+	uart1.RxOutPtr = &uart1.RxLocation[0];
+	uart1.RxEndPtr = &uart1.RxLocation[9];
+	uart1.RxCounter = 0;
+	uart1.RxInPtr->start = U1_RxBuff;
 
-/**
- * @brief       UART底层初始化函数
- * @param       huart: UART句柄类型指针
- * @note        此函数会被HAL_UART_Init()调用
- *              完成时钟使能，引脚配置，中断配置
- * @retval      无
- */
+	uart1.TxInPtr = &uart1.TxLocation[0];
+	uart1.TxOutPtr = &uart1.TxLocation[0];
+	uart1.TxEndPtr = &uart1.TxLocation[9];
+	uart1.TxCounter = 0;
+	uart1.TxInPtr->start = U1_TxBuff;
+
+	__HAL_UART_ENABLE_IT(&uart1.uart, UART_IT_IDLE);
+	HAL_UART_Receive_DMA(&uart1.uart, uart1.RxInPtr->start, U1_RX_MAX);
+}
+void u1_txdata(uint8_t *data, uint32_t data_len)
+{
+	if ((U1_TX_SIZE - uart1.TxCounter) >= data_len)
+	{
+		uart1.TxInPtr->start = &U1_TxBuff[uart1.TxCounter];
+	}
+	else
+	{
+		uart1.TxCounter = 0;
+		uart1.TxInPtr->start = U1_TxBuff;
+	}
+	memcpy(uart1.TxInPtr->start, data, data_len);
+	uart1.TxCounter += data_len;
+	uart1.TxInPtr->end = &U1_TxBuff[uart1.TxCounter - 1];
+	uart1.TxInPtr++;
+	if (uart1.TxInPtr == uart1.TxEndPtr)
+	{
+		uart1.TxInPtr = &uart1.TxLocation[0];
+	}
+}
+void u1_printf(char *fmt, ...)
+{
+	uint8_t tempbuff[256];
+	uint16_t i;
+	va_list ap;
+	va_start(ap, fmt);
+	vsprintf((char *)tempbuff, fmt, ap);
+	va_end(ap);
+
+	for (i = 0; i < strlen((char *)tempbuff); i++)
+	{
+		while (!__HAL_UART_GET_FLAG(&uart1.uart, UART_FLAG_TXE))
+			;
+		uart1.uart.Instance->DR = tempbuff[i];
+	}
+	while (!__HAL_UART_GET_FLAG(&uart1.uart, UART_FLAG_TC))
+		;
+}
+//void u2_init(uint32_t bandrate)
+//{
+//	uart2.uart.Instance = USART2;
+//	uart2.uart.Init.BaudRate = bandrate;
+//	uart2.uart.Init.WordLength = UART_WORDLENGTH_8B;
+//	uart2.uart.Init.StopBits = UART_STOPBITS_1;
+//	uart2.uart.Init.Parity = UART_PARITY_NONE;
+//	uart2.uart.Init.Mode = UART_MODE_TX_RX;
+//	uart2.uart.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+//	HAL_UART_Init(&uart2.uart);
+//	u2_ptrinit();
+//}
+//void u2_ptrinit(void)
+//{
+//	uart2.RxInPtr = &uart2.RxLocation[0];
+//	uart2.RxOutPtr = &uart2.RxLocation[0];
+//	uart2.RxEndPtr = &uart2.RxLocation[9];
+//	uart2.RxCounter = 0;
+//	uart2.RxInPtr->start = U2_RxBuff;
+
+//	uart2.TxInPtr = &uart2.TxLocation[0];
+//	uart2.TxOutPtr = &uart2.TxLocation[0];
+//	uart2.TxEndPtr = &uart2.TxLocation[9];
+//	uart2.TxCounter = 0;
+//	uart2.TxInPtr->start = U2_TxBuff;
+
+//	__HAL_UART_ENABLE_IT(&uart2.uart, UART_IT_IDLE);
+//	HAL_UART_Receive_DMA(&uart2.uart, uart2.RxInPtr->start, U2_RX_MAX);
+//}
+//void u2_txdata(uint8_t *data, uint32_t data_len)
+//{
+//	if ((U2_TX_SIZE - uart2.TxCounter) >= data_len)
+//	{
+//		uart2.TxInPtr->start = &U2_TxBuff[uart2.TxCounter];
+//	}
+//	else
+//	{
+//		uart2.TxCounter = 0;
+//		uart2.TxInPtr->start = U2_TxBuff;
+//	}
+//	memcpy(uart2.TxInPtr->start, data, data_len);
+//	uart2.TxCounter += data_len;
+//	uart2.TxInPtr->end = &U2_TxBuff[uart2.TxCounter - 1];
+//	uart2.TxInPtr++;
+//	if (uart2.TxInPtr == uart2.TxEndPtr)
+//	{
+//		uart2.TxInPtr = &uart2.TxLocation[0];
+//	}
+//}
+//void u2_printf(char *fmt, ...)
+//{
+//	uint8_t tempbuff[256];
+//	uint16_t i;
+//	va_list ap;
+//	va_start(ap, fmt);
+//	vsprintf((char *)tempbuff, fmt, ap);
+//	va_end(ap);
+
+//	for (i = 0; i < strlen((char *)tempbuff); i++)
+//	{
+//		while (!__HAL_UART_GET_FLAG(&uart2.uart, UART_FLAG_TXE))
+//			;
+//		uart2.uart.Instance->DR = tempbuff[i];
+//	}
+//	while (!__HAL_UART_GET_FLAG(&uart2.uart, UART_FLAG_TC))
+//		;
+//}
+//void u3_init(uint32_t bandrate)
+//{
+//	uart3.uart.Instance = USART3;
+//	uart3.uart.Init.BaudRate = bandrate;
+//	uart3.uart.Init.WordLength = UART_WORDLENGTH_8B;
+//	uart3.uart.Init.StopBits = UART_STOPBITS_1;
+//	uart3.uart.Init.Parity = UART_PARITY_NONE;
+//	uart3.uart.Init.Mode = UART_MODE_TX_RX;
+//	uart3.uart.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+//	HAL_UART_Init(&uart3.uart);
+//	u3_ptrinit();
+//}
+//void u3_ptrinit(void)
+//{
+//	uart3.RxInPtr = &uart3.RxLocation[0];
+//	uart3.RxOutPtr = &uart3.RxLocation[0];
+//	uart3.RxEndPtr = &uart3.RxLocation[9];
+//	uart3.RxCounter = 0;
+//	uart3.RxInPtr->start = U3_RxBuff;
+
+//	uart3.TxInPtr = &uart3.TxLocation[0];
+//	uart3.TxOutPtr = &uart3.TxLocation[0];
+//	uart3.TxEndPtr = &uart3.TxLocation[9];
+//	uart3.TxCounter = 0;
+//	uart3.TxInPtr->start = U3_TxBuff;
+
+//	__HAL_UART_ENABLE_IT(&uart3.uart, UART_IT_IDLE);
+//	HAL_UART_Receive_DMA(&uart3.uart, uart3.RxInPtr->start, U3_RX_MAX);
+//}
+//void u3_txdata(uint8_t *data, uint32_t data_len)
+//{
+//	if ((U3_TX_SIZE - uart3.TxCounter) >= data_len)
+//	{
+//		uart3.TxInPtr->start = &U3_TxBuff[uart3.TxCounter];
+//	}
+//	else
+//	{
+//		uart3.TxCounter = 0;
+//		uart3.TxInPtr->start = U3_TxBuff;
+//	}
+//	memcpy(uart3.TxInPtr->start, data, data_len);
+//	uart3.TxCounter += data_len;
+//	uart3.TxInPtr->end = &U3_TxBuff[uart3.TxCounter - 1];
+//	uart3.TxInPtr++;
+//	if (uart3.TxInPtr == uart3.TxEndPtr)
+//	{
+//		uart3.TxInPtr = &uart3.TxLocation[0];
+//	}
+//}
+//void u3_printf(char *fmt, ...)
+//{
+//	uint8_t tempbuff[256];
+//	uint16_t i;
+//	va_list ap;
+//	va_start(ap, fmt);
+//	vsprintf((char *)tempbuff, fmt, ap);
+//	va_end(ap);
+
+//	for (i = 0; i < strlen((char *)tempbuff); i++)
+//	{
+//		while (!__HAL_UART_GET_FLAG(&uart3.uart, UART_FLAG_TXE))
+//			;
+//		uart3.uart.Instance->DR = tempbuff[i];
+//	}
+//	while (!__HAL_UART_GET_FLAG(&uart3.uart, UART_FLAG_TC))
+//		;
+//}
 void HAL_UART_MspInit(UART_HandleTypeDef *huart)
 {
-    GPIO_InitTypeDef gpio_init_struct;
 
-    if (huart->Instance == USART_UX) /* 如果是串口1，进行串口1 MSP初始化 */
-    {
-        USART_TX_GPIO_CLK_ENABLE(); /* 使能串口TX脚时钟 */
-        USART_RX_GPIO_CLK_ENABLE(); /* 使能串口RX脚时钟 */
-        USART_UX_CLK_ENABLE();      /* 使能串口时钟 */
+	GPIO_InitTypeDef GPIO_InitType;
 
-        gpio_init_struct.Pin = USART_TX_GPIO_PIN;      /* 串口发送引脚号 */
-        gpio_init_struct.Mode = GPIO_MODE_AF_PP;       /* 复用推挽输出 */
-        gpio_init_struct.Pull = GPIO_PULLUP;           /* 上拉 */
-        gpio_init_struct.Speed = GPIO_SPEED_FREQ_HIGH; /* IO速度设置为高速 */
-        HAL_GPIO_Init(USART_TX_GPIO_PORT, &gpio_init_struct);
+	if (huart->Instance == USART1)
+	{
 
-        gpio_init_struct.Pin = USART_RX_GPIO_PIN; /* 串口RX脚 模式设置 */
-        gpio_init_struct.Mode = GPIO_MODE_AF_INPUT;
-        HAL_GPIO_Init(USART_RX_GPIO_PORT, &gpio_init_struct); /* 串口RX脚 必须设置成输入模式 */
+		__HAL_RCC_GPIOA_CLK_ENABLE();
+		__HAL_RCC_USART1_CLK_ENABLE();
+		__HAL_RCC_DMA1_CLK_ENABLE();
 
-#if USART_EN_RX
-        HAL_NVIC_EnableIRQ(USART_UX_IRQn);         /* 使能USART1中断通道 */
-        HAL_NVIC_SetPriority(USART_UX_IRQn, 3, 3); /* 组2，最低优先级:抢占优先级3，子优先级3 */
-#endif
-    }
+		GPIO_InitType.Pin = GPIO_PIN_9;
+		GPIO_InitType.Mode = GPIO_MODE_AF_PP;
+		GPIO_InitType.Speed = GPIO_SPEED_FREQ_MEDIUM;
+		HAL_GPIO_Init(GPIOA, &GPIO_InitType);
+
+		GPIO_InitType.Pin = GPIO_PIN_10;
+		GPIO_InitType.Mode = GPIO_MODE_AF_INPUT;
+		GPIO_InitType.Pull = GPIO_NOPULL;
+		HAL_GPIO_Init(GPIOA, &GPIO_InitType);
+
+		HAL_NVIC_SetPriority(USART1_IRQn, 3, 0);
+		HAL_NVIC_EnableIRQ(USART1_IRQn);
+
+		uart1.dmatx.Instance = DMA1_Channel4;
+		uart1.dmatx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+		uart1.dmatx.Init.PeriphInc = DMA_PINC_DISABLE;
+		uart1.dmatx.Init.MemInc = DMA_MINC_ENABLE;
+		uart1.dmatx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+		uart1.dmatx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+		uart1.dmatx.Init.Mode = DMA_NORMAL;
+		uart1.dmatx.Init.Priority = DMA_PRIORITY_MEDIUM;
+		__HAL_LINKDMA(huart, hdmatx, uart1.dmatx);
+		HAL_DMA_Init(&uart1.dmatx);
+
+		HAL_NVIC_SetPriority(DMA1_Channel4_IRQn, 3, 0);
+		HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+
+		uart1.dmarx.Instance = DMA1_Channel5;
+		uart1.dmarx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+		uart1.dmarx.Init.PeriphInc = DMA_PINC_DISABLE;
+		uart1.dmarx.Init.MemInc = DMA_MINC_ENABLE;
+		uart1.dmarx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+		uart1.dmarx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+		uart1.dmarx.Init.Mode = DMA_NORMAL;
+		uart1.dmarx.Init.Priority = DMA_PRIORITY_MEDIUM;
+		__HAL_LINKDMA(huart, hdmarx, uart1.dmarx);
+		HAL_DMA_Init(&uart1.dmarx);
+
+		HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 3, 0);
+		HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
+	}
+//	else if (huart->Instance == USART2)
+//	{
+//		__HAL_RCC_GPIOA_CLK_ENABLE();
+//		__HAL_RCC_USART2_CLK_ENABLE();
+//		__HAL_RCC_DMA1_CLK_ENABLE();
+
+//		GPIO_InitType.Pin = GPIO_PIN_2;
+//		GPIO_InitType.Mode = GPIO_MODE_AF_OD;
+//		GPIO_InitType.Speed = GPIO_SPEED_FREQ_MEDIUM;
+//		HAL_GPIO_Init(GPIOA, &GPIO_InitType);
+
+//		GPIO_InitType.Pin = GPIO_PIN_3;
+//		GPIO_InitType.Mode = GPIO_MODE_AF_INPUT;
+//		GPIO_InitType.Pull = GPIO_NOPULL;
+//		HAL_GPIO_Init(GPIOA, &GPIO_InitType);
+
+//		HAL_NVIC_SetPriority(USART2_IRQn, 3, 0);
+//		HAL_NVIC_EnableIRQ(USART2_IRQn);
+
+//		uart2.dmatx.Instance = DMA1_Channel7;
+//		uart2.dmatx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+//		uart2.dmatx.Init.PeriphInc = DMA_PINC_DISABLE;
+//		uart2.dmatx.Init.MemInc = DMA_MINC_ENABLE;
+//		uart2.dmatx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+//		uart2.dmatx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+//		uart2.dmatx.Init.Mode = DMA_NORMAL;
+//		uart2.dmatx.Init.Priority = DMA_PRIORITY_MEDIUM;
+//		__HAL_LINKDMA(huart, hdmatx, uart2.dmatx);
+//		HAL_DMA_Init(&uart2.dmatx);
+
+//		HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 3, 0);
+//		HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
+
+//		uart2.dmarx.Instance = DMA1_Channel6;
+//		uart2.dmarx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+//		uart2.dmarx.Init.PeriphInc = DMA_PINC_DISABLE;
+//		uart2.dmarx.Init.MemInc = DMA_MINC_ENABLE;
+//		uart2.dmarx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+//		uart2.dmarx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+//		uart2.dmarx.Init.Mode = DMA_NORMAL;
+//		uart2.dmarx.Init.Priority = DMA_PRIORITY_MEDIUM;
+//		__HAL_LINKDMA(huart, hdmarx, uart2.dmarx);
+//		HAL_DMA_Init(&uart2.dmarx);
+
+//		HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 3, 0);
+//		HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
+//	}
+//	else if (huart->Instance == USART3)
+//	{
+//		__HAL_RCC_GPIOB_CLK_ENABLE();
+//		__HAL_RCC_USART3_CLK_ENABLE();
+//		__HAL_RCC_DMA1_CLK_ENABLE();
+
+//		GPIO_InitType.Pin = GPIO_PIN_10;
+//		GPIO_InitType.Mode = GPIO_MODE_AF_OD;
+//		GPIO_InitType.Speed = GPIO_SPEED_FREQ_MEDIUM;
+//		HAL_GPIO_Init(GPIOB, &GPIO_InitType);
+
+//		GPIO_InitType.Pin = GPIO_PIN_11;
+//		GPIO_InitType.Mode = GPIO_MODE_AF_INPUT;
+//		GPIO_InitType.Pull = GPIO_NOPULL;
+//		HAL_GPIO_Init(GPIOB, &GPIO_InitType);
+
+//		HAL_NVIC_SetPriority(USART3_IRQn, 3, 0);
+//		HAL_NVIC_EnableIRQ(USART3_IRQn);
+
+//		uart3.dmatx.Instance = DMA1_Channel2;
+//		uart3.dmatx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+//		uart3.dmatx.Init.PeriphInc = DMA_PINC_DISABLE;
+//		uart3.dmatx.Init.MemInc = DMA_MINC_ENABLE;
+//		uart3.dmatx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+//		uart3.dmatx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+//		uart3.dmatx.Init.Mode = DMA_NORMAL;
+//		uart3.dmatx.Init.Priority = DMA_PRIORITY_MEDIUM;
+//		__HAL_LINKDMA(huart, hdmatx, uart3.dmatx);
+//		HAL_DMA_Init(&uart3.dmatx);
+
+//		HAL_NVIC_SetPriority(DMA1_Channel2_IRQn, 3, 0);
+//		HAL_NVIC_EnableIRQ(DMA1_Channel2_IRQn);
+
+//		uart3.dmarx.Instance = DMA1_Channel3;
+//		uart3.dmarx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+//		uart3.dmarx.Init.PeriphInc = DMA_PINC_DISABLE;
+//		uart3.dmarx.Init.MemInc = DMA_MINC_ENABLE;
+//		uart3.dmarx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+//		uart3.dmarx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+//		uart3.dmarx.Init.Mode = DMA_NORMAL;
+//		uart3.dmarx.Init.Priority = DMA_PRIORITY_MEDIUM;
+//		__HAL_LINKDMA(huart, hdmarx, uart3.dmarx);
+//		HAL_DMA_Init(&uart3.dmarx);
+
+//		HAL_NVIC_SetPriority(DMA1_Channel3_IRQn, 3, 0);
+//		HAL_NVIC_EnableIRQ(DMA1_Channel3_IRQn);
+//	}
 }
-
-/**
- * @brief       串口数据接收回调函数
-                数据处理在这里进行
- * @param       huart:串口句柄
- * @retval      无
- */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    if (huart->Instance == USART_UX) /* 如果是串口1 */
-    {
-        if (g_usart_rx_cnt < USART_REC_LEN)
-        {
-            g_usart_rx_buf[g_usart_rx_cnt] = g_rx_buffer[0];
-            g_usart_rx_cnt++;
-        }
-    }
+	if (huart->Instance == USART1)
+	{
+	}
 }
-
-/**
- * @brief       串口X中断服务函数
-                注意,读取USARTx->SR能避免莫名其妙的错误
- * @param       无
- * @retval      无
- */
-void USART_UX_IRQHandler(void)
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
-#if SYS_SUPPORT_OS /* 使用OS */
-    OSIntEnter();
-#endif
-    HAL_UART_IRQHandler(&g_uart1_handle); /* 调用HAL库中断处理公用函数 */
-
-    while (HAL_UART_Receive_IT(&g_uart1_handle, (uint8_t *)g_rx_buffer, RXBUFFERSIZE) !=
-           HAL_OK) /* 重新开启中断并接收数据 */
-    {
-        /* 如果出错会卡死在这里 */
-    }
-
-#if SYS_SUPPORT_OS /* 使用OS */
-    OSIntExit();
-#endif
+	if (huart->Instance == USART1)
+	{
+	}
 }
-#endif
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART1)
+	{
+		uart1.TxState = 0;
+	}
+//	else if (huart->Instance == USART2)
+//	{
+//		uart2.TxState = 0;
+//	}
+//	else if (huart->Instance == USART3)
+//	{
+//		uart3.TxState = 0;
+//	}
+}
+void HAL_UART_AbortReceiveCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART1)
+	{
+		uart1.RxInPtr->end = &U1_RxBuff[uart1.RxCounter - 1];
+		uart1.RxInPtr++;
+		if (uart1.RxInPtr == uart1.RxEndPtr)
+		{
+			uart1.RxInPtr = &uart1.RxLocation[0];
+		}
+		if ((U1_RX_SIZE - uart1.RxCounter) < U1_RX_MAX)
+		{
+			uart1.RxCounter = 0;
+			uart1.RxInPtr->start = U1_RxBuff;
+		}
+		else
+		{
+			uart1.RxInPtr->start = &U1_RxBuff[uart1.RxCounter];
+		}
+		HAL_UART_Receive_DMA(&uart1.uart, uart1.RxInPtr->start, U1_RX_MAX);
+	}
+//	else if (huart->Instance == USART2)
+//	{
+//		uart2.RxInPtr->end = &U2_RxBuff[uart2.RxCounter - 1];
+//		uart2.RxInPtr++;
+//		if (uart2.RxInPtr == uart2.RxEndPtr)
+//		{
+//			uart2.RxInPtr = &uart2.RxLocation[0];
+//		}
+//		if ((U2_RX_SIZE - uart2.RxCounter) < U2_RX_MAX)
+//		{
+//			uart2.RxCounter = 0;
+//			uart2.RxInPtr->start = U2_RxBuff;
+//		}
+//		else
+//		{
+//			uart2.RxInPtr->start = &U2_RxBuff[uart2.RxCounter];
+//		}
+//		HAL_UART_Receive_DMA(&uart2.uart, uart2.RxInPtr->start, U2_RX_MAX);
+//	}
+//	else if (huart->Instance == USART3)
+//	{
+//		uart3.RxInPtr->end = &U3_RxBuff[uart3.RxCounter - 1];
+//		uart3.RxInPtr++;
+//		if (uart3.RxInPtr == uart3.RxEndPtr)
+//		{
+//			uart3.RxInPtr = &uart3.RxLocation[0];
+//		}
+//		if ((U3_RX_SIZE - uart3.RxCounter) < U3_RX_MAX)
+//		{
+//			uart3.RxCounter = 0;
+//			uart3.RxInPtr->start = U3_RxBuff;
+//		}
+//		else
+//		{
+//			uart3.RxInPtr->start = &U3_RxBuff[uart3.RxCounter];
+//		}
+//		HAL_UART_Receive_DMA(&uart3.uart, uart3.RxInPtr->start, U3_RX_MAX);
+//	}
+}
