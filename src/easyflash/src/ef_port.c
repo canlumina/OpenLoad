@@ -28,9 +28,10 @@
 
 #include <easyflash.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <stm32f1xx_hal_conf.h>
+#include <sfud.h>
 
 /* default environment variables set for user */
 static const ef_env default_env_set[] = {
@@ -56,6 +57,8 @@ EfErrCode ef_port_init(ef_env const **default_env, size_t *default_env_size) {
 
     *default_env = default_env_set;
     *default_env_size = sizeof(default_env_set) / sizeof(default_env_set[0]);
+    /* initialize SFUD library for SPI Flash */
+    sfud_init();
 
     return result;
 }
@@ -72,13 +75,9 @@ EfErrCode ef_port_init(ef_env const **default_env, size_t *default_env_size) {
  */
 EfErrCode ef_port_read(uint32_t addr, uint32_t *buf, size_t size) {
     EfErrCode result = EF_NO_ERR;
-    uint8_t *buf_8 = (uint8_t *)buf;
-    size_t i;
+    const sfud_flash *flash = sfud_get_device_table() + SFUD_XXXX_DEVICE_INDEX;
 
-    /*copy from flash to ram */
-    for (i = 0; i < size; i++, addr ++, buf_8++) {
-        *buf_8 = *(uint8_t *) addr;
-    }
+    sfud_read(flash, addr, size, (uint8_t *)buf);
 
     return result;
 }
@@ -95,31 +94,20 @@ EfErrCode ef_port_read(uint32_t addr, uint32_t *buf, size_t size) {
  */
 EfErrCode ef_port_erase(uint32_t addr, size_t size) {
     EfErrCode result = EF_NO_ERR;
-
-    /* make sure the start address is a multiple of EF_ERASE_MIN_SIZE */
+    sfud_err sfud_result = SFUD_SUCCESS;
+    const sfud_flash *flash = sfud_get_device_table() + SFUD_XXXX_DEVICE_INDEX;
+    
+    /* make sure the start address is a multiple of FLASH_ERASE_MIN_SIZE */
     EF_ASSERT(addr % EF_ERASE_MIN_SIZE == 0);
+    
+    sfud_result = sfud_erase(flash, addr, size);
 
-    /* You can add your code under here. */
-		HAL_FLASH_Unlock();
-		
-		__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPERR);
-	
-    /* Erase FLASH*/
-    FLASH_EraseInitTypeDef FlashSet;
-    FlashSet.TypeErase = FLASH_TYPEERASE_PAGES;
-    FlashSet.PageAddress = addr;
-    FlashSet.NbPages = (size + EF_ERASE_MIN_SIZE -1)/ EF_ERASE_MIN_SIZE;
+    if(sfud_result != SFUD_SUCCESS) {
+        result = EF_ERASE_ERR;
+    }
 
-    /*Set PageError and call the erase function*/
-    uint32_t PageError = 0;
-    if (HAL_FLASHEx_Erase(&FlashSet, &PageError) != HAL_OK)
-			result = EF_ERASE_ERR;
-
-    HAL_FLASH_Lock();
     return result;
 }
-
-
 /**
  * Write data to flash.
  * @note This operation's units is word.
@@ -133,24 +121,15 @@ EfErrCode ef_port_erase(uint32_t addr, size_t size) {
  */
 EfErrCode ef_port_write(uint32_t addr, const uint32_t *buf, size_t size) {
     EfErrCode result = EF_NO_ERR;
-    
-    /* You can add your code under here. */
-		size_t i;
-    uint32_t read_data;
+    sfud_err sfud_result = SFUD_SUCCESS;
+    const sfud_flash *flash = sfud_get_device_table() + SFUD_XXXX_DEVICE_INDEX;
 
-    HAL_FLASH_Unlock();
-    __HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_BSY | FLASH_FLAG_EOP | FLASH_FLAG_PGERR | FLASH_FLAG_WRPERR);
-    for (i = 0; i < size; i += 4, buf++, addr += 4) {
-        /* write data */
-        HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr, (uint64_t)*buf);
-        read_data = *(uint32_t *)addr;
-        /* check data */
-        if (read_data != *buf) {
-            result = EF_WRITE_ERR;
-            break;
-        }
+    sfud_result = sfud_write(flash, addr, size, (const uint8_t *)buf);
+
+    if(sfud_result != SFUD_SUCCESS) {
+        result = EF_WRITE_ERR;
     }
-    HAL_FLASH_Lock();
+
     return result;
 }
 

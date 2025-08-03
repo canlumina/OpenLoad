@@ -41,7 +41,7 @@ enum {
 
 #define SFUD_FLASH_DEVICE_TABLE                                                \
 {                                                                              \
-    [SFUD_XXXX_DEVICE_INDEX] = {.name = "XXXX", .spi.name = "SPIX"},           \
+    [SFUD_XXXX_DEVICE_INDEX] = {.name = "W25Q64FV", .spi.name = "SPI2"},           \
 }
 
 int spi_flash_init(void);
