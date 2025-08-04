@@ -161,6 +161,16 @@ void USART1_IRQHandler(void)
     HAL_UART_AbortReceive_IT(&uart1.uart);
   }
 }
+void USART2_IRQHandler(void)
+{
+	HAL_UART_IRQHandler(&uart2.uart);
+	
+	if(__HAL_UART_GET_FLAG(&uart2.uart, UART_FLAG_IDLE)){
+		__HAL_UART_CLEAR_IDLEFLAG(&uart2.uart);
+		uart2.RxCounter += (U2_RX_MAX - uart2.uart.RxXferCount);
+		HAL_UART_AbortReceive_IT(&uart2.uart);
+	}
+}
 /**
   * @brief  This function handles PPP interrupt request.
   * @param  None

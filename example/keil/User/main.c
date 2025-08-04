@@ -20,6 +20,7 @@ int main(void)
     sys_stm32_clock_init(RCC_PLL_MUL9); /* 设置时钟, 72Mhz */
     delay_init(72);                     /* 延时初始化 */
     u1_init(115200);                 		/* 串口初始化为115200 */
+		u2_init(115200);                 		/* 串口初始化为115200 */
     led_init();                         /* 初始化LED */
     key_init();                         /* 初始化按键 */
                                         // W25QXX_Init();                      // W25QXX初始化();
