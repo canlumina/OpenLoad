@@ -19,8 +19,8 @@ int main(void)
     HAL_Init();                         /* 初始化HAL库 */
     sys_stm32_clock_init(RCC_PLL_MUL9); /* 设置时钟, 72Mhz */
     delay_init(72);                     /* 延时初始化 */
-    u1_init(115200);                 		/* 串口初始化为115200 */
-		u2_init(115200);                 		/* 串口初始化为115200 */
+    u1_init(115200);                    /* 串口初始化为115200 */
+    u2_init(115200);                    /* 串口初始化为115200 */
     led_init();                         /* 初始化LED */
     key_init();                         /* 初始化按键 */
                                         // W25QXX_Init();                      // W25QXX初始化();
@@ -28,7 +28,7 @@ int main(void)
     fal_init();
     spi_flash_init();
 
-	  if (fal_test("app") == 0)
+    if (fal_test("app") == 0)
     {
         log_i("Fal partition (%s) test success!", "app");
     }
@@ -36,7 +36,7 @@ int main(void)
     {
         log_e("Fal partition (%s) test failed!", "app");
     }
-	
+
     if (fal_test("env") == 0)
     {
         log_i("Fal partition (%s) test success!", "env");
@@ -45,8 +45,6 @@ int main(void)
     {
         log_e("Fal partition (%s) test failed!", "env");
     }
-
-
 
     if (easyflash_init() == EF_NO_ERR)
     {
