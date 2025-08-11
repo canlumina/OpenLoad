@@ -8,6 +8,7 @@
 #include "usart.h"
 #include <fal.h>
 #include <stdio.h>
+#include "bootloader.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,13 +32,8 @@ int main(void) {
     /* 关闭stdout缓冲，确保即时输出 */
 
     setvbuf(stdout, NULL, _IONBF, 0);
-    printf("Boot OK on USART1 @115200, use linux ttyUSB0 output...\r\n");
-
-    if (fal_test("app") == 0) {
-        log_i("Fal partition (%s) test success!", "app");
-    } else {
-        log_e("Fal partition (%s) test failed!", "app");
-    }
+    printf("Boot OK on USART1 @115200\r\n");
+    bootloader_main();
 
     // if (fal_test("env") == 0)
     // {
@@ -54,9 +50,7 @@ int main(void) {
     //     test_env();
     // }
 
-    while (1) {
-        delay_ms(500);
-    }
+    while (1) { delay_ms(500); }
     return 0;
 }
 
