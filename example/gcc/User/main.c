@@ -31,7 +31,7 @@ int main(void) {
     /* 关闭stdout缓冲，确保即时输出 */
 
     setvbuf(stdout, NULL, _IONBF, 0);
-    printf("Boot OK on USART1 @115200\r\n");
+    printf("Boot OK on USART1 @115200, use linux ttyUSB0 output...\r\n");
 
     if (fal_test("app") == 0) {
         log_i("Fal partition (%s) test success!", "app");
