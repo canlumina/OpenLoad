@@ -36,6 +36,7 @@
 *.i*86
 *.x86_64
 *.hex
+*.bin
 
 # Debug files
 *.dSYM/
@@ -63,3 +64,15 @@ example/keil/Projects/MDK-ARM/*.uvguix.*
 example/keil/Projects/MDK-ARM/*.uvoptx
 example/keil/Projects/MDK-ARM/*.scvd
 !example/keil/Projects/MDK-ARM/*.uvprojx
+
+# GCC example build artifacts
+example/gcc/build/
+example/gcc/build-*/
+example/gcc/**/CMakeCache.txt
+example/gcc/**/CMakeFiles/
+example/gcc/**/cmake_install.cmake
+example/gcc/**/Makefile
+example/gcc/**/compile_commands.json
+example/gcc/**/*.ninja
+example/gcc/**/.ninja_*
+example/gcc/**/rules.ninja
