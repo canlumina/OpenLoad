@@ -65,6 +65,8 @@ if(BUILD_OPENLOAD_EXAMPLE)
     ./User/main.c
     ./User/stm32f1xx_it.c
     ./User/bootloader.c
+    ./User/xmodem.c
+    ./User/ymodem.c
     ./User/syscalls.c
     ../platform/stm32/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
     ../platform/stm32/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103xe.S
