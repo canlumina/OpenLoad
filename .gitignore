@@ -56,6 +56,8 @@ dkms.conf
 # debug information files
 *.dwo
 
+build/
+
 # Ignore Keil project files and workspace settings
 example/keil/Output/
 example/keil/Projects/MDK-ARM/DebugConfig/
