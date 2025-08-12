@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "stm32f1xx_hal_dma.h": "c",
+        "stm32f1xx_hal_uart.h": "c",
+        "delay.h": "c",
+        "bsp_esp8266.h": "c",
+        "usart.h": "c"
+    },
+    "cmake.sourceDirectory": "E:/stm32/OpenLoad/example/gcc",
+    "cmake.configureSettings": {
+        "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/example/gcc/cmake/arm-gcc-toolchain.cmake"
+    }
+}

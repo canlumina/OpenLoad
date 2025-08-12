@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "OpenOCD Download & Debug",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "openocd",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/example/gcc/build/OpenLoad.elf",
+            "device": "STM32F103C8",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32f1x.cfg"
+            ],
+            "svdFile": "${workspaceFolder}/.vscode/STM32F103.svd",
+            "preLaunchTask": "CMake Build",
+            "runToMain": true
+        }
+    ]
+}
