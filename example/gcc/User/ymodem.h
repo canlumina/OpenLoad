@@ -24,8 +24,11 @@
 #define YMODEM_CANCELLED    -2
 #define YMODEM_TIMEOUT      -3
 
+#include <fal.h>
+
 // Function prototypes
 int ymodem_receive(UART_HandleTypeDef *huart, uint8_t *buffer, uint32_t buffer_size, uint32_t *received_size, char *filename, uint32_t *file_size);
+int ymodem_receive_to_flash(UART_HandleTypeDef *huart, const struct fal_partition *part, uint32_t *received_size, char *filename, uint32_t *file_size, uint32_t *fw_crc);
 int ymodem_send(UART_HandleTypeDef *huart, uint8_t *buffer, uint32_t buffer_size, const char *filename);
 
 #endif // __YMODEM_H

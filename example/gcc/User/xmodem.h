@@ -23,8 +23,11 @@
 #define XMODEM_CANCELLED    -2
 #define XMODEM_TIMEOUT      -3
 
+#include <fal.h>
+
 // Function prototypes
 int xmodem_receive(UART_HandleTypeDef *huart, uint8_t *buffer, uint32_t buffer_size, uint32_t *received_size);
+int xmodem_receive_to_flash(UART_HandleTypeDef *huart, const struct fal_partition *part, uint32_t *received_size, uint32_t *fw_crc);
 int xmodem_send(UART_HandleTypeDef *huart, uint8_t *buffer, uint32_t buffer_size);
 
 #endif // __XMODEM_H

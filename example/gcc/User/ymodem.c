@@ -2,6 +2,8 @@
 #include "stm32f1xx_hal.h"
 #include <string.h>
 #include <stdlib.h>
+#include <fal.h>
+#include "crc32.h"
 
 // CRC calculation for YMODEM
 static uint16_t ymodem_crc_update(uint16_t crc, uint8_t data) {
@@ -72,7 +74,8 @@ static int ymodem_receive_packet(UART_HandleTypeDef *huart, uint8_t *packet, uin
     // Check for EOT
     if (header == EOT) {
         ymodem_send_byte(huart, ACK);
-        return YMODEM_OK; // End of transmission
+        *packet_size = 0; // Mark as EOT
+        return YMODEM_OK; 
     }
     
     // Check header type
@@ -101,6 +104,12 @@ static int ymodem_receive_packet(UART_HandleTypeDef *huart, uint8_t *packet, uin
     
     // Verify expected packet number (unless it's the first packet)
     if (expected_packet_num != 0 && *packet_num != expected_packet_num) {
+        // Handle retransmission of the same packet
+        if (*packet_num == (uint8_t)(expected_packet_num - 1)) {
+            // This is a retransmission of the previous packet, just ACK it
+            ymodem_send_byte(huart, ACK);
+            return YMODEM_OK; // Or a new status code for duplicate packet
+        }
         return YMODEM_ERROR;
     }
     
@@ -140,7 +149,7 @@ int ymodem_receive(UART_HandleTypeDef *huart, uint8_t *buffer, uint32_t buffer_s
     int file_info_received = 0;
     
     // Send 'C' to start transfer in CRC mode
-    ymodem_send_byte(huart, C);
+    ymodem_send_byte(huart, 'C');
     
     while (total_received < buffer_size && retries < max_retries) {
         int result = ymodem_receive_packet(huart, packet, &packet_size, &packet_num);
@@ -165,7 +174,7 @@ int ymodem_receive(UART_HandleTypeDef *huart, uint8_t *buffer, uint32_t buffer_s
                 // Send ACK for file info packet
                 ymodem_send_byte(huart, ACK);
                 // Send 'C' for next packet
-                ymodem_send_byte(huart, C);
+                ymodem_send_byte(huart, 'C');
                 retries = 0; // Reset retries
                 continue;
             }
@@ -185,17 +194,10 @@ int ymodem_receive(UART_HandleTypeDef *huart, uint8_t *buffer, uint32_t buffer_s
             // Move to next packet
             packet_num++;
             retries = 0; // Reset retries on successful packet
-        } else if (result == YMODEM_TIMEOUT) {
-            retries++;
-            if (!file_info_received) {
-                ymodem_send_byte(huart, C);
-            } else {
-                ymodem_send_byte(huart, NAK);
-            }
         } else {
             retries++;
             if (!file_info_received) {
-                ymodem_send_byte(huart, C);
+                ymodem_send_byte(huart, 'C');
             } else {
                 ymodem_send_byte(huart, NAK);
             }
@@ -210,6 +212,84 @@ int ymodem_receive(UART_HandleTypeDef *huart, uint8_t *buffer, uint32_t buffer_s
     }
     
     *received_size = total_received;
+    return YMODEM_OK;
+}
+
+int ymodem_receive_to_flash(UART_HandleTypeDef *huart, const struct fal_partition *part, uint32_t *received_size, char *filename, uint32_t *file_size, uint32_t *fw_crc) {
+    uint8_t packet[YMODEM_PACKET_SIZE_1K];
+    uint16_t packet_size;
+    uint8_t packet_num = 0; // Start with packet 0 for file info
+    uint32_t total_received = 0;
+    int retries = 0;
+    const int max_retries = 10;
+    int file_info_received = 0;
+    
+    *fw_crc = crc32_init();
+
+    // Send 'C' to start transfer in CRC mode
+    ymodem_send_byte(huart, 'C');
+    
+    while (total_received < part->len && retries < max_retries) {
+        int result = ymodem_receive_packet(huart, packet, &packet_size, &packet_num);
+        
+        if (result == YMODEM_OK) {
+             if (packet_size == 0) { // EOT
+                // Send final ACK
+                ymodem_send_byte(huart, ACK);
+                *received_size = total_received;
+                *fw_crc = crc32_final(*fw_crc);
+                return YMODEM_OK;
+            }
+
+            if (!file_info_received) {
+                if (packet_num == 0) {
+                    ymodem_parse_file_info(packet, filename, file_size);
+                    file_info_received = 1;
+                    packet_num = 1; // Next should be 1
+                }
+                ymodem_send_byte(huart, ACK);
+                ymodem_send_byte(huart, 'C');
+                retries = 0;
+                continue;
+            }
+
+            if (total_received + packet_size > part->len) {
+                ymodem_send_byte(huart, CAN);
+                ymodem_send_byte(huart, CAN);
+                return YMODEM_ERROR;
+            }
+
+            if (fal_partition_write(part, total_received, packet, packet_size) < 0) {
+                ymodem_send_byte(huart, CAN);
+                ymodem_send_byte(huart, CAN);
+                return YMODEM_ERROR;
+            }
+
+            *fw_crc = crc32_update(*fw_crc, packet, packet_size);
+            total_received += packet_size;
+
+            ymodem_send_byte(huart, ACK);
+            
+            packet_num++;
+            retries = 0;
+        } else {
+            retries++;
+            if (!file_info_received) {
+                ymodem_send_byte(huart, 'C');
+            } else {
+                ymodem_send_byte(huart, NAK);
+            }
+        }
+    }
+    
+    if (retries >= max_retries) {
+        ymodem_send_byte(huart, CAN);
+        ymodem_send_byte(huart, CAN);
+        return YMODEM_CANCELLED;
+    }
+    
+    *received_size = total_received;
+    *fw_crc = crc32_final(*fw_crc);
     return YMODEM_OK;
 }
 

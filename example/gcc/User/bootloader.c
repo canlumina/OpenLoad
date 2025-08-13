@@ -10,6 +10,7 @@
 #include <fal.h>
 #include "xmodem.h"
 #include "ymodem.h"
+#include "crc32.h"
 
 static int is_app_valid(uint32_t app_addr) {
     uint32_t stack_pointer = *(uint32_t *)app_addr;
@@ -105,118 +106,117 @@ static int read_line(UART_HandleTypeDef *huart, char *line_buf, size_t max_len, 
     return (int)idx;
 }
 
-static int program_app_from_uart_xymodem(int protocol) {
-    const struct fal_partition *download_part = fal_partition_find("download");
-    if (download_part == NULL) {
-        printf("[BL] No 'download' partition!\r\n");
-        return -1;
+
+static int verify_and_apply_update(const struct fal_partition *app_part, const struct fal_partition *download_part, uint32_t firmware_size, uint32_t expected_crc) {
+    printf("[BL] Verifying firmware integrity...\r\n");
+
+    uint8_t buffer[512];
+    uint32_t calculated_crc = crc32_init();
+    uint32_t read_len = 0;
+
+    while (read_len < firmware_size) {
+        uint32_t chunk = (firmware_size - read_len) > sizeof(buffer) ? sizeof(buffer) : (firmware_size - read_len);
+        if (fal_partition_read(download_part, read_len, buffer, chunk) < 0) {
+            printf("[BL] Failed to read from download partition for verification.\r\n");
+            return -1;
+        }
+        calculated_crc = crc32_update(calculated_crc, buffer, chunk);
+        read_len += chunk;
     }
-    
-    const struct fal_partition *app_part = fal_partition_find("app");
-    if (app_part == NULL) {
-        printf("[BL] No 'app' partition!\r\n");
+    calculated_crc = crc32_final(calculated_crc);
+
+    printf("[BL] Expected CRC: 0x%08lX, Calculated CRC: 0x%08lX\r\n", expected_crc, calculated_crc);
+
+    if (calculated_crc != expected_crc) {
+        printf("[BL] Firmware verification failed. CRC mismatch.\r\n");
+        return -2;
+    }
+
+    printf("[BL] Firmware verification successful. Applying update...\r\n");
+
+    // Erase app partition
+    printf("[BL] Erasing app partition...\r\n");
+    if (fal_partition_erase_all(app_part) < 0) {
+        printf("[BL] Failed to erase app partition.\r\n");
+        return -3;
+    }
+
+    // Copy from download to app partition
+    uint32_t copied = 0;
+    while (copied < firmware_size) {
+        uint32_t chunk = (firmware_size - copied) > sizeof(buffer) ? sizeof(buffer) : (firmware_size - copied);
+        if (fal_partition_read(download_part, copied, buffer, chunk) < 0) {
+            printf("[BL] Failed to read from download partition for copy.\r\n");
+            return -4;
+        }
+        if (fal_partition_write(app_part, copied, buffer, chunk) < 0) {
+            printf("[BL] Failed to write to app partition.\r\n");
+            return -5;
+        }
+        copied += chunk;
+        if ((copied % (16 * 1024)) == 0) {
+             printf("[BL] Copied %lu/%lu bytes\r\n", (unsigned long)copied, (unsigned long)firmware_size);
+        }
+    }
+
+    printf("[BL] Update applied successfully. Total size: %lu bytes.\r\n", (unsigned long)copied);
+    return 0;
+}
+
+static int program_app_from_uart_streamed(int protocol) {
+    const struct fal_partition *download_part = fal_partition_find("download");
+    if (!download_part) {
+        printf("[BL] No 'download' partition found!\r\n");
         return -1;
     }
 
-    UART_HandleTypeDef *upd_uart = &uart1.uart; /* Use USART1 for update channel */
-    printf("[BL] Upgrade on USART1 using %s.\r\n", protocol ? "YMODEM" : "XMODEM");
-    printf("[BL] Download partition size: %lu bytes.\r\n", (unsigned long)download_part->len);
-    printf("[BL] App partition size: %lu bytes.\r\n", (unsigned long)app_part->len);
-    
-    // Allocate buffer for download partition
-    uint8_t *download_buffer = (uint8_t *)malloc(download_part->len);
-    if (download_buffer == NULL) {
-        printf("[BL] Failed to allocate download buffer.\r\n");
+    const struct fal_partition *app_part = fal_partition_find("app");
+    if (!app_part) {
+        printf("[BL] No 'app' partition found!\r\n");
+        return -1;
+    }
+
+    UART_HandleTypeDef *upd_uart = &uart1.uart;
+    printf("[BL] Starting %s update on USART1...\r\n", protocol ? "YMODEM" : "XMODEM");
+
+    // Erase the download partition first
+    printf("[BL] Erasing download partition...\r\n");
+    if (fal_partition_erase_all(download_part) < 0) {
+        printf("[BL] Failed to erase download partition.\r\n");
         return -2;
     }
-    
+
     uint32_t received_size = 0;
+    uint32_t fw_crc = 0;
     int result = 0;
-    
-    if (protocol == 0) {
-        // XMODEM
-        printf("[BL] Waiting for XMODEM transfer...\r\n");
-        result = xmodem_receive(upd_uart, download_buffer, download_part->len, &received_size);
-    } else {
-        // YMODEM
+
+    if (protocol == 0) { // XMODEM
+        result = xmodem_receive_to_flash(upd_uart, download_part, &received_size, &fw_crc);
+        if (result != XMODEM_OK) {
+            printf("[BL] XMODEM transfer failed with code %d.\r\n", result);
+            return -3;
+        }
+    } else { // YMODEM
         char filename[256] = {0};
         uint32_t file_size = 0;
-        printf("[BL] Waiting for YMODEM transfer...\r\n");
-        result = ymodem_receive(upd_uart, download_buffer, download_part->len, &received_size, filename, &file_size);
-        if (result == YMODEM_OK) {
-            printf("[BL] Received file: %s, size: %lu bytes\r\n", filename, (unsigned long)file_size);
+        result = ymodem_receive_to_flash(upd_uart, download_part, &received_size, filename, &file_size, &fw_crc);
+        if (result != YMODEM_OK) {
+            printf("[BL] YMODEM transfer failed with code %d.\r\n", result);
+            return -4;
         }
+        printf("[BL] Received file: %s, size: %lu\r\n", filename, (unsigned long)file_size);
     }
     
-    if (result != 0) {
-        printf("[BL] Transfer failed with error code: %d\r\n", result);
-        free(download_buffer);
-        return -3;
-    }
+    printf("[BL] Received %lu bytes. Firmware CRC: 0x%08lX\r\n", (unsigned long)received_size, (unsigned long)fw_crc);
     
-    printf("[BL] Received %lu bytes.\r\n", (unsigned long)received_size);
+    // Now, let's ask the user for the expected CRC
+    char crc_buf[11]; // "0x" + 8 hex chars + null terminator
+    printf("Please enter the expected CRC32 of the firmware (e.g., 0x12345678): ");
+    read_line(upd_uart, crc_buf, sizeof(crc_buf), 60000); // 60s timeout
     
-    // Erase download partition
-    printf("[BL] Erasing download partition...\r\n");
-    if (fal_partition_erase(download_part, 0, download_part->len) < 0) {
-        printf("[BL] Erase download partition failed.\r\n");
-        free(download_buffer);
-        return -4;
-    }
+    uint32_t expected_crc = (uint32_t)strtoul(crc_buf, NULL, 0);
     
-    // Write received data to download partition
-    printf("[BL] Writing to download partition...\r\n");
-    uint32_t written = 0;
-    while (written < received_size) {
-        uint32_t chunk = (received_size - written) > 512 ? 512 : (received_size - written);
-        if (fal_partition_write(download_part, written, download_buffer + written, chunk) < 0) {
-            printf("[BL] Write to download partition failed at %lu.\r\n", (unsigned long)written);
-            free(download_buffer);
-            return -5;
-        }
-        written += chunk;
-    }
-    
-    // Now copy from download partition to app partition
-    printf("[BL] Copying from download to app partition...\r\n");
-    
-    // Erase app partition
-    printf("[BL] Erasing app partition...\r\n");
-    if (fal_partition_erase(app_part, 0, app_part->len) < 0) {
-        printf("[BL] Erase app partition failed.\r\n");
-        free(download_buffer);
-        return -6;
-    }
-    
-    // Copy data from download to app partition
-    uint8_t copy_buffer[512];
-    uint32_t copied = 0;
-    while (copied < received_size) {
-        uint32_t chunk = (received_size - copied) > sizeof(copy_buffer) ? sizeof(copy_buffer) : (received_size - copied);
-        
-        // Read from download partition
-        if (fal_partition_read(download_part, copied, copy_buffer, chunk) < 0) {
-            printf("[BL] Read from download partition failed at %lu.\r\n", (unsigned long)copied);
-            free(download_buffer);
-            return -7;
-        }
-        
-        // Write to app partition
-        if (fal_partition_write(app_part, copied, copy_buffer, chunk) < 0) {
-            printf("[BL] Write to app partition failed at %lu.\r\n", (unsigned long)copied);
-            free(download_buffer);
-            return -8;
-        }
-        
-        copied += chunk;
-        if ((copied & 0x3FFFU) == 0) { /* every 16KB */
-            printf("[BL] Copied %lu/%lu bytes\r\n", (unsigned long)copied, (unsigned long)received_size);
-        }
-    }
-    
-    free(download_buffer);
-    printf("[BL] Upgrade completed. Copied %lu bytes to app partition.\r\n", (unsigned long)copied);
-    return 0;
+    return verify_and_apply_update(app_part, download_part, received_size, expected_crc);
 }
 
 static int restore_app_from_backup(void) {
@@ -308,26 +308,26 @@ void bootloader_main(void) {
             
             switch (ch) {
                 case '1': // XMODEM IAP
-                    {
-                        int r = program_app_from_uart_xymodem(0); // 0 for XMODEM
-                        if (r == 0) {
-                            printf("[BL] XMODEM transfer successful.\r\n");
-                        } else {
-                            printf("[BL] XMODEM transfer failed with code %d.\r\n", r);
-                        }
-                    }
-                    break;
+                   {
+                       int r = program_app_from_uart_streamed(0); // 0 for XMODEM
+                       if (r == 0) {
+                           printf("[BL] XMODEM update successful.\r\n");
+                       } else {
+                           printf("[BL] XMODEM update failed with code %d.\r\n", r);
+                       }
+                   }
+                   break;
                     
                 case '2': // YMODEM IAP
-                    {
-                        int r = program_app_from_uart_xymodem(1); // 1 for YMODEM
-                        if (r == 0) {
-                            printf("[BL] YMODEM transfer successful.\r\n");
-                        } else {
-                            printf("[BL] YMODEM transfer failed with code %d.\r\n", r);
-                        }
-                    }
-                    break;
+                   {
+                       int r = program_app_from_uart_streamed(1); // 1 for YMODEM
+                       if (r == 0) {
+                           printf("[BL] YMODEM update successful.\r\n");
+                       } else {
+                           printf("[BL] YMODEM update failed with code %d.\r\n", r);
+                       }
+                   }
+                   break;
                     
                 case '3': // Restore from backup
                     {

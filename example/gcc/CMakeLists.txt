@@ -68,6 +68,7 @@ if(BUILD_OPENLOAD_EXAMPLE)
     ./User/xmodem.c
     ./User/ymodem.c
     ./User/syscalls.c
+    ./User/Utils/crc32.c
     ../platform/stm32/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
     ../platform/stm32/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103xe.S
   )
@@ -123,6 +124,7 @@ if(BUILD_OPENLOAD_EXAMPLE)
     ./Drivers/SYSTEM/sys
     ./Drivers/SYSTEM/usart
     ./Drivers/BSP
+    ./User/Utils
     ../../src/fal/inc
     ../../src/easyflash/inc
     ../../src/SUFD/inc
