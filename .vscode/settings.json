@@ -1,13 +1,31 @@
 {
-    "files.associations": {
+    // VSCode工作区设置文件，根据你的项目结构优化
+    "cmake.configureOnOpen": true,        // 打开项目时自动配置CMake
+    "cmake.sourceDirectory": "${workspaceFolder}/example/gcc",  // CMake源码目录
+    "cmake.buildDirectory": "${workspaceFolder}/example/gcc/build",  // CMake构建目录
+    "cmake.configureSettings": {          // CMake配置参数
+        "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/example/gcc/cmake/arm-gcc-toolchain.cmake",  // 工具链文件
+        "CMAKE_BUILD_TYPE": "Debug"        // 构建类型
+    },
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",  // 使用CMake Tools作为配置提供者
+    "C_Cpp.default.intelliSenseMode": "gcc-arm",  // IntelliSense模式设为ARM GCC
+    "files.associations": {              // 文件关联
+        "*.h": "c",                      // .h文件关联为C语言
+        "*.c": "c",                      // .c文件关联为C语言
         "stm32f1xx_hal_dma.h": "c",
         "stm32f1xx_hal_uart.h": "c",
         "delay.h": "c",
         "bsp_esp8266.h": "c",
         "usart.h": "c"
     },
-    "cmake.sourceDirectory": "E:/stm32/OpenLoad/example/gcc",
-    "cmake.configureSettings": {
-        "CMAKE_TOOLCHAIN_FILE": "${workspaceFolder}/example/gcc/cmake/arm-gcc-toolchain.cmake"
+    "files.exclude": {                   // 从文件浏览器中排除的文件/文件夹
+        "**/build": true,                // 排除build目录
+        "**/.git": true,                 // 排除.git目录
+        "**/.DS_Store": true,            // 排除macOS的.DS_Store文件
+        "**/Thumbs.db": true             // 排除Windows的Thumbs.db文件
+    },
+    "search.exclude": {                  // 搜索时排除的文件/文件夹
+        "**/build": true,
+        "**/.git": true
     }
 }

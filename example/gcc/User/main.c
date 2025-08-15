@@ -30,9 +30,8 @@ int main(void)
     fal_init();
     spi_flash_init();
 
-    /* 关闭stdout缓冲，确保即时输出 */
-
     printf("Boot OK on USART1 @115200\r\n");
+    
     bootloader_main();
 
     // if (fal_test("env") == 0)

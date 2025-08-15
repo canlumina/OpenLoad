@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "STM32",
             "includePath": [
                 "${workspaceFolder}/**"
             ],
@@ -12,9 +12,9 @@
                 "USE_HAL_DRIVER",
                 "STM32F103xE"
             ],
-            "compilerPath": "D:\\ARMTools\\MinGW\\mingw64\\bin\\gcc.exe",
-            "cStandard": "c17",
-            "cppStandard": "gnu++17",
+            "compilerPath": "arm-none-eabi-gcc",
+            "cStandard": "c11",
+            "cppStandard": "gnu++14",
             "intelliSenseMode": "gcc-arm"
         }
     ],

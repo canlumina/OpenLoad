@@ -2,16 +2,130 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Clean Build Directory",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-Command",
+                "if (Test-Path '${workspaceFolder}/example/gcc/build') { Remove-Item -Recurse -Force '${workspaceFolder}/example/gcc/build'; Write-Host 'Build directory cleaned' } else { Write-Host 'Build directory does not exist' }"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "detail": "Clean CMake build directory using PowerShell",
+            "windows": {
+                "command": "powershell",
+                "args": [
+                    "-Command",
+                    "if (Test-Path '${workspaceFolder}/example/gcc/build') { Remove-Item -Recurse -Force '${workspaceFolder}/example/gcc/build'; Write-Host 'Build directory cleaned' } else { Write-Host 'Build directory does not exist' }"
+                ]
+            },
+            "linux": {
+                "command": "rm", 
+                "args": ["-rf", "${workspaceFolder}/example/gcc/build"]
+            }
+        },
+        {
+            "label": "CMake Configure",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-B", "${workspaceFolder}/example/gcc/build",
+                "-S", "${workspaceFolder}/example/gcc", 
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-DCMAKE_TOOLCHAIN_FILE=${workspaceFolder}/example/gcc/cmake/arm-gcc-toolchain.cmake",
+                "-G", "Unix Makefiles"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "detail": "Configure CMake project"
+        },
+        {
             "label": "CMake Build",
             "type": "shell",
-            "command": "cmake --build ${command:cmake.buildDirectory}",
+            "command": "cmake",
+            "args": [
+                "--build", "${workspaceFolder}/example/gcc/build",
+                "--parallel", "4"
+            ],
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": [
-                "$gcc"
-            ]
+            "presentation": {
+                "echo": true,
+                "reveal": "always", 
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "Build the project with CMake",
+            "dependsOn": "CMake Configure"
+        },
+        {
+            "label": "CMake Rebuild",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build", "${workspaceFolder}/example/gcc/build",
+                "--clean-first"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": ["$gcc"],
+            "detail": "Rebuild the project with CMake",
+            "dependsOn": "CMake Configure"
+        },
+        {
+            "label": "Flash with OpenOCD",
+            "type": "shell",
+            "command": "openocd",
+            "args": [
+                "-f", "interface/stlink.cfg",
+                "-f", "target/stm32f1x.cfg", 
+                "-c", "program \"${workspaceFolder}/example/gcc/build/openload.elf\" verify reset exit"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "detail": "Flash firmware to MCU using OpenOCD",
+            "dependsOn": "CMake Build",
+            "windows": {
+                "command": "openocd",
+                "args": [
+                    "-f", "interface/stlink.cfg",
+                    "-f", "target/stm32f1x.cfg", 
+                    "-c", "program {${workspaceFolder}/example/gcc/build/openload.elf} verify reset exit"
+                ]
+            }
+        },
+        {
+            "label": "Build and Flash",
+            "dependsOn": ["CMake Build", "Flash with OpenOCD"],
+            "dependsOrder": "sequence",
+            "group": "build", 
+            "detail": "Build project and flash to MCU"
         }
     ]
 }

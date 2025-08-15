@@ -7,15 +7,16 @@
             "request": "launch",
             "servertype": "openocd",
             "cwd": "${workspaceFolder}",
-            "executable": "${workspaceFolder}/example/gcc/build/OpenLoad.elf",
-            "device": "STM32F103C8",
+            "executable": "${workspaceFolder}/example/gcc/build/openload.elf",
+            "device": "STM32F103ZE",
             "configFiles": [
                 "interface/stlink.cfg",
                 "target/stm32f1x.cfg"
             ],
             "svdFile": "${workspaceFolder}/.vscode/STM32F103.svd",
             "preLaunchTask": "CMake Build",
-            "runToMain": true
+            "runToMain": true,
+            "showDevDebugOutput": "parsed"
         }
     ]
 }
