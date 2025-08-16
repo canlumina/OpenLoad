@@ -31,7 +31,8 @@ int main(void)
     spi_flash_init();
 
     printf("Boot OK on USART1 @115200\r\n");
-    
+
+    // 待修复
     bootloader_main();
 
     // if (fal_test("env") == 0)
