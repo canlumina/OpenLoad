@@ -30,7 +30,7 @@ int main(void)
     fal_init();
     spi_flash_init();
 
-    printf("Boot OK on USART1 @115200\r\n");
+    printf("Boot start on USART1 @115200\r\n");
 
     // 待修复
     bootloader_main();
