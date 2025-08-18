@@ -1,217 +1,265 @@
-# OpenLoad
+# STM32F103ZET6 通用Bootloader设计文档
 
-## 概述
-这是一个高度可移植的通用单片机Bootloader框架，支持多种MCU架构（包括ARM Cortex-M, RISC-V, AVR, PIC等）。设计核心是**硬件抽象层(HAL)** 架构，使得同一套代码可以轻松适配不同单片机平台，无需重写核心逻辑。
+## 1. 项目概述
 
-## 设计特点
-- **跨平台支持**：通过HAL接口实现硬件无关性
-- **模块化架构**：各功能组件解耦，便于定制
-- **安全机制**：支持CRC校验、AES加密和数字签名
-- **多通信接口**：UART/USB/CAN/Ethernet/无线兼容
-- **轻量高效**：核心代码<8KB，RAM占用<1KB
-- **可靠更新**：双区备份和断电保护机制
+本项目旨在开发一个通用的STM32F103ZET6 bootloader，支持Flash分区管理、外部Flash扩展、YModem协议固件下载等功能。
 
-## 系统架构
+### 1.1 主要特性
+- Flash分区管理（内部Bootloader区/App区 + 外部Download区/Backup区）
+- 外部Flash支持（通过SPI）
+- YModem协议固件下载
+- 串口DMA + 空闲中断 + 环形缓冲区
+- 按键检测启动逻辑
+- 固件完整性校验
+
+### 1.2 硬件配置
+- 主控：STM32F103ZET6 (512KB Flash, 64KB RAM)
+- 外部Flash：W25Q64 (8MB) 通过SPI1连接
+- 串口：USART1 (PA9-TX, PA10-RX) 用于固件下载
+- 按键：PA0 (低电平有效)
+- LED指示：PC13 (状态指示)
+
+## 2. Flash分区设计
+
+### 2.1 内部Flash分区 (512KB总容量)
+```
+地址范围                 | 大小    | 分区名称     | 用途
+0x0800 0000 - 0x0800 FFFF | 64KB   | Bootloader   | 引导程序
+0x0801 0000 - 0x0807 FFFF | 448KB  | Application  | 应用程序
+```
+
+### 2.2 外部Flash分区 (8MB)
+```
+地址范围                 | 大小   | 分区名称      | 用途
+0x0000 0000 - 0x0000 FFFF | 64KB  | Backup_Boot   | 备份引导
+0x0001 0000 - 0x0001 FFFF | 64KB  | Download      | 临时下载区
+0x0002 0000 - 0x007F FFFF | 8MB-128KB | Firmware_Store | 固件存储
+```
+
+## 3. 系统架构
+
+### 3.1 模块划分
+```
+bootloader/
+├── Core/                    # 核心系统文件
+│   ├── Inc/
+│   └── Src/
+├── Drivers/                 # 驱动层
+│   ├── CMSIS/
+│   ├── STM32F1xx_HAL_Driver/
+│   └── BSP/                # 板级支持包
+│       ├── flash_driver.c  # 内部/外部Flash驱动
+│       ├── uart_driver.c   # 串口驱动
+│       └── spi_flash.c     # 外部Flash驱动
+├── Middlewares/            # 中间件
+│   ├── ymodem.c           # YModem协议
+│   ├── ringbuffer.c       # 环形缓冲区
+│   └── crc.c              # CRC校验
+├── Application/            # 应用层
+│   ├── bootloader.c       # 主程序逻辑
+│   ├── flash_manager.c    # 内部/外部Flash分区管理
+│   └── firmware_update.c  # 固件更新
+└── Config/                # 配置文件
+    └── bootloader_config.h
+```
+
+### 3.2 启动流程
 ```mermaid
 graph TD
-    A[Bootloader核心] --> B[硬件抽象层]
-    A --> C[通信协议层]
-    A --> D[安全模块]
-    B --> E[MCU平台1]
-    B --> F[MCU平台2]
-    B --> G[MCU平台N]
-    C --> H[UART]
-    C --> I[USB]
-    C --> J[CAN]
-    D --> K[CRC校验]
-    D --> L[AES加密]
-    D --> M[数字签名]
+    A[系统复位] --> B[硬件初始化]
+    B --> C[检查按键状态]
+    C --> D{按键按下?}
+    D -->|是| E[进入下载模式]
+    D -->|否| F[等待2秒]
+    F --> G{2秒内按键按下?}
+    G -->|是| E
+    G -->|否| H[检查App有效性]
+    H --> I{App有效?}
+    I -->|是| J[跳转到App]
+    I -->|否| E
+    
+    E --> K[初始化串口DMA]
+    K --> L[等待YModem数据]
+    L --> M[接收固件到外部Flash Download区]
+    M --> N{接收完成?}
+    N -->|否| L
+    N -->|是| O[校验固件]
+    O --> P{校验通过?}
+    P -->|是| Q[从外部Flash复制到App区]
+    P -->|否| R[报告错误]
+    Q --> S[擦除外部Flash Download区]
+    S --> J
+    R --> L
 ```
 
+## 4. 关键模块设计
 
-
-##  快速开始
-
-### 1. 配置硬件抽象层
-
-在`hal`目录中实现目标平台的HAL接口：
-
+### 4.1 Flash管理模块
 ```c
-// hal_template.c
-void hal_init(void) {
-    // 初始化时钟、内存、中断
-}
+typedef struct {
+    uint32_t start_addr;    // 起始地址
+    uint32_t size;          // 分区大小
+    uint32_t used_size;     // 已使用大小
+    uint8_t  status;        // 分区状态
+} flash_partition_t;
 
-int hal_flash_write(uint32_t addr, const uint8_t *data, uint32_t len) {
-    // 实现Flash写入
-}
-
-int hal_comm_receive(uint8_t *buf, uint32_t timeout) {
-    // 实现通信接口接收
-}
+// Flash操作接口
+int flash_init(void);
+int flash_erase_partition(uint8_t partition_id);
+int flash_write_data(uint32_t addr, uint8_t *data, uint32_t len);
+int flash_read_data(uint32_t addr, uint8_t *data, uint32_t len);
 ```
 
-### 2. 配置内存布局
-
-修改`boot_config.h`:
-
+### 4.2 串口DMA + 环形缓冲区
 ```c
-// STM32F4示例配置
-#define APP_START_ADDR     0x08008000
-#define FLASH_PAGE_SIZE    0x2000       // 16KB页
-#define RAM_SIZE           0x20000      // 128KB RAM
-#define BOOTLOADER_SIZE    0x8000       // 32KB Bootloader
+typedef struct {
+    uint8_t *buffer;        // 缓冲区指针
+    uint32_t size;          // 缓冲区大小
+    uint32_t head;          // 头指针
+    uint32_t tail;          // 尾指针
+} ring_buffer_t;
+
+// 串口接收处理
+void uart_dma_init(void);
+void uart_idle_callback(void);
+uint32_t ringbuf_read(ring_buffer_t *rb, uint8_t *data, uint32_t len);
 ```
 
-### 3. 选择通信协议
-
-在`protocols`目录中选择或实现通信协议：
-
+### 4.3 YModem协议处理
 ```c
-// protocols/xmodem.c
-const Protocol xmodem_protocol = {
-    .init = xmodem_init,
-    .receive_packet = xmodem_receive,
-    .send_ack = xmodem_ack
-};
+typedef struct {
+    uint8_t soh;            // 帧头 0x01
+    uint8_t seq;            // 序号
+    uint8_t seq_inv;        // 序号取反
+    uint8_t data[128];      // 数据
+    uint16_t crc;           // CRC校验
+} ymodem_packet_t;
+
+// YModem接口
+int ymodem_receive_init(void);
+int ymodem_receive_packet(ymodem_packet_t *packet);
+int ymodem_send_ack(void);
+int ymodem_send_nak(void);
 ```
 
-### 4. 编译烧录
+### 4.4 固件更新流程
+```c
+typedef struct {
+    uint32_t magic;         // 魔数 0x12345678
+    uint32_t version;       // 版本号
+    uint32_t size;          // 固件大小
+    uint32_t crc32;         // CRC32校验
+    uint32_t timestamp;     // 时间戳
+} firmware_header_t;
 
-
-
-
-
-## 工作流程
-
-```mermaid
-flowchart TD
-    %% 纵向主干流程
-    A[上电复位] --> B[初始化基础硬件]
-    B --> C{应用程序有效?}
-    C -->|有效| D{更新触发条件满足?}
-    D -->|是| E[进入Boot模式]
-    D -->|否| F[跳转到应用程序]
-    C -->|无效| E
-    E --> G[初始化通信接口]
-    G --> H[发送就绪信号]
-    H --> I{等待固件数据}
-    I -->|收到数据包| J[解析协议头]
-    J --> K{数据包校验通过?}
-    K -->|是| L[写入存储器]
-    K -->|否| M[请求重传]
-    M --> I
-    L --> N{最后数据包?}
-    N -->|否| I
-    N -->|是| O[验证固件完整性]
-    O -->|验证通过| P[更新引导标志]
-    O -->|验证失败| Q[发送错误报告]
-    Q --> R[等待清除指令]
-    R --> I
-    P --> F
-    
-    %% 横向功能分组
-    subgraph 硬件抽象层
-        direction TB
-        B1[时钟初始化] --> B2[内存初始化] --> B3[中断配置]
-        G1[UART/USB] --> G2[CAN/Ethernet] --> G3[无线模块]
-        L1[Flash驱动] --> L2[EEPROM驱动] --> L3[外部存储]
-    end
-    
-    subgraph 安全模块
-        direction LR
-        O1[CRC校验] --> O2[AES解密] --> O3[数字签名验证]
-    end
-    
-    subgraph 应用跳转流程
-        direction TB
-        F1[关闭外设] --> F2[禁用中断] --> F3[设置应用栈指针] --> F4[加载应用复位向量] --> F5[跳转到应用入口]
-    end
-    
-    %% 连接关系
-    B --> B1
-    G --> G1
-    L --> L1
-    O --> O1
-    F --> F1
-    
-    %% 样式定义
-    style 硬件抽象层 fill:#e6f7ff,stroke:#0066cc,stroke-dasharray: 5 5
-    style 安全模块 fill:#fff2e6,stroke:#ff9900,stroke-dasharray: 5 5
-    style 应用跳转流程 fill:#e6ffe6,stroke:#00cc66,stroke-dasharray: 5 5
-    
-    style C fill:#ffcc99,stroke:#ff6600
-    style D fill:#ffcc99,stroke:#ff6600
-    style K fill:#ffcc99,stroke:#ff6600
-    style N fill:#ffcc99,stroke:#ff6600
-    style O fill:#ffcc99,stroke:#ff6600
-    
-    classDef main fill:#f0f8ff,stroke:#1e90ff;
-    class A,B,E,G,H,I,J,L,P,F main;
+// 固件更新接口
+int firmware_download(void);  // 通过YModem下载到外部Flash Download区
+int firmware_verify(uint32_t addr);  // 校验外部Flash中的固件
+int firmware_install(void);  // 从外部Flash Download区复制到内部App区
 ```
 
+## 5. 通信协议
 
+### 5.1 YModem协议帧格式
+```
+SOH + 序号 + 序号取反 + 128字节数据 + CRC16
+STX + 序号 + 序号取反 + 1024字节数据 + CRC16
+```
 
+### 5.2 控制字符定义
+```c
+#define SOH     0x01    // 128字节数据包
+#define STX     0x02    // 1024字节数据包
+#define EOT     0x04    // 传输结束
+#define ACK     0x06    // 确认
+#define NAK     0x15    // 否认
+#define CAN     0x18    // 取消
+#define C       0x43    // CRC模式
+```
 
+## 6. 状态管理
 
-## 安全特性
+### 6.1 系统状态定义
+```c
+typedef enum {
+    BOOT_STATE_INIT,        // 初始化
+    BOOT_STATE_CHECK_KEY,   // 检查按键
+    BOOT_STATE_WAIT_TIMEOUT,// 等待超时
+    BOOT_STATE_DOWNLOAD,    // 下载模式
+    BOOT_STATE_VERIFY,      // 校验固件
+    BOOT_STATE_INSTALL,     // 安装固件
+    BOOT_STATE_JUMP_APP,    // 跳转应用
+    BOOT_STATE_ERROR        // 错误状态
+} boot_state_t;
+```
 
-| 安全机制    | 功能描述             | 配置文件选项         |
-| :---------- | :------------------- | :------------------- |
-| CRC32校验   | 固件完整性验证       | `ENABLE_CRC_CHECK=1` |
-| AES-256加密 | 固件传输加密         | `ENABLE_AES=1`       |
-| ECDSA签名   | 固件来源认证         | `ENABLE_ECDSA=1`     |
-| 防回滚保护  | 防止旧版本固件被安装 | `ENABLE_VERSION=1`   |
-| 双区备份    | 安全更新和回退机制   | `ENABLE_DUAL_BANK=1` |
+### 6.2 LED状态指示
+- 常亮：正常启动
+- 慢闪(1Hz)：等待按键
+- 快闪(5Hz)：下载模式
+- 双闪：校验错误
+- 三闪：跳转应用
 
+## 7. 安全机制
 
+### 7.1 固件完整性校验
+- 每个固件包含Header信息
+- CRC32校验确保数据完整性
+- 版本号检查防止固件降级
 
-## 移植指南
+### 7.2 容错机制
+- 下载失败时保留原有App
+- 提供固件恢复功能
+- 看门狗保护防止死机
 
-1. **实现HAL接口**：
-   - `hal_init()` - 硬件初始化
-   - `hal_flash_*()` - Flash操作
-   - `hal_comm_*()` - 通信接口
-2. **配置内存布局**：
-   - 在`boot_config.h`中定义应用起始地址
-   - 设置Flash页大小和总容量
-3. **选择通信协议**：
-   - 内置支持XMODEM/YMODEM
-   - 可扩展自定义协议
-4. **定制安全选项**：
-   - 根据需求启用安全特性
-   - 配置加密密钥和证书
+## 8. 配置参数
 
+### 8.1 系统配置
+```c
+#define BOOTLOADER_VERSION      "1.0.0"
+#define FIRMWARE_MAGIC          0x12345678
+#define MAX_FIRMWARE_SIZE       (448 * 1024)  // 448KB
+#define UART_BAUDRATE          115200
+#define KEY_CHECK_TIMEOUT      2000           // 2秒
+#define DOWNLOAD_TIMEOUT       30000          // 30秒
+```
 
+### 8.2 内存配置
+```c
+#define BOOTLOADER_START       0x08000000
+#define BOOTLOADER_SIZE        (64 * 1024)
+#define EXTERNAL_DOWNLOAD_START 0x00010000  // 外部Flash Download区地址
+#define DOWNLOAD_SIZE          (64 * 1024)
+#define APPLICATION_START      0x08010000
+#define APPLICATION_SIZE       (448 * 1024)
+```
 
-## 工具链支持
+## 9. 调试与测试
 
-- **固件打包工具**：生成加密签名固件
-- **Bootloader CLI**：命令行更新工具
-- **QBoot助手**：图形化更新工具
-- **日志分析器**：Bootloader调试工具
+### 9.1 调试接口
+- 串口调试输出
+- LED状态指示
+- 关键状态记录
 
+### 9.2 测试用例
+- 正常启动测试
+- 按键检测测试
+- YModem下载测试
+- 固件校验测试
+- 错误恢复测试
 
+## 10. 使用说明
 
-## 贡献指南
+### 10.1 固件制作
+1. 编译应用程序生成bin文件
+2. 添加固件头信息
+3. 计算CRC32校验值
+4. 使用YModem发送工具下载
 
-欢迎通过Issue和Pull Request贡献：
+### 10.2 升级流程
+1. 按住按键上电进入下载模式
+2. 使用串口工具选择YModem发送
+3. 选择固件文件开始传输
+4. 等待传输完成自动重启
 
-1. 新增MCU平台支持
-2. 扩展通信协议
-3. 增强安全功能
-4. 优化文档和示例
-
-
-
-## 许可证
-Apache License 2.0 - 允许商业使用和修改
-
-本项目中使用了以下第三方组件：
-RT-Thread fal库
-项目名称: fal
-功能: 用于存储管理和分区管理
-来源: 基于RT-Thread官方fal组件开发
-LICENSE: RT-ThreadfalLICENSE
-版权声明
-本项目基于RT-Thread fal组件进行开发和优化，版权归RT-Thread所有。如需使用本项目中的fal相关功能，请遵守RT-Thread的LICENSE协议。
+这个设计提供了一个完整、可靠的bootloader解决方案，具有良好的扩展性和维护性。
