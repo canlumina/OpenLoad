@@ -25,7 +25,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "dev_usart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +57,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+static int s_count = 0;
 /* USER CODE END 0 */
 
 /**
@@ -68,7 +68,8 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+  uint16_t size = 0;
+  uint8_t buf[256];
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -93,13 +94,20 @@ int main(void)
   MX_USART1_UART_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
-
+  uart_device_init(DEV_UART1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    s_count++;
+    if(s_count % 5000)
+    {
+      size = uart_read(DEV_UART1, buf, 256);
+      uart_write(DEV_UART1, buf, size);
+      uart_poll_dma_tx(DEV_UART1);
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
