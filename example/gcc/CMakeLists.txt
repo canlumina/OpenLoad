@@ -1,143 +1,68 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.22)
 
-project(OpenLoad C ASM)
+#
+# This file is generated only once,
+# and is not re-generated if converter is called multiple times.
+#
+# User is free to modify the file as much as necessary
+#
 
-# Options
-option(BUILD_OPENLOAD_EXAMPLE "Build STM32F103 example target" ON)
-set(MCU_FAMILY STM32F1 CACHE STRING "MCU family")
-set(MCU_MODEL STM32F103xE CACHE STRING "MCU model define for HAL")
+# Setup compiler settings
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS ON)
 
-# Toolchain note: pass -DCMAKE_TOOLCHAIN_FILE=${CMAKE_CURRENT_LIST_DIR}/cmake/arm-gcc-toolchain.cmake when using arm-none-eabi-gcc
 
-if(NOT CMAKE_TOOLCHAIN_FILE)
-  message(STATUS "No CMAKE_TOOLCHAIN_FILE set. For cross-compiling use ${CMAKE_CURRENT_LIST_DIR}/cmake/arm-gcc-toolchain.cmake")
+# Define the build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-# Common compile options similar to Keil project
-set(COMMON_DEFINES
-  USE_HAL_DRIVER
-  ${MCU_MODEL}
+# Set the project name
+set(CMAKE_PROJECT_NAME OpenLoad)
+
+# Enable compile command to ease indexing with e.g. clangd
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+
+# Core project settings
+project(${CMAKE_PROJECT_NAME})
+message("Build type: " ${CMAKE_BUILD_TYPE})
+
+# Enable CMake support for ASM and C languages
+enable_language(C ASM)
+
+# Create an executable object type
+add_executable(${CMAKE_PROJECT_NAME})
+
+# Add STM32CubeMX generated sources
+add_subdirectory(cmake/stm32cubemx)
+
+# Link directories setup
+target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user defined library search paths
 )
 
-set(COMMON_C_FLAGS
-  -mcpu=cortex-m3
-  -mthumb
-  -ffunction-sections
-  -fdata-sections
-  -fno-builtin
-  -fno-common
-  -Wall
-  -Wextra
-  -Wno-unused-parameter
-  -Wno-missing-field-initializers
-  -std=c11
+# Add sources to executable
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user sources here
 )
 
-set(COMMON_ASM_FLAGS
-  -mcpu=cortex-m3
-  -mthumb
+# Add include paths
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user defined include paths
 )
 
-set(COMMON_LINK_FLAGS
-  -mcpu=cortex-m3
-  -mthumb
-  -Wl,--gc-sections
-  -Wl,--print-memory-usage
-  -specs=nosys.specs
-  -specs=nano.specs
+# Add project symbols (macros)
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    # Add user defined symbols
 )
 
-if(BUILD_OPENLOAD_EXAMPLE)
-  enable_language(ASM)
+# Remove wrong libob.a library dependency when using cpp files
+list(REMOVE_ITEM CMAKE_C_IMPLICIT_LINK_LIBRARIES ob)
 
-  # Sources
-  file(GLOB_RECURSE FAL_SOURCES
-    ../../src/fal/src/*.c
-  )
-  file(GLOB_RECURSE EASYFLASH_SOURCES
-    ../../src/easyflash/src/*.c
-  )
-  file(GLOB_RECURSE SFUD_SOURCES
-    ../../src/SUFD/src/*.c
-  )
+# Add linked libraries
+target_link_libraries(${CMAKE_PROJECT_NAME}
+    stm32cubemx
 
-  set(USER_SOURCES
-    ./User/main.c
-    ./User/stm32f1xx_it.c
-    ./User/bootloader.c
-    ./User/xmodem.c
-    ./User/ymodem.c
-    ./User/syscalls.c
-    ./User/Utils/crc32.c
-    ../platform/stm32/CMSIS/Device/ST/STM32F1xx/Source/Templates/system_stm32f1xx.c
-    ../platform/stm32/CMSIS/Device/ST/STM32F1xx/Source/Templates/gcc/startup_stm32f103xe.S
-  )
-
-  # Minimal HAL sources used in Keil project (extend if needed)
-  set(HAL_SOURCES
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_cortex.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_flash.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_flash_ex.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_rcc.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_spi.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_sram.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_tim_ex.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_uart.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_usart.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_dma.c
-    ../platform/stm32/STM32F1xx_HAL_Driver/Src/stm32f1xx_ll_fsmc.c
-  )
-
-  set(BSP_SOURCES
-    ./Drivers/BSP/bsp_key.c
-    ./Drivers/BSP/bsp_led.c
-    ./Drivers/BSP/bsp_spi.c
-    ./Drivers/SYSTEM/delay/delay.c
-    ./Drivers/SYSTEM/sys/sys.c
-    ./Drivers/SYSTEM/usart/usart.c
-  )
-
-  add_executable(openload.elf
-    ${USER_SOURCES}
-    ${HAL_SOURCES}
-    ${BSP_SOURCES}
-    ${FAL_SOURCES}
-    ${EASYFLASH_SOURCES}
-    ${SFUD_SOURCES}
-  )
-
-  target_compile_definitions(openload.elf PRIVATE ${COMMON_DEFINES})
-  target_compile_options(openload.elf PRIVATE 
-    $<$<COMPILE_LANGUAGE:C>:${COMMON_C_FLAGS}>
-    $<$<COMPILE_LANGUAGE:ASM>:${COMMON_ASM_FLAGS}>
-  )
-
-  target_include_directories(openload.elf PRIVATE
-    ../platform/stm32/CMSIS/Device/ST/STM32F1xx/Include
-    ../platform/stm32/STM32F1xx_HAL_Driver/Inc
-    ../platform/stm32/CMSIS/Include
-    ./User
-    ./Drivers/SYSTEM/delay
-    ./Drivers/SYSTEM/sys
-    ./Drivers/SYSTEM/usart
-    ./Drivers/BSP
-    ./User/Utils
-    ../../src/fal/inc
-    ../../src/easyflash/inc
-    ../../src/SUFD/inc
-  )
-
-  # Linker script
-  set(LINKER_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/linker/stm32f103xe.ld)
-  target_link_options(openload.elf PRIVATE ${COMMON_LINK_FLAGS} -T${LINKER_SCRIPT} -Wl,-Map=${CMAKE_BINARY_DIR}/openload.map)
-
-  # Output formats
-  add_custom_command(TARGET openload.elf POST_BUILD
-    COMMAND ${CMAKE_OBJCOPY} -O ihex $<TARGET_FILE:openload.elf> ${CMAKE_BINARY_DIR}/openload.hex
-    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:openload.elf> ${CMAKE_BINARY_DIR}/openload.bin
-    COMMENT "Generating HEX and BIN files")
-
-endif()
+    # Add user defined libraries
+)
