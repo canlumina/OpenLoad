@@ -145,6 +145,7 @@ void uart_dmarx_done_isr(uint8_t uart_id)
 				   (const uint8_t *)&(s_uart_dev[uart_id].dmarx_buf[s_uart_dev[uart_id].last_dmarx_size]), recv_size);
 
 	s_uart_dev[uart_id].last_dmarx_size = 0;
+	bsp_uart1_dmarx_config(s_uart_dev[uart_id].dmarx_buf, s_uart_dev[uart_id].dmarx_buf_size);
 }
 
 /**
