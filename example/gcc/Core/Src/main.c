@@ -92,9 +92,11 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_USART1_UART_Init();
+  MX_USART2_UART_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
   uart_device_init(DEV_UART1);
+  uart_device_init(DEV_UART2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -104,13 +106,22 @@ int main(void)
     s_count++;
     if(s_count % 100)
     {
+      /* 处理串口1 */
       size = uart_read(DEV_UART1, buf, 256);
       if(size > 0)
       {
         uart_write(DEV_UART1, buf, size);
       }
+      
+      /* 处理串口2 */
+      size = uart_read(DEV_UART2, buf, 256);
+      if(size > 0)
+      {
+        uart_write(DEV_UART2, buf, size);
+      }
     }
     uart_poll_dma_tx(DEV_UART1);
+    uart_poll_dma_tx(DEV_UART2);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

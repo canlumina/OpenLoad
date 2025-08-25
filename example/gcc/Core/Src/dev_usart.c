@@ -23,11 +23,21 @@ typedef struct
 #define	UART1_DMA_RX_BUF_SIZE		1024
 #define	UART1_DMA_TX_BUF_SIZE		512
 
+#define UART2_TX_BUF_SIZE           2048
+#define UART2_RX_BUF_SIZE           2048
+#define	UART2_DMA_RX_BUF_SIZE		1024
+#define	UART2_DMA_TX_BUF_SIZE		512
+
 
 static uint8_t s_uart1_tx_buf[UART1_TX_BUF_SIZE];
 static uint8_t s_uart1_rx_buf[UART1_RX_BUF_SIZE];
-static uint8_t s_uart1_dmarx_buf[UART1_DMA_RX_BUF_SIZE] __attribute__((at(0X20001000)));
+static uint8_t s_uart1_dmarx_buf[UART1_DMA_RX_BUF_SIZE];
 static uint8_t s_uart1_dmatx_buf[UART1_DMA_TX_BUF_SIZE];
+
+static uint8_t s_uart2_tx_buf[UART2_TX_BUF_SIZE];
+static uint8_t s_uart2_rx_buf[UART2_RX_BUF_SIZE];
+static uint8_t s_uart2_dmarx_buf[UART2_DMA_RX_BUF_SIZE];
+static uint8_t s_uart2_dmatx_buf[UART2_DMA_TX_BUF_SIZE];
 
 static uart_device_t s_uart_dev[2] = {0};
 
@@ -61,6 +71,10 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 	{
 		uart_id = 0;
 	}
+	else if (huart->Instance == USART2)
+	{
+		uart_id = 1;
+	}
 	
 	/* 将接收到的数据写入接收FIFO */
 	s_UartTxRxCount[uart_id*2+1] += Size;
@@ -85,6 +99,10 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 	if (huart->Instance == USART1)
 	{
 		uart_id = 0;
+	}
+	else if (huart->Instance == USART2)
+	{
+		uart_id = 1;
 	}
 	
 	/* 清除发送忙标志 */
@@ -123,6 +141,27 @@ void uart_device_init(uint8_t uart_id)
 		
 		/* 启动UART1的DMA接收功能，使用HAL_UARTEx_ReceiveToIdle_DMA */
 		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, 
+									  s_uart_dev[uart_id].dmarx_buf, 
+									  s_uart_dev[uart_id].dmarx_buf_size);
+	}
+	else if (uart_id == 1)
+	{
+		/* 初始化UART2的发送和接收FIFO */
+		fifo_register(&s_uart_dev[uart_id].tx_fifo, &s_uart2_tx_buf[0], 
+                      sizeof(s_uart2_tx_buf), fifo_lock, fifo_unlock);
+		fifo_register(&s_uart_dev[uart_id].rx_fifo, &s_uart2_rx_buf[0], 
+                      sizeof(s_uart2_rx_buf), fifo_lock, fifo_unlock);
+		
+		/* 配置UART2的DMA发送和接收缓冲区 */
+		s_uart_dev[uart_id].dmarx_buf = &s_uart2_dmarx_buf[0];
+		s_uart_dev[uart_id].dmarx_buf_size = sizeof(s_uart2_dmarx_buf);
+		s_uart_dev[uart_id].dmatx_buf = &s_uart2_dmatx_buf[0];
+		s_uart_dev[uart_id].dmatx_buf_size = sizeof(s_uart2_dmatx_buf);
+		s_uart_dev[uart_id].huart = &huart2;
+		s_uart_dev[uart_id].tx_busy = 0;
+		
+		/* 启动UART2的DMA接收功能，使用HAL_UARTEx_ReceiveToIdle_DMA */
+		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, 
 									  s_uart_dev[uart_id].dmarx_buf, 
 									  s_uart_dev[uart_id].dmarx_buf_size);
 	}
