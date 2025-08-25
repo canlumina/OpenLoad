@@ -1,0 +1,43 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug STM32 (OpenOCD)",
+            "type": "cortex-debug", 
+            "request": "launch",
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceRoot}/build/Debug/OpenLoad.elf",
+            "servertype": "openocd",
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "target/stm32f1x.cfg"
+            ],
+            "serverpath": "D:/ARMTools/OpenOCD-20230202-0.12.0/bin/openocd.exe",
+            "gdbPath": "D:/ARMTools/arm-gnu-toolchain-14.3.rel1-mingw-w64-x86_64-arm-none-eabi/bin/arm-none-eabi-gdb.exe",
+            "device": "STM32F103ZE",
+            "interface": "swd",
+            "runToMain": true,
+            "showDevDebugOutput": false,
+            "svdFile": "${workspaceRoot}/STM32F103xx.svd",
+            "preLaunchTask": "CMake: Build Debug"
+        },
+        {
+            "name": "Attach STM32 (OpenOCD)",
+            "type": "cortex-debug",
+            "request": "attach", 
+            "cwd": "${workspaceRoot}",
+            "executable": "${workspaceRoot}/build/Debug/OpenLoad.elf",
+            "servertype": "openocd",
+            "configFiles": [
+                "interface/cmsis-dap.cfg",
+                "target/stm32f1x.cfg"
+            ],
+            "serverpath": "D:/ARMTools/OpenOCD-20230202-0.12.0/bin/openocd.exe",
+            "gdbPath": "D:/ARMTools/arm-gnu-toolchain-14.3.rel1-mingw-w64-x86_64-arm-none-eabi/bin/arm-none-eabi-gdb.exe",
+            "device": "STM32F103ZE",
+            "interface": "swd",
+            "showDevDebugOutput": false,
+            "svdFile": "${workspaceRoot}/STM32F103xx.svd"
+        }
+    ]
+}

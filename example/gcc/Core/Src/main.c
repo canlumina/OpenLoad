@@ -102,12 +102,15 @@ int main(void)
   while (1)
   {
     s_count++;
-    if(s_count % 5000)
+    if(s_count % 100)
     {
       size = uart_read(DEV_UART1, buf, 256);
-      uart_write(DEV_UART1, buf, size);
-      uart_poll_dma_tx(DEV_UART1);
+      if(size > 0)
+      {
+        uart_write(DEV_UART1, buf, size);
+      }
     }
+    uart_poll_dma_tx(DEV_UART1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

@@ -22,7 +22,7 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "dev_usart.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -235,11 +235,7 @@ void DMA1_Channel5_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-  if(__HAL_UART_GET_IT_SOURCE(&huart1, UART_IT_IDLE) != RESET)
-  {
-    __HAL_UART_CLEAR_IDLEFLAG(&huart1);
-		uart_dmarx_idle_isr(0);
-  }
+
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
@@ -248,27 +244,5 @@ void USART1_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if(huart->Instance ==USART1)
-	{
-		uart_dmarx_done_isr(0);
-	}
-}
-void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart)
-{
-	if(huart->Instance ==USART1)
-	{
-		uart_dmarx_half_done_isr(0);
-	}
-}
 
-
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-	if(huart->Instance ==USART1)
-	{
-		uart_dmatx_done_isr(0);
-	}
-}
 /* USER CODE END 1 */
