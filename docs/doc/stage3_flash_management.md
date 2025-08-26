@@ -9,9 +9,8 @@
 ```c
 /* 内部Flash分区 */
 typedef enum {
-    FLASH_PARTITION_BOOTLOADER = 0,  // 0x08000000-0x08007FFF (32KB)
-    FLASH_PARTITION_APPLICATION,     // 0x08008000-0x0807EFFF (472KB)  
-    FLASH_PARTITION_CONFIG,          // 0x0807F000-0x0807FFFF (4KB)
+    FLASH_PARTITION_BOOTLOADER = 0,  // 0x08000000-0x0800FFFF (64KB)
+    FLASH_PARTITION_APPLICATION,     // 0x08010000-0x0807FFFF (448KB)
     FLASH_PARTITION_COUNT
 } Internal_Flash_Partition_t;
 
@@ -44,42 +43,43 @@ typedef struct {
 #include "spi_driver.h"
 #include "gpio_driver.h"
 
-#define W25Q64_CS_LOW()     GPIO_ResetBits(GPIOA, GPIO_Pin_4)
-#define W25Q64_CS_HIGH()    GPIO_SetBits(GPIOA, GPIO_Pin_4)
+#define W25Q64_CS_LOW()     GPIO_ResetBits(GPIOB, GPIO_Pin_12)
+#define W25Q64_CS_HIGH()    GPIO_SetBits(GPIOB, GPIO_Pin_12)
 
 /**
-  * @brief  SPI1初始化
+  * @brief  SPI2初始化
   * @param  None
   * @retval None
   */
-void SPI1_Init(void)
+void SPI2_Init(void)
 {
     /* 使能时钟 */
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SPI1 | RCC_APB2Periph_GPIOA, ENABLE);
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
     
     /* GPIO配置 */
     GPIO_InitTypeDef GPIO_InitStructure;
     
-    /* SPI1 SCK (PA5) */
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_5;
+    /* SPI2 SCK (PB13) */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
     
-    /* SPI1 MISO (PA6) */
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6;
+    /* SPI2 MISO (PB14) */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
     
-    /* SPI1 MOSI (PA7) */
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_7;
+    /* SPI2 MOSI (PB15) */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
     
-    /* SPI1 CS (PA4) - 软件控制 */
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
+    /* SPI2 CS (PB12) - 软件控制 */
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
+    GPIO_Init(GPIOB, &GPIO_InitStructure);
     
     W25Q64_CS_HIGH(); // 默认不选中
     
@@ -94,10 +94,10 @@ void SPI1_Init(void)
     SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_4; // 18MHz
     SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
     SPI_InitStructure.SPI_CRCPolynomial = 7;
-    SPI_Init(SPI1, &SPI_InitStructure);
+    SPI_Init(SPI2, &SPI_InitStructure);
     
-    /* 使能SPI1 */
-    SPI_Cmd(SPI1, ENABLE);
+    /* 使能SPI2 */
+    SPI_Cmd(SPI2, ENABLE);
 }
 
 /**
@@ -105,19 +105,19 @@ void SPI1_Init(void)
   * @param  data: 发送的数据
   * @retval 接收的数据
   */
-uint8_t SPI1_ReadWriteByte(uint8_t data)
+uint8_t SPI2_ReadWriteByte(uint8_t data)
 {
     /* 等待发送缓冲区空 */
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_TXE) == RESET);
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET);
     
     /* 发送数据 */
-    SPI_I2S_SendData(SPI1, data);
+    SPI_I2S_SendData(SPI2, data);
     
     /* 等待接收缓冲区非空 */
-    while (SPI_I2S_GetFlagStatus(SPI1, SPI_I2S_FLAG_RXNE) == RESET);
+    while (SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) == RESET);
     
     /* 读取数据 */
-    return SPI_I2S_ReceiveData(SPI1);
+    return SPI_I2S_ReceiveData(SPI2);
 }
 ```
 
@@ -168,11 +168,11 @@ uint8_t SPI1_ReadWriteByte(uint8_t data)
 W25Q64_Result_t W25Q64_Init(void)
 {
     /* 初始化SPI */
-    SPI1_Init();
+    SPI2_Init();
     
     /* 释放掉电模式 */
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_RELEASE_POWER_DOWN);
+    SPI2_ReadWriteByte(W25Q64_CMD_RELEASE_POWER_DOWN);
     W25Q64_CS_HIGH();
     
     Delay_us(3); // 等待tRES1
@@ -202,10 +202,10 @@ uint32_t W25Q64_ReadJEDEC_ID(void)
     uint32_t jedec_id = 0;
     
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_JEDEC_ID);
-    jedec_id |= (SPI1_ReadWriteByte(0xFF) << 16);
-    jedec_id |= (SPI1_ReadWriteByte(0xFF) << 8);
-    jedec_id |= SPI1_ReadWriteByte(0xFF);
+    SPI2_ReadWriteByte(W25Q64_CMD_JEDEC_ID);
+    jedec_id |= (SPI2_ReadWriteByte(0xFF) << 16);
+    jedec_id |= (SPI2_ReadWriteByte(0xFF) << 8);
+    jedec_id |= SPI2_ReadWriteByte(0xFF);
     W25Q64_CS_HIGH();
     
     return jedec_id;
@@ -221,8 +221,8 @@ uint8_t W25Q64_ReadStatusReg(void)
     uint8_t status;
     
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_READ_STATUS_REG);
-    status = SPI1_ReadWriteByte(0xFF);
+    SPI2_ReadWriteByte(W25Q64_CMD_READ_STATUS_REG);
+    status = SPI2_ReadWriteByte(0xFF);
     W25Q64_CS_HIGH();
     
     return status;
@@ -246,7 +246,7 @@ void W25Q64_WaitForReady(void)
 void W25Q64_WriteEnable(void)
 {
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_WRITE_ENABLE);
+    SPI2_ReadWriteByte(W25Q64_CMD_WRITE_ENABLE);
     W25Q64_CS_HIGH();
 }
 
@@ -258,7 +258,7 @@ void W25Q64_WriteEnable(void)
 void W25Q64_WriteDisable(void)
 {
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_WRITE_DISABLE);
+    SPI2_ReadWriteByte(W25Q64_CMD_WRITE_DISABLE);
     W25Q64_CS_HIGH();
 }
 
@@ -277,14 +277,14 @@ W25Q64_Result_t W25Q64_ReadData(uint32_t address, uint8_t* buffer, uint32_t leng
     W25Q64_WaitForReady();
     
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_READ_DATA);
-    SPI1_ReadWriteByte((address >> 16) & 0xFF);
-    SPI1_ReadWriteByte((address >> 8) & 0xFF);
-    SPI1_ReadWriteByte(address & 0xFF);
+    SPI2_ReadWriteByte(W25Q64_CMD_READ_DATA);
+    SPI2_ReadWriteByte((address >> 16) & 0xFF);
+    SPI2_ReadWriteByte((address >> 8) & 0xFF);
+    SPI2_ReadWriteByte(address & 0xFF);
     
     for (uint32_t i = 0; i < length; i++)
     {
-        buffer[i] = SPI1_ReadWriteByte(0xFF);
+        buffer[i] = SPI2_ReadWriteByte(0xFF);
     }
     
     W25Q64_CS_HIGH();
@@ -311,14 +311,14 @@ W25Q64_Result_t W25Q64_PageProgram(uint32_t address, uint8_t* buffer, uint32_t l
     W25Q64_WriteEnable();
     
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_PAGE_PROGRAM);
-    SPI1_ReadWriteByte((address >> 16) & 0xFF);
-    SPI1_ReadWriteByte((address >> 8) & 0xFF);
-    SPI1_ReadWriteByte(address & 0xFF);
+    SPI2_ReadWriteByte(W25Q64_CMD_PAGE_PROGRAM);
+    SPI2_ReadWriteByte((address >> 16) & 0xFF);
+    SPI2_ReadWriteByte((address >> 8) & 0xFF);
+    SPI2_ReadWriteByte(address & 0xFF);
     
     for (uint32_t i = 0; i < length; i++)
     {
-        SPI1_ReadWriteByte(buffer[i]);
+        SPI2_ReadWriteByte(buffer[i]);
     }
     
     W25Q64_CS_HIGH();
@@ -343,10 +343,10 @@ W25Q64_Result_t W25Q64_SectorErase(uint32_t address)
     W25Q64_WriteEnable();
     
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_SECTOR_ERASE);
-    SPI1_ReadWriteByte((address >> 16) & 0xFF);
-    SPI1_ReadWriteByte((address >> 8) & 0xFF);
-    SPI1_ReadWriteByte(address & 0xFF);
+    SPI2_ReadWriteByte(W25Q64_CMD_SECTOR_ERASE);
+    SPI2_ReadWriteByte((address >> 16) & 0xFF);
+    SPI2_ReadWriteByte((address >> 8) & 0xFF);
+    SPI2_ReadWriteByte(address & 0xFF);
     W25Q64_CS_HIGH();
     
     W25Q64_WaitForReady();
@@ -369,10 +369,10 @@ W25Q64_Result_t W25Q64_BlockErase64K(uint32_t address)
     W25Q64_WriteEnable();
     
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_BLOCK_ERASE_64K);
-    SPI1_ReadWriteByte((address >> 16) & 0xFF);
-    SPI1_ReadWriteByte((address >> 8) & 0xFF);
-    SPI1_ReadWriteByte(address & 0xFF);
+    SPI2_ReadWriteByte(W25Q64_CMD_BLOCK_ERASE_64K);
+    SPI2_ReadWriteByte((address >> 16) & 0xFF);
+    SPI2_ReadWriteByte((address >> 8) & 0xFF);
+    SPI2_ReadWriteByte(address & 0xFF);
     W25Q64_CS_HIGH();
     
     W25Q64_WaitForReady();
@@ -392,7 +392,7 @@ W25Q64_Result_t W25Q64_ChipErase(void)
     W25Q64_WriteEnable();
     
     W25Q64_CS_LOW();
-    SPI1_ReadWriteByte(W25Q64_CMD_CHIP_ERASE);
+    SPI2_ReadWriteByte(W25Q64_CMD_CHIP_ERASE);
     W25Q64_CS_HIGH();
     
     W25Q64_WaitForReady();
@@ -416,9 +416,8 @@ W25Q64_Result_t W25Q64_ChipErase(void)
 
 /* 内部Flash分区表 */
 static const Flash_Partition_Info_t internal_partitions[FLASH_PARTITION_COUNT] = {
-    {0x08000000, 32768,  2048, "Bootloader"},    // 32KB, 2KB页
-    {0x08008000, 483328, 2048, "Application"},   // 472KB, 2KB页
-    {0x0807F000, 4096,   2048, "Config"}         // 4KB, 2KB页
+    {0x08000000, 65536,  2048, "Bootloader"},    // 64KB, 2KB页
+    {0x08010000, 458752, 2048, "Application"},   // 448KB, 2KB页
 };
 
 /* 外部Flash分区表 */
@@ -798,8 +797,8 @@ typedef enum {
 #define W25Q64_CHIP_SIZE        8388608
 
 /* CS引脚控制 */
-#define W25Q64_CS_LOW()         GPIO_ResetBits(GPIOA, GPIO_Pin_4)
-#define W25Q64_CS_HIGH()        GPIO_SetBits(GPIOA, GPIO_Pin_4)
+#define W25Q64_CS_LOW()         GPIO_ResetBits(GPIOB, GPIO_Pin_12)
+#define W25Q64_CS_HIGH()        GPIO_SetBits(GPIOB, GPIO_Pin_12)
 
 /* 函数声明 */
 W25Q64_Result_t W25Q64_Init(void);

@@ -422,8 +422,8 @@ void Xmodem_Cancel(void)
 #include "app_check.h"
 
 #define IAP_BUFFER_SIZE         (64 * 1024)    // 64KB缓冲区
-#define IAP_APP_START_ADDR      0x08008000     // 应用程序起始地址
-#define IAP_APP_MAX_SIZE        (472 * 1024)   // 应用程序最大大小
+#define IAP_APP_START_ADDR      0x08010000     // 应用程序起始地址
+#define IAP_APP_MAX_SIZE        (448 * 1024)   // 应用程序最大大小
 
 /* IAP状态 */
 typedef enum {

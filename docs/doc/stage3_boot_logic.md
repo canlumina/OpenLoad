@@ -312,7 +312,7 @@ Boot_State_t Boot_Manager_GetState(void)
 #include "flash_manager.h"
 #include <string.h>
 
-#define APP_START_ADDRESS       0x08008000
+#define APP_START_ADDRESS       0x08010000
 #define APP_VECTOR_TABLE_SIZE   256
 #define SRAM_BASE              0x20000000
 #define SRAM_SIZE              0x10000
@@ -343,7 +343,7 @@ App_Check_Result_t App_Check_Validity(void)
     
     /* 检查复位向量是否在应用程序区域内 */
     if ((app_reset_handler < APP_START_ADDRESS) || 
-        (app_reset_handler > 0x0807EFFF))
+        (app_reset_handler > 0x0807FFFF))
     {
         printf("App Check: Invalid reset handler 0x%08X\r\n", app_reset_handler);
         return APP_INVALID_STACK;
@@ -416,7 +416,7 @@ void App_Get_Info(App_Info_t* info)
     info->start_address = APP_START_ADDRESS;
     info->stack_pointer = *(__IO uint32_t*)APP_START_ADDRESS;
     info->reset_handler = *(__IO uint32_t*)(APP_START_ADDRESS + 4);
-    info->size = 0x76000; // 472KB
+    info->size = 0x70000; // 448KB
     info->valid = (App_Check_Validity() == APP_VALID);
 }
 ```
@@ -433,7 +433,7 @@ void App_Get_Info(App_Info_t* info)
 #include "app_jump.h"
 #include "stm32f10x.h"
 
-#define APP_START_ADDRESS   0x08008000
+#define APP_START_ADDRESS   0x08010000
 
 typedef void (*pFunction)(void);
 
@@ -490,7 +490,7 @@ static void App_Deinit_Peripherals(void)
     USART_DeInit(USART2);
     
     /* 关闭SPI */
-    SPI_DeInit(SPI1);
+    SPI_DeInit(SPI2);
     
     /* 复位GPIO */
     GPIO_DeInit(GPIOA);
@@ -499,10 +499,11 @@ static void App_Deinit_Peripherals(void)
     
     /* 关闭外设时钟 */
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1 | 
-                          RCC_APB2Periph_SPI1 | 
                           RCC_APB2Periph_GPIOA |
                           RCC_APB2Periph_GPIOB |
                           RCC_APB2Periph_GPIOE, DISABLE);
+    
+    RCC_APB1PeriphClockCmd(RCC_APB1Periph_SPI2, DISABLE);
     
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, DISABLE);
     

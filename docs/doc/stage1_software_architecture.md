@@ -8,16 +8,13 @@
 ### STM32F103ZET6 内部Flash分区 (512KB)
 ```
 +------------------+ 0x08080000 (512KB)
-|   配置参数区     |
-|     (4KB)        | 0x0807F000-0x0807FFFF
-+------------------+ 0x0807F000
 |                  |
 |   应用程序区     |
-|    (472KB)       | 0x08008000-0x0807EFFF
+|    (448KB)       | 0x08010000-0x0807FFFF
 |                  |
-+------------------+ 0x08008000 (32KB)
++------------------+ 0x08010000 (64KB)
 |   Bootloader区   |
-|     (32KB)       | 0x08000000-0x08007FFF
+|     (64KB)       | 0x08000000-0x0800FFFF
 +------------------+ 0x08000000
 ```
 
@@ -58,7 +55,7 @@ graph TD
 ```c
 // 应用程序跳转函数原型
 typedef void (*pFunction)(void);
-#define APP_ADDRESS    0x08008000
+#define APP_ADDRESS    0x08010000
 
 void JumpToApplication(void)
 {
@@ -255,7 +252,7 @@ typedef enum {
 ```
 define symbol __ICFEDIT_intvec_start__ = 0x08000000;
 define symbol __ICFEDIT_region_ROM_start__ = 0x08000000;
-define symbol __ICFEDIT_region_ROM_end__   = 0x08007FFF;
+define symbol __ICFEDIT_region_ROM_end__   = 0x0800FFFF;
 define symbol __ICFEDIT_region_RAM_start__ = 0x20000000;
 define symbol __ICFEDIT_region_RAM_end__   = 0x2000FFFF;
 ```
@@ -263,10 +260,9 @@ define symbol __ICFEDIT_region_RAM_end__   = 0x2000FFFF;
 ### 编译宏定义
 ```c
 #define BOOTLOADER_VERSION      0x01000000
-#define APP_START_ADDRESS       0x08008000
-#define CONFIG_START_ADDRESS    0x0807F000
+#define APP_START_ADDRESS       0x08010000
 #define EXTERNAL_FLASH_SIZE     0x800000
-#define MAX_FIRMWARE_SIZE       0x76000
+#define MAX_FIRMWARE_SIZE       0x70000
 ```
 
 ## 性能要求

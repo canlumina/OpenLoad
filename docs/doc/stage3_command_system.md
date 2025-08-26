@@ -467,9 +467,8 @@ static void Cmd_Flash_Info(int argc, char* argv[])
     printf("Flash Information:\r\n");
     printf("=================\r\n");
     printf("Internal Flash: 512KB (0x08000000 - 0x0807FFFF)\r\n");
-    printf("  Bootloader:   32KB  (0x08000000 - 0x08007FFF)\r\n");
-    printf("  Application:  472KB (0x08008000 - 0x0807EFFF)\r\n");
-    printf("  Config:       4KB   (0x0807F000 - 0x0807FFFF)\r\n");
+    printf("  Bootloader:   64KB  (0x08000000 - 0x0800FFFF)\r\n");
+    printf("  Application:  448KB (0x08010000 - 0x0807FFFF)\r\n");
     printf("External Flash: 8MB (W25Q64)\r\n");
     printf("  Download:     2MB   (0x000000 - 0x1FFFFF)\r\n");
     printf("  Backup:       2MB   (0x200000 - 0x3FFFFF)\r\n");

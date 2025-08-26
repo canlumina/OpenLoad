@@ -101,7 +101,7 @@ Firmware_Result_t Firmware_Get_CurrentInfo(Firmware_Info_t* info)
         return FIRMWARE_ERROR;
     
     /* 检查应用程序区域是否有有效固件 */
-    uint32_t app_addr = 0x08008000;
+    uint32_t app_addr = 0x08010000;
     Firmware_Header_t* header = (Firmware_Header_t*)app_addr;
     
     if (header->magic == FIRMWARE_MAGIC)
@@ -181,7 +181,7 @@ Firmware_Result_t Firmware_Backup_Current(void)
     /* 读取并写入固件数据 */
     uint8_t buffer[256];
     uint32_t bytes_copied = 0;
-    uint32_t source_addr = 0x08008000;
+    uint32_t source_addr = 0x08010000;
     
     while (bytes_copied < backup_size)
     {
@@ -257,7 +257,7 @@ Firmware_Result_t Firmware_Restore_FromBackup(void)
     
     /* 擦除应用程序区域 */
     printf("Firmware: Erasing application area (%d pages)...\r\n", pages_to_erase);
-    if (Flash_Internal_Erase(0x08008000, pages_to_erase) != FLASH_OK)
+    if (Flash_Internal_Erase(0x08010000, pages_to_erase) != FLASH_OK)
     {
         printf("Firmware: Application area erase failed\r\n");
         return FIRMWARE_ERROR;
@@ -266,7 +266,7 @@ Firmware_Result_t Firmware_Restore_FromBackup(void)
     /* 恢复固件数据 */
     uint8_t buffer[256];
     uint32_t bytes_restored = 0;
-    uint32_t dest_addr = 0x08008000;
+    uint32_t dest_addr = 0x08010000;
     
     while (bytes_restored < restore_size)
     {
@@ -488,9 +488,9 @@ Firmware_Result_t Firmware_Erase_Current(void)
     printf("Firmware: WARNING - Erasing current firmware!\r\n");
     
     /* 擦除整个应用程序区域 */
-    uint32_t pages_to_erase = (472 * 1024) / 2048;  // 472KB / 2KB per page
+    uint32_t pages_to_erase = (448 * 1024) / 2048;  // 448KB / 2KB per page
     
-    if (Flash_Internal_Erase(0x08008000, pages_to_erase) != FLASH_OK)
+    if (Flash_Internal_Erase(0x08010000, pages_to_erase) != FLASH_OK)
     {
         printf("Firmware: Erase failed\r\n");
         return FIRMWARE_ERROR;

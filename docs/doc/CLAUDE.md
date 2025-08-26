@@ -1,0 +1,1 @@
+- 使用SPI2来驱动w25q64，请将文档中有关SPI1全部修改成SPI2，而且内部falsh只有两个分区，前64k是bootloader，后448k是应用程序app分区

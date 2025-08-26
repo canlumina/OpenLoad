@@ -114,8 +114,8 @@ Use Memory Layout from Target Dialog: ☑
 ### 创建自定义Scatter文件
 ```scatter
 ; STM32F103ZE_Bootloader.sct
-LR_IROM1 0x08000000 0x00008000  {    ; 加载域, 32KB Bootloader区域
-  ER_IROM1 0x08000000 0x00008000  {  ; 执行域
+LR_IROM1 0x08000000 0x00010000  {    ; 加载域, 64KB Bootloader区域
+  ER_IROM1 0x08000000 0x00010000  {  ; 执行域
    *.o (RESET, +First)
    *(InRoot$$Sections)
    .ANY (+RO)

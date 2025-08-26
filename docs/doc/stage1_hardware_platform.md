@@ -29,11 +29,11 @@
   - 格式: 8N1
 
 ### SPI通信
-- **SPI1**：W25Q64外部Flash
-  - SCLK: PA5 (引脚15)
-  - MISO: PA6 (引脚16)
-  - MOSI: PA7 (引脚17)
-  - CS: PA4 (引脚14)
+- **SPI2**：W25Q64外部Flash
+  - SCLK: PB13 (引脚52)
+  - MISO: PB14 (引脚53)
+  - MOSI: PB15 (引脚54)
+  - CS: PB12 (引脚51)
   - 最大速度: 18MHz
 
 ### GPIO配置

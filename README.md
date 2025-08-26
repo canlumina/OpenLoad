@@ -14,10 +14,10 @@
 
 ### 1.2 硬件配置
 - 主控：STM32F103ZET6 (512KB Flash, 64KB RAM)
-- 外部Flash：W25Q64 (8MB) 通过SPI1连接
+- 外部Flash：W25Q64 (8MB) 通过SPI2连接
 - 串口：USART1 (PA9-TX, PA10-RX) 用于固件下载
 - 按键：PA0 (低电平有效)
-- LED指示：PC13 (状态指示)
+- LED指示：PB5(状态指示)
 
 ## 2. Flash分区设计
 

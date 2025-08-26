@@ -37,8 +37,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 内存分区方案
 ### STM32F103ZET6 内部Flash (512KB)
 - **Bootloader区**: 0x08000000-0x0800FFFF (64KB)
-- **应用程序区**: 0x08010000-0x0807EFFF (444KB)
-- **配置参数区**: 0x0807F000-0x0807FFFF (4KB)
+- **应用程序区**: 0x08010000-0x0807FFFF (448KB)
 
 ### W25Q64 外部Flash (8MB)
 - **固件下载区**: 0x000000-0x1FFFFF (2MB)
