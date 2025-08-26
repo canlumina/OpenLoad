@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/D:\\STM32\\OpenLoad/**)",
+      "Read(/D:\\STM32\\OpenLoad/**)",
+      "Read(/D:\\STM32\\OpenLoad\\docs/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\keil/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\keil\\User/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\gcc/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\gcc/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\gcc/**)",
+      "Read(/D:\\STM32\\OpenLoad/**)",
+      "Read(/D:\\STM32\\OpenLoad/**)",
+      "Read(/D:\\STM32\\OpenLoad/**)",
+      "Read(/D:\\STM32\\OpenLoad\\docs/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\gcc/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\gcc/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\gcc/**)",
+      "Read(/D:\\STM32\\OpenLoad\\example\\gcc\\Core\\Inc/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
