@@ -15,6 +15,7 @@ typedef struct
 	uint16_t dmarx_buf_size;    /*!< DMA接收缓冲区大小 */
 	uint8_t *dmatx_buf;	        /*!< DMA发送缓冲区指针 */
 	uint16_t dmatx_buf_size;    /*!< DMA发送缓冲区大小 */
+	uint16_t last_dmarx_size;   /*!< 上次DMA接收处理的位置 */
 	UART_HandleTypeDef *huart;  /*!< UART句柄指针 */
 }uart_device_t;
 
@@ -58,12 +59,83 @@ static void fifo_unlock(void)
 
 
 /**
- * @brief HAL库UART接收事件回调函数(空闲中断/DMA半满/DMA满)
- * @param huart UART句柄
- * @param Size 接收到的数据大小
+ * @brief UART DMA接收半满中断处理
+ * @param uart_id UART设备ID
  * @retval 无
  */
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+void uart_dmarx_half_done_isr(uint8_t uart_id)
+{
+	uint16_t recv_total_size;
+	uint16_t recv_size;
+	
+	/* 获取已接收的总数据量 = 缓冲区大小 - DMA剩余计数 */
+	recv_total_size = s_uart_dev[uart_id].dmarx_buf_size - __HAL_DMA_GET_COUNTER(s_uart_dev[uart_id].huart->hdmarx);
+	recv_size = recv_total_size - s_uart_dev[uart_id].last_dmarx_size;
+	
+	if (recv_size > 0)
+	{
+		s_UartTxRxCount[uart_id*2+1] += recv_size;
+		fifo_write(&s_uart_dev[uart_id].rx_fifo, 
+				   &s_uart_dev[uart_id].dmarx_buf[s_uart_dev[uart_id].last_dmarx_size], 
+				   recv_size);
+		s_uart_dev[uart_id].last_dmarx_size = recv_total_size;
+	}
+}
+
+/**
+ * @brief UART DMA接收完成中断处理
+ * @param uart_id UART设备ID
+ * @retval 无
+ */
+void uart_dmarx_done_isr(uint8_t uart_id)
+{
+	uint16_t recv_size;
+	
+	/* DMA完成，处理剩余数据 */
+	recv_size = s_uart_dev[uart_id].dmarx_buf_size - s_uart_dev[uart_id].last_dmarx_size;
+	
+	if (recv_size > 0)
+	{
+		s_UartTxRxCount[uart_id*2+1] += recv_size;
+		fifo_write(&s_uart_dev[uart_id].rx_fifo, 
+				   &s_uart_dev[uart_id].dmarx_buf[s_uart_dev[uart_id].last_dmarx_size], 
+				   recv_size);
+	}
+	
+	/* 循环模式下，DMA会自动从0开始 */
+	s_uart_dev[uart_id].last_dmarx_size = 0;
+}
+
+/**
+ * @brief UART空闲中断处理
+ * @param uart_id UART设备ID
+ * @retval 无
+ */
+void uart_dmarx_idle_isr(uint8_t uart_id)
+{
+	uint16_t recv_total_size;
+	uint16_t recv_size;
+	
+	/* 获取已接收的总数据量 = 缓冲区大小 - DMA剩余计数 */
+	recv_total_size = s_uart_dev[uart_id].dmarx_buf_size - __HAL_DMA_GET_COUNTER(s_uart_dev[uart_id].huart->hdmarx);
+	recv_size = recv_total_size - s_uart_dev[uart_id].last_dmarx_size;
+	
+	if (recv_size > 0)
+	{
+		s_UartTxRxCount[uart_id*2+1] += recv_size;
+		fifo_write(&s_uart_dev[uart_id].rx_fifo, 
+				   &s_uart_dev[uart_id].dmarx_buf[s_uart_dev[uart_id].last_dmarx_size], 
+				   recv_size);
+		s_uart_dev[uart_id].last_dmarx_size = recv_total_size;
+	}
+}
+
+/**
+ * @brief HAL库UART接收半满回调函数
+ * @param huart UART句柄
+ * @retval 无
+ */
+void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart)
 {
 	uint8_t uart_id = 0;
 	
@@ -76,15 +148,28 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 		uart_id = 1;
 	}
 	
-	/* 将接收到的数据写入接收FIFO */
-	s_UartTxRxCount[uart_id*2+1] += Size;
-	fifo_write(&s_uart_dev[uart_id].rx_fifo, 
-			   s_uart_dev[uart_id].dmarx_buf, Size);
+	uart_dmarx_half_done_isr(uart_id);
+}
+
+/**
+ * @brief HAL库UART接收完成回调函数
+ * @param huart UART句柄
+ * @retval 无
+ */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	uint8_t uart_id = 0;
 	
-	/* 重新启动DMA接收 */
-	HAL_UARTEx_ReceiveToIdle_DMA(huart, 
-								  s_uart_dev[uart_id].dmarx_buf, 
-								  s_uart_dev[uart_id].dmarx_buf_size);
+	if (huart->Instance == USART1)
+	{
+		uart_id = 0;
+	}
+	else if (huart->Instance == USART2)
+	{
+		uart_id = 1;
+	}
+	
+	uart_dmarx_done_isr(uart_id);
 }
 
 /**
@@ -138,11 +223,14 @@ void uart_device_init(uint8_t uart_id)
 		s_uart_dev[uart_id].dmatx_buf_size = sizeof(s_uart1_dmatx_buf);
 		s_uart_dev[uart_id].huart = &huart1;
 		s_uart_dev[uart_id].tx_busy = 0;
+		s_uart_dev[uart_id].last_dmarx_size = 0;
 		
-		/* 启动UART1的DMA接收功能，使用HAL_UARTEx_ReceiveToIdle_DMA */
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart1, 
-									  s_uart_dev[uart_id].dmarx_buf, 
-									  s_uart_dev[uart_id].dmarx_buf_size);
+		/* 直接启动DMA循环接收 */
+		HAL_UART_Receive_DMA(&huart1, 
+							 s_uart_dev[uart_id].dmarx_buf, 
+							 s_uart_dev[uart_id].dmarx_buf_size);
+		/* 使能空闲中断 */
+		__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
 	}
 	else if (uart_id == 1)
 	{
@@ -159,11 +247,14 @@ void uart_device_init(uint8_t uart_id)
 		s_uart_dev[uart_id].dmatx_buf_size = sizeof(s_uart2_dmatx_buf);
 		s_uart_dev[uart_id].huart = &huart2;
 		s_uart_dev[uart_id].tx_busy = 0;
+		s_uart_dev[uart_id].last_dmarx_size = 0;
 		
-		/* 启动UART2的DMA接收功能，使用HAL_UARTEx_ReceiveToIdle_DMA */
-		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, 
-									  s_uart_dev[uart_id].dmarx_buf, 
-									  s_uart_dev[uart_id].dmarx_buf_size);
+		/* 直接启动DMA循环接收 */
+		HAL_UART_Receive_DMA(&huart2, 
+							 s_uart_dev[uart_id].dmarx_buf, 
+							 s_uart_dev[uart_id].dmarx_buf_size);
+		/* 使能空闲中断 */
+		__HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
 	}
 }
 

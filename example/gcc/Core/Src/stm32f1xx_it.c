@@ -238,7 +238,15 @@ void DMA1_Channel5_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-
+  /* 处理空闲中断 */
+  if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) != RESET)
+  {
+    /* 清除空闲中断标志(通过读SR和DR寄存器) */
+    __HAL_UART_CLEAR_IDLEFLAG(&huart1);
+    /* 调用空闲中断处理 */
+    extern void uart_dmarx_idle_isr(uint8_t uart_id);
+    uart_dmarx_idle_isr(0);
+  }
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);
   /* USER CODE BEGIN USART1_IRQn 1 */
@@ -280,7 +288,15 @@ void DMA1_Channel7_IRQHandler(void)
 void USART2_IRQHandler(void)
 {
   /* USER CODE BEGIN USART2_IRQn 0 */
-
+  /* 处理空闲中断 */
+  if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE) != RESET)
+  {
+    /* 清除空闲中断标志(通过读SR和DR寄存器) */
+    __HAL_UART_CLEAR_IDLEFLAG(&huart2);
+    /* 调用空闲中断处理 */
+    extern void uart_dmarx_idle_isr(uint8_t uart_id);
+    uart_dmarx_idle_isr(1);
+  }
   /* USER CODE END USART2_IRQn 0 */
   HAL_UART_IRQHandler(&huart2);
   /* USER CODE BEGIN USART2_IRQn 1 */
