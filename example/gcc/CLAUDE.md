@@ -129,3 +129,5 @@ cmake --build build/Release
 - Ninja 构建工具
 - STM32CubeMX (用于硬件配置)
 - 现在同样的方式添加串口2的驱动，跟串口1相同
+- 串口已经完成，现在需要完成bootloader的逻辑，先完成bootloader command，你帮我设计几个命令，比如更新固件，下载固件，备份固件等，前提是在商店3s内有按键按下或者串口有字符输入就可以进入bootloader command界面，否则就运行app
+- 修改内部flash的分区，内部flash只需要分两个区，因为我用的是stm32f103zet6，前64k是bootloader，后448k是app分区

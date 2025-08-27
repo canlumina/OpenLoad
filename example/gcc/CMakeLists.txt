@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/dev_usart.c
     Core/Src/ringbuff.c
+    Core/Src/bootloader_cmd.c
 )
 
 # Add include paths

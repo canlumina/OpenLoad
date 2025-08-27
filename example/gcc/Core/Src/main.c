@@ -26,6 +26,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "dev_usart.h"
+#include "bootloader_cmd.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,7 +58,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static int s_count = 0;
+
 /* USER CODE END 0 */
 
 /**
@@ -68,8 +69,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  uint16_t size = 0;
-  uint8_t buf[256];
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -95,23 +95,34 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
+  /* 初始化串口设备 */
   uart_device_init(DEV_UART1);
   // uart_device_init(DEV_UART2);
+  
+  /* 初始化Bootloader */
+  bootloader_init();
+  
+  /* 检查是否进入Bootloader模式 (3秒超时) */
+  if(bootloader_check_entry(3000))
+  {
+    /* 进入Bootloader命令模式 */
+    bootloader_cmd_mode();
+  }
+  else
+  {
+    /* 跳转到应用程序 */
+    bootloader_jump_to_app();
+  }
+  
+  /* 如果跳转失败，进入Bootloader命令模式 */
+  bootloader_cmd_mode();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    s_count++;
-
-    if (s_count % 5000)
-    {
-      size = uart_read(DEV_UART1, buf, 256);
-      uart_write(DEV_UART1, buf, size);
-
-      uart_poll_dma_tx(DEV_UART1);
-    }
+    /* 正常情况下不会执行到这里 */
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
