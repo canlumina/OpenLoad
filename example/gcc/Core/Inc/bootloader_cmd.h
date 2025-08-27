@@ -32,7 +32,11 @@ typedef enum {
     CMD_EXTINFO,
     CMD_EXTBACKUP,
     CMD_EXTRESTORE,
-    CMD_EXTLIST
+    CMD_EXTLIST,
+    CMD_ESP_INIT,
+    CMD_ESP_TEST,
+    CMD_ESP_WIFI,
+    CMD_ESP_INFO
 } cmd_id_t;
 
 /* 命令结构 */
@@ -62,6 +66,10 @@ void cmd_extinfo_handler(void);
 void cmd_extbackup_handler(void);
 void cmd_extrestore_handler(void);
 void cmd_extlist_handler(void);
+void cmd_esp_init_handler(void);
+void cmd_esp_test_handler(void);
+void cmd_esp_wifi_handler(void);
+void cmd_esp_info_handler(void);
 
 /* Flash操作函数 */
 bool bootloader_flash_erase(uint32_t addr, uint32_t size);

@@ -4,6 +4,7 @@
 #include "gpio.h"
 #include "w25q64.h"
 #include "xmodem.h"
+#include "esp8266.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -24,6 +25,10 @@ static const bootloader_cmd_t cmd_table[] = {
     {"xbackup", "xb", "Backup to external flash",   CMD_EXTBACKUP,  cmd_extbackup_handler},
     {"xrestore","xr", "Restore from external flash",CMD_EXTRESTORE, cmd_extrestore_handler},
     {"xlist",   "xl", "List external flash backups",CMD_EXTLIST,    cmd_extlist_handler},
+    {"espinit", "ei", "Initialize ESP8266 module",  CMD_ESP_INIT,   cmd_esp_init_handler},
+    {"esptest", "et", "Test ESP8266 communication", CMD_ESP_TEST,   cmd_esp_test_handler},
+    {"espwifi", "ew", "Connect to WiFi network",    CMD_ESP_WIFI,   cmd_esp_wifi_handler},
+    {"espinfo", "ef", "Show ESP8266 information",   CMD_ESP_INFO,   cmd_esp_info_handler},
 };
 
 #define CMD_TABLE_SIZE (sizeof(cmd_table)/sizeof(cmd_table[0]))
@@ -808,4 +813,202 @@ static uint32_t calculate_firmware_size(w25q64_partition_id_t pid)
     
     /* 如果没找到有效数据，返回最小固件大小 */
     return 8192;
+}
+
+/* ESP8266命令处理函数 */
+void cmd_esp_init_handler(void)
+{
+    print_str("\r\n=== ESP8266 Initialization ===\r\n");
+    
+    esp8266_status_t status = esp8266_init();
+    
+    if(status == ESP8266_OK)
+    {
+        print_str("ESP8266 initialized successfully!\r\n");
+    }
+    else if(status == ESP8266_TIMEOUT)
+    {
+        print_str("ESP8266 initialization timeout!\r\n");
+        print_str("Check module connection and power.\r\n");
+    }
+    else
+    {
+        print_str("ESP8266 initialization failed!\r\n");
+    }
+}
+
+void cmd_esp_test_handler(void)
+{
+    print_str("\r\n=== ESP8266 Communication Test ===\r\n");
+    
+    esp8266_status_t status = esp8266_test();
+    
+    if(status == ESP8266_OK)
+    {
+        print_str("ESP8266 communication test passed!\r\n");
+    }
+    else if(status == ESP8266_TIMEOUT)
+    {
+        print_str("ESP8266 communication timeout!\r\n");
+        print_str("Check serial connection and baud rate.\r\n");
+    }
+    else
+    {
+        print_str("ESP8266 communication test failed!\r\n");
+    }
+}
+
+void cmd_esp_wifi_handler(void)
+{
+    char ssid[64];
+    char password[64];
+    uint8_t ssid_len = 0;
+    uint8_t pwd_len = 0;
+    uint8_t ch;
+    
+    print_str("\r\n=== WiFi Connection ===\r\n");
+    
+    /* 输入SSID */
+    print_str("Enter WiFi SSID: ");
+    while(ssid_len < sizeof(ssid) - 1)
+    {
+        ch = read_char();
+        if(ch == '\r' || ch == '\n')
+        {
+            break;
+        }
+        else if(ch == '\b' || ch == 0x7F)
+        {
+            if(ssid_len > 0)
+            {
+                ssid_len--;
+                print_str(" \b");
+            }
+        }
+        else
+        {
+            ssid[ssid_len++] = ch;
+        }
+    }
+    ssid[ssid_len] = '\0';
+    print_str("\r\n");
+    
+    if(ssid_len == 0)
+    {
+        print_str("SSID cannot be empty!\r\n");
+        return;
+    }
+    
+    /* 输入密码 */
+    print_str("Enter Password: ");
+    while(pwd_len < sizeof(password) - 1)
+    {
+        ch = read_char();
+        if(ch == '\r' || ch == '\n')
+        {
+            break;
+        }
+        else if(ch == '\b' || ch == 0x7F)
+        {
+            if(pwd_len > 0)
+            {
+                pwd_len--;
+                print_str(" \b");
+            }
+        }
+        else
+        {
+            password[pwd_len++] = ch;
+            print_str("*"); /* 隐藏密码显示 */
+        }
+    }
+    password[pwd_len] = '\0';
+    print_str("\r\n");
+    
+    print_str("Connecting to \"");
+    print_str(ssid);
+    print_str("\"...\r\n");
+    
+    esp8266_status_t status = esp8266_connect_wifi(ssid, password);
+    
+    if(status == ESP8266_OK)
+    {
+        print_str("WiFi connected successfully!\r\n");
+        
+        /* 获取IP地址 */
+        char ip[32];
+        if(esp8266_get_ip(ip, sizeof(ip)) == ESP8266_OK)
+        {
+            print_str("IP Address: ");
+            print_str(ip);
+            print_str("\r\n");
+        }
+    }
+    else if(status == ESP8266_TIMEOUT)
+    {
+        print_str("WiFi connection timeout!\r\n");
+        print_str("Check SSID and password.\r\n");
+    }
+    else
+    {
+        print_str("WiFi connection failed!\r\n");
+    }
+}
+
+void cmd_esp_info_handler(void)
+{
+    char buffer[512];
+    
+    print_str("\r\n=== ESP8266 Information ===\r\n");
+    
+    /* 获取版本信息 */
+    print_str("Getting version info...\r\n");
+    if(esp8266_get_version(buffer, sizeof(buffer)) == ESP8266_OK)
+    {
+        print_str("Version:\r\n");
+        print_str(buffer);
+        print_str("\r\n");
+    }
+    else
+    {
+        print_str("Failed to get version info.\r\n");
+    }
+    
+    /* 检查连接状态 */
+    print_str("Connection Status: ");
+    if(esp8266_is_connected())
+    {
+        print_str("Connected\r\n");
+        
+        /* 获取IP地址 */
+        if(esp8266_get_ip(buffer, sizeof(buffer)) == ESP8266_OK)
+        {
+            print_str("IP Address: ");
+            print_str(buffer);
+            print_str("\r\n");
+        }
+    }
+    else
+    {
+        print_str("Disconnected\r\n");
+    }
+    
+    /* 获取详细状态 */
+    esp8266_conn_status_t conn_status = esp8266_get_connection_status();
+    print_str("Detailed Status: ");
+    switch(conn_status)
+    {
+        case ESP8266_DISCONNECTED:
+            print_str("Disconnected\r\n");
+            break;
+        case ESP8266_CONNECTED:
+            print_str("Connected but no IP\r\n");
+            break;
+        case ESP8266_GOT_IP:
+            print_str("Connected with IP\r\n");
+            break;
+        default:
+            print_str("Unknown\r\n");
+            break;
+    }
 }

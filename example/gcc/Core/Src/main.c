@@ -97,7 +97,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   /* 初始化串口设备 */
   uart_device_init(DEV_UART1);
-  // uart_device_init(DEV_UART2);
+  uart_device_init(DEV_UART2);
   
   /* 初始化Bootloader */
   bootloader_init();

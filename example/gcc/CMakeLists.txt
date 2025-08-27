@@ -50,6 +50,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/bootloader_cmd.c
     Core/Src/w25q64.c
     Core/Src/xmodem.c
+    Core/Src/esp8266.c
 )
 
 # Add include paths
