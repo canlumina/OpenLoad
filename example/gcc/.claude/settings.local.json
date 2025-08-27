@@ -11,12 +11,17 @@
       "Read(/D:\\STM32\\stm32-uart-dma\\stm32f1-uart-dma\\Source\\Bsp/**)",
       "Bash(del CoreSrczmodem.c CoreInczmodem.h)",
       "Bash(rm:*)",
-      "Bash(arm-none-eabi-size:*)"
+      "Bash(arm-none-eabi-size:*)",
+      "Read(D:\\STM32\\ota_server/**)",
+      "Read(D:\\STM32\\ota_server/**)",
+      "Read(D:\\STM32\\ota_server/**)",
+      "Read(D:\\STM32\\ota_server/**)"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": [
-      "D:\\"
+      "D:\\",
+      "D:\\D\\STM32\\OpenLoad\\example"
     ]
   }
 }

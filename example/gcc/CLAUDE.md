@@ -135,3 +135,4 @@ cmake --build build/Release
 - 使用流式写入将固件写入外部flash，IAP使用zmodem
 - 在现有的功能下，优化代码，主要是将功能模块化，减小bootloader程序的大小，现在程序太大了
 - 现在已经完成了串口2的驱动，现在实现串口2用来驱动esp8266的代码，PE9是esp8266的复位引脚
+- esp8266驱动已经完成，现在需要完成OTA更新，命令就在原来的u中添加，也是同样可以选择下载固件到internal还是external

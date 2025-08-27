@@ -29,6 +29,8 @@ static const bootloader_cmd_t cmd_table[] = {
     {"esptest", "et", "Test ESP8266 communication", CMD_ESP_TEST,   cmd_esp_test_handler},
     {"espwifi", "ew", "Connect to WiFi network",    CMD_ESP_WIFI,   cmd_esp_wifi_handler},
     {"espinfo", "ef", "Show ESP8266 information",   CMD_ESP_INFO,   cmd_esp_info_handler},
+    {"espping", "ep", "Test network connectivity",  CMD_ESP_PING,   cmd_esp_ping_handler},
+    {"httptest", "ht", "Test HTTP request debug",   CMD_HTTP_TEST,  cmd_http_test_handler},
 };
 
 #define CMD_TABLE_SIZE (sizeof(cmd_table)/sizeof(cmd_table[0]))
@@ -212,16 +214,27 @@ void cmd_help_handler(void)
     print_str("===============================================\r\n");
 }
 
+/* OTA更新函数声明 */
+static void ota_update_internal(const char *url);
+static void ota_update_external(const char *url, uint8_t slot);
+
 void cmd_update_handler(void)
 {
-    print_str("Firmware update via XMODEM\r\n");
-    print_str("1=Internal 2=External: ");
+    uint8_t ch;
     
-    uint8_t ch = read_char();
+    print_str("Firmware update method:\r\n");
+    print_str("1 = XMODEM to Internal Flash\r\n");
+    print_str("2 = XMODEM to External Flash\r\n");
+    print_str("3 = OTA to Internal Flash\r\n");
+    print_str("4 = OTA to External Flash\r\n");
+    print_str("Select (1-4): ");
+    
+    ch = read_char();
     print_str("\r\n");
     
     if(ch == '1')
     {
+        /* XMODEM到内部Flash */
         print_str("WARNING! Update internal flash? (y/n): ");
         if(read_char() != 'y')
         {
@@ -252,6 +265,7 @@ void cmd_update_handler(void)
     }
     else if(ch == '2')
     {
+        /* XMODEM到外部Flash */
         print_str("Slot (1-3): ");
         ch = read_char() - '0';
         print_str("\r\n");
@@ -274,6 +288,129 @@ void cmd_update_handler(void)
         {
             print_str("Transfer failed!\r\n");
         }
+    }
+    else if(ch == '3')
+    {
+        /* OTA到内部Flash */
+        char url[256];
+        uint8_t url_len = 0;
+        
+        print_str("Enter firmware URL or 'latest': ");
+        while(url_len < sizeof(url) - 1)
+        {
+            ch = read_char();
+            if(ch == '\r' || ch == '\n')
+            {
+                break;
+            }
+            else if(ch == '\b' || ch == 0x7F)
+            {
+                if(url_len > 0)
+                {
+                    url_len--;
+                    print_str(" \b");
+                }
+            }
+            else
+            {
+                url[url_len++] = ch;
+            }
+        }
+        url[url_len] = '\0';
+        print_str("\r\n");
+        
+        if(url_len == 0)
+        {
+            print_str("URL cannot be empty!\r\n");
+            return;
+        }
+        
+        /* 如果用户只输入"latest"，构造完整URL */
+        if(strcmp(url, "latest") == 0)
+        {
+            strcpy(url, "http://115.190.137.231:3685/api/firmware/download/latest");
+        }
+        /* 修正常见的URL错误：将/latest改为/download/latest */
+        else if(strstr(url, "/api/firmware/latest") != NULL && strstr(url, "/download/") == NULL)
+        {
+            char temp_url[256];
+            char *latest_pos = strstr(url, "/api/firmware/latest");
+            strncpy(temp_url, url, latest_pos - url);
+            temp_url[latest_pos - url] = '\0';
+            strcat(temp_url, "/api/firmware/download/latest");
+            strcpy(url, temp_url);
+        }
+        
+        ota_update_internal(url);
+    }
+    else if(ch == '4')
+    {
+        /* OTA到外部Flash */
+        char url[256];
+        uint8_t url_len = 0;
+        uint8_t slot;
+        
+        print_str("Slot (1-3): ");
+        slot = read_char() - '0';
+        print_str("\r\n");
+        
+        if(slot < 1 || slot > 3)
+        {
+            print_str("Invalid slot!\r\n");
+            return;
+        }
+        
+        print_str("Enter firmware URL or 'latest': ");
+        while(url_len < sizeof(url) - 1)
+        {
+            ch = read_char();
+            if(ch == '\r' || ch == '\n')
+            {
+                break;
+            }
+            else if(ch == '\b' || ch == 0x7F)
+            {
+                if(url_len > 0)
+                {
+                    url_len--;
+                    print_str(" \b");
+                }
+            }
+            else
+            {
+                url[url_len++] = ch;
+            }
+        }
+        url[url_len] = '\0';
+        print_str("\r\n");
+        
+        if(url_len == 0)
+        {
+            print_str("URL cannot be empty!\r\n");
+            return;
+        }
+        
+        /* 如果用户只输入"latest"，构造完整URL */
+        if(strcmp(url, "latest") == 0)
+        {
+            strcpy(url, "http://115.190.137.231:3685/api/firmware/download/latest");
+        }
+        /* 修正常见的URL错误：将/latest改为/download/latest */
+        else if(strstr(url, "/api/firmware/latest") != NULL && strstr(url, "/download/") == NULL)
+        {
+            char temp_url[256];
+            char *latest_pos = strstr(url, "/api/firmware/latest");
+            strncpy(temp_url, url, latest_pos - url);
+            temp_url[latest_pos - url] = '\0';
+            strcat(temp_url, "/api/firmware/download/latest");
+            strcpy(url, temp_url);
+        }
+        
+        ota_update_external(url, slot);
+    }
+    else
+    {
+        print_str("Invalid selection!\r\n");
     }
 }
 
@@ -1010,5 +1147,536 @@ void cmd_esp_info_handler(void)
         default:
             print_str("Unknown\r\n");
             break;
+    }
+}
+
+void cmd_esp_ping_handler(void)
+{
+    char host[64];
+    uint8_t host_len = 0;
+    uint8_t ch;
+    
+    print_str("\r\n=== Network Connectivity Test ===\r\n");
+    
+    /* 检查WiFi连接 */
+    if(!esp8266_is_connected())
+    {
+        print_str("ERROR: WiFi not connected!\r\n");
+        print_str("Use 'espwifi' command to connect first.\r\n");
+        return;
+    }
+    
+    print_str("Enter host/IP to test (e.g. 115.190.137.231): ");
+    while(host_len < sizeof(host) - 1)
+    {
+        ch = read_char();
+        if(ch == '\r' || ch == '\n')
+        {
+            break;
+        }
+        else if(ch == '\b' || ch == 0x7F)
+        {
+            if(host_len > 0)
+            {
+                host_len--;
+                print_str(" \b");
+            }
+        }
+        else
+        {
+            host[host_len++] = ch;
+        }
+    }
+    host[host_len] = '\0';
+    print_str("\r\n");
+    
+    if(host_len == 0)
+    {
+        /* 默认测试一些常见的服务 */
+        print_str("Testing common servers...\r\n");
+        
+        /* 测试百度 */
+        print_str("Testing baidu.com:80... ");
+        esp8266_status_t status = esp8266_test_connection("baidu.com", 80);
+        if(status == ESP8266_OK)
+        {
+            print_str("SUCCESS\r\n");
+        }
+        else
+        {
+            print_str("FAILED\r\n");
+        }
+        
+        /* 测试Google DNS */
+        print_str("Testing 8.8.8.8:53... ");
+        status = esp8266_test_connection("8.8.8.8", 53);
+        if(status == ESP8266_OK)
+        {
+            print_str("SUCCESS\r\n");
+        }
+        else
+        {
+            print_str("FAILED\r\n");
+        }
+        
+        /* 测试HTTP服务 */
+        print_str("Testing httpbin.org:80... ");
+        status = esp8266_test_connection("httpbin.org", 80);
+        if(status == ESP8266_OK)
+        {
+            print_str("SUCCESS\r\n");
+        }
+        else
+        {
+            print_str("FAILED\r\n");
+        }
+    }
+    else
+    {
+        /* 测试用户指定的主机 */
+        print_str("Testing ");
+        print_str(host);
+        print_str(":3685... ");
+        
+        esp8266_status_t status = esp8266_test_connection(host, 3685);
+        if(status == ESP8266_OK)
+        {
+            print_str("SUCCESS\r\n");
+            print_str("Server is reachable!\r\n");
+        }
+        else if(status == ESP8266_TIMEOUT)
+        {
+            print_str("TIMEOUT\r\n");
+            print_str("Possible issues:\r\n");
+            print_str("1. Server is down\r\n");
+            print_str("2. Port 3685 is blocked\r\n");
+            print_str("3. Network routing issue\r\n");
+        }
+        else
+        {
+            print_str("FAILED\r\n");
+            print_str("Connection rejected or network error\r\n");
+        }
+        
+        /* 也测试HTTP端口 */
+        print_str("Testing ");
+        print_str(host);
+        print_str(":80... ");
+        
+        status = esp8266_test_connection(host, 80);
+        if(status == ESP8266_OK)
+        {
+            print_str("SUCCESS\r\n");
+        }
+        else
+        {
+            print_str("FAILED\r\n");
+        }
+    }
+}
+
+void cmd_http_test_handler(void)
+{
+    esp8266_status_t status;
+    char url[] = "http://115.190.137.231:3685/api/firmware/download/latest";
+    char host[] = "115.190.137.231";
+    char path[] = "/api/firmware/download/latest";
+    uint16_t port = 3685;
+    char http_request[256];
+    uint8_t buffer[512];
+    uint16_t received;
+    
+    print_str("\r\n=== HTTP Request Debug ===\r\n");
+    
+    /* 检查WiFi连接 */
+    if(!esp8266_is_connected())
+    {
+        print_str("ERROR: WiFi not connected!\r\n");
+        return;
+    }
+    
+    print_str("Testing HTTP request to your server...\r\n");
+    print_str("URL: ");
+    print_str(url);
+    print_str("\r\n\r\n");
+    
+    /* 建立TCP连接 */
+    print_str("Step 1: Connecting to TCP...\r\n");
+    status = esp8266_tcp_connect(host, port);
+    if (status != ESP8266_OK) {
+        print_str("TCP connection failed!\r\n");
+        return;
+    }
+    print_str("TCP connection SUCCESS\r\n\r\n");
+    
+    /* 构造HTTP请求 */
+    snprintf(http_request, sizeof(http_request),
+             "GET %s HTTP/1.1\r\n"
+             "Host: %s\r\n"
+             "Connection: close\r\n"
+             "\r\n",
+             path, host);
+    
+    print_str("Step 2: Sending HTTP request:\r\n");
+    print_str("--------\r\n");
+    print_str(http_request);
+    print_str("--------\r\n");
+    
+    /* 发送HTTP请求 */
+    status = esp8266_tcp_send((uint8_t *)http_request, strlen(http_request));
+    if (status != ESP8266_OK) {
+        print_str("HTTP request send failed!\r\n");
+        esp8266_tcp_close();
+        return;
+    }
+    print_str("HTTP request sent SUCCESS\r\n\r\n");
+    
+    /* 读取HTTP响应 */
+    print_str("Step 3: Reading HTTP response...\r\n");
+    HAL_Delay(1000);  /* 等待响应 */
+    
+    uint32_t start_time = HAL_GetTick();
+    uint16_t total_received = 0;
+    
+    print_str("HTTP Response:\r\n");
+    print_str("--------\r\n");
+    
+    while ((HAL_GetTick() - start_time) < 5000 && total_received < 400) {
+        received = esp8266_tcp_receive(buffer, sizeof(buffer) - 1, 500);
+        if (received > 0) {
+            buffer[received] = '\0';
+            print_str((char*)buffer);
+            total_received += received;
+        } else {
+            break;
+        }
+    }
+    
+    print_str("\r\n--------\r\n");
+    print_str("Total received: ");
+    print_dec(total_received);
+    print_str(" bytes\r\n");
+    
+    esp8266_tcp_close();
+    print_str("Connection closed.\r\n");
+}
+
+/**
+ * @brief OTA更新到内部Flash
+ * @param url 固件下载URL
+ */
+static void ota_update_internal(const char *url)
+{
+    esp8266_http_info_t http_info;
+    esp8266_status_t status;
+    uint8_t buffer[1024];
+    uint16_t received;
+    uint32_t total_written = 0;
+    
+    print_str("Starting OTA update to internal flash...\r\n");
+    
+    /* 检查WiFi连接 */
+    if(!esp8266_is_connected())
+    {
+        print_str("ERROR: WiFi not connected!\r\n");
+        print_str("Use 'espwifi' command to connect first.\r\n");
+        return;
+    }
+    
+    print_str("Connected to: ");
+    print_str(url);
+    print_str("\r\n");
+    
+    /* 开始HTTP下载 */
+    status = esp8266_http_get_start(url, &http_info);
+    if(status != ESP8266_OK)
+    {
+        if(status == ESP8266_TIMEOUT)
+        {
+            print_str("HTTP request timeout!\r\n");
+            print_str("Check network connection and server.\r\n");
+        }
+        else
+        {
+            print_str("HTTP request failed!\r\n");
+            print_str("Let's test the connection first...\r\n");
+            
+            /* 尝试调试连接 */
+            print_str("Testing TCP connection to 115.190.137.231:3685...\r\n");
+            esp8266_status_t test_status = esp8266_test_connection("115.190.137.231", 3685);
+            if(test_status == ESP8266_OK)
+            {
+                print_str("TCP connection: SUCCESS\r\n");
+                print_str("Problem might be in HTTP protocol.\r\n");
+                print_str("Try using 'httptest' command for debugging.\r\n");
+            }
+            else
+            {
+                print_str("TCP connection: FAILED\r\n");
+                print_str("Check WiFi connection and server status.\r\n");
+            }
+        }
+        return;
+    }
+    
+    print_str("HTTP 200 OK, Content-Length: ");
+    if(http_info.content_length > 0)
+    {
+        print_dec(http_info.content_length);
+        print_str(" bytes\r\n");
+        
+        /* 检查固件大小 */
+        if(http_info.content_length > APP_MAX_SIZE)
+        {
+            print_str("ERROR: Firmware too large!\r\n");
+            esp8266_http_get_finish();
+            return;
+        }
+    }
+    else
+    {
+        print_str("Unknown (chunked)\r\n");
+    }
+    
+    /* 确认更新 */
+    print_str("WARNING! This will overwrite internal flash!\r\n");
+    print_str("Continue? (y/n): ");
+    if(read_char() != 'y')
+    {
+        print_str("\r\nCancelled\r\n");
+        esp8266_http_get_finish();
+        return;
+    }
+    print_str("\r\n");
+    
+    /* 擦除内部Flash */
+    print_str("Erasing internal flash...\r\n");
+    if(!bootloader_flash_erase(APP_START_ADDR, APP_MAX_SIZE))
+    {
+        print_str("Flash erase failed!\r\n");
+        esp8266_http_get_finish();
+        return;
+    }
+    
+    /* 下载并写入固件 */
+    print_str("Downloading firmware...\r\n");
+    uint32_t last_progress = 0;
+    
+    while(true)
+    {
+        received = esp8266_http_get_data(buffer, sizeof(buffer), 5000);
+        if(received == 0)
+        {
+            break; /* 下载完成 */
+        }
+        
+        /* 写入内部Flash */
+        if(!bootloader_flash_write(APP_START_ADDR + total_written, buffer, received))
+        {
+            print_str("\r\nFlash write failed!\r\n");
+            esp8266_http_get_finish();
+            return;
+        }
+        
+        total_written += received;
+        
+        /* 显示进度 */
+        if(http_info.content_length > 0)
+        {
+            uint32_t progress = (total_written * 100) / http_info.content_length;
+            if(progress != last_progress && (progress % 5) == 0)
+            {
+                show_progress(total_written, http_info.content_length, "Download");
+                last_progress = progress;
+            }
+        }
+        else
+        {
+            /* 未知大小，每32KB显示一次 */
+            if((total_written % 32768) == 0 || received < sizeof(buffer))
+            {
+                print_str("Downloaded: ");
+                print_dec(total_written / 1024);
+                print_str("KB\r\n");
+            }
+        }
+    }
+    
+    esp8266_http_get_finish();
+    
+    print_str("\r\nOTA update completed!\r\n");
+    print_str("Total downloaded: ");
+    print_dec(total_written);
+    print_str(" bytes\r\n");
+    
+    /* 验证应用程序 */
+    if(bootloader_validate_app())
+    {
+        print_str("Firmware validation: PASSED\r\n");
+    }
+    else
+    {
+        print_str("Firmware validation: FAILED\r\n");
+    }
+}
+
+/**
+ * @brief OTA更新到外部Flash
+ * @param url 固件下载URL
+ * @param slot 备份槽位(1-3)
+ */
+static void ota_update_external(const char *url, uint8_t slot)
+{
+    esp8266_http_info_t http_info;
+    esp8266_status_t status;
+    uint8_t buffer[1024];
+    uint16_t received;
+    uint32_t total_written = 0;
+    w25q64_partition_id_t pid = W25Q64_PARTITION_BACKUP1 + slot - 1;
+    
+    print_str("Starting OTA update to external flash slot ");
+    print_dec(slot);
+    print_str("...\r\n");
+    
+    /* 检查WiFi连接 */
+    if(!esp8266_is_connected())
+    {
+        print_str("ERROR: WiFi not connected!\r\n");
+        print_str("Use 'espwifi' command to connect first.\r\n");
+        return;
+    }
+    
+    print_str("Connected to: ");
+    print_str(url);
+    print_str("\r\n");
+    
+    /* 开始HTTP下载 */
+    status = esp8266_http_get_start(url, &http_info);
+    if(status != ESP8266_OK)
+    {
+        if(status == ESP8266_TIMEOUT)
+        {
+            print_str("HTTP request timeout!\r\n");
+            print_str("Check network connection and server.\r\n");
+        }
+        else
+        {
+            print_str("HTTP request failed!\r\n");
+            print_str("Let's test the connection first...\r\n");
+            
+            /* 尝试调试连接 */
+            print_str("Testing TCP connection to 115.190.137.231:3685...\r\n");
+            esp8266_status_t test_status = esp8266_test_connection("115.190.137.231", 3685);
+            if(test_status == ESP8266_OK)
+            {
+                print_str("TCP connection: SUCCESS\r\n");
+                print_str("Problem might be in HTTP protocol.\r\n");
+                print_str("Try using 'httptest' command for debugging.\r\n");
+            }
+            else
+            {
+                print_str("TCP connection: FAILED\r\n");
+                print_str("Check WiFi connection and server status.\r\n");
+            }
+        }
+        return;
+    }
+    
+    print_str("HTTP 200 OK, Content-Length: ");
+    if(http_info.content_length > 0)
+    {
+        print_dec(http_info.content_length);
+        print_str(" bytes\r\n");
+    }
+    else
+    {
+        print_str("Unknown (chunked)\r\n");
+    }
+    
+    /* 初始化外部Flash */
+    w25q64_init();
+    
+    /* 擦除外部Flash分区 */
+    print_str("Erasing external flash partition...\r\n");
+    if(!w25q64_erase_partition(pid))
+    {
+        print_str("External flash erase failed!\r\n");
+        esp8266_http_get_finish();
+        return;
+    }
+    
+    /* 下载并写入固件 */
+    print_str("Downloading firmware...\r\n");
+    uint32_t last_progress = 0;
+    
+    while(true)
+    {
+        received = esp8266_http_get_data(buffer, sizeof(buffer), 5000);
+        if(received == 0)
+        {
+            break; /* 下载完成 */
+        }
+        
+        /* 写入外部Flash */
+        if(!w25q64_write_partition(pid, total_written, buffer, received))
+        {
+            print_str("\r\nExternal flash write failed!\r\n");
+            esp8266_http_get_finish();
+            return;
+        }
+        
+        total_written += received;
+        
+        /* 显示进度 */
+        if(http_info.content_length > 0)
+        {
+            uint32_t progress = (total_written * 100) / http_info.content_length;
+            if(progress != last_progress && (progress % 5) == 0)
+            {
+                show_progress(total_written, http_info.content_length, "Download");
+                last_progress = progress;
+            }
+        }
+        else
+        {
+            /* 未知大小，每32KB显示一次 */
+            if((total_written % 32768) == 0 || received < sizeof(buffer))
+            {
+                print_str("Downloaded: ");
+                print_dec(total_written / 1024);
+                print_str("KB\r\n");
+            }
+        }
+    }
+    
+    esp8266_http_get_finish();
+    
+    print_str("\r\nOTA update completed!\r\n");
+    print_str("Total downloaded: ");
+    print_dec(total_written);
+    print_str(" bytes to slot ");
+    print_dec(slot);
+    print_str("\r\n");
+    
+    /* 验证外部Flash中的固件 */
+    uint8_t verify_buf[256];
+    if(w25q64_read_partition(pid, 0, verify_buf, 256))
+    {
+        uint32_t stack = *((uint32_t*)verify_buf);
+        if(stack >= 0x20000000 && stack <= 0x20010000)
+        {
+            print_str("Firmware validation: PASSED\r\n");
+            print_str("Use 'xr ");
+            print_dec(slot);
+            print_str("' to restore this firmware.\r\n");
+        }
+        else
+        {
+            print_str("Firmware validation: FAILED\r\n");
+        }
+    }
+    else
+    {
+        print_str("Firmware validation: READ ERROR\r\n");
     }
 }

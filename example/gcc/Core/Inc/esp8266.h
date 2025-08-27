@@ -61,4 +61,24 @@ extern esp8266_status_t esp8266_init(void);
 extern bool esp8266_is_connected(void);
 extern esp8266_conn_status_t esp8266_get_connection_status(void);
 
+/* TCP/HTTP客户端功能 */
+extern esp8266_status_t esp8266_tcp_connect(const char *host, uint16_t port);
+extern esp8266_status_t esp8266_tcp_send(const uint8_t *data, uint16_t len);
+extern uint16_t esp8266_tcp_receive(uint8_t *buffer, uint16_t max_len, uint32_t timeout_ms);
+extern esp8266_status_t esp8266_tcp_close(void);
+
+/* HTTP下载功能 */
+typedef struct {
+    uint32_t content_length;    /* HTTP内容长度 */
+    uint32_t downloaded;        /* 已下载字节数 */
+    bool chunked;              /* 是否为分块传输 */
+} esp8266_http_info_t;
+
+extern esp8266_status_t esp8266_http_get_start(const char *url, esp8266_http_info_t *info);
+extern uint16_t esp8266_http_get_data(uint8_t *buffer, uint16_t max_len, uint32_t timeout_ms);
+extern esp8266_status_t esp8266_http_get_finish(void);
+
+/* 调试和测试函数 */
+extern esp8266_status_t esp8266_test_connection(const char *host, uint16_t port);
+
 #endif

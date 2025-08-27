@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "esp8266.h"
 #include "dev_usart.h"
 #include "gpio.h"
@@ -355,4 +356,396 @@ esp8266_conn_status_t esp8266_get_connection_status(void)
     }
     
     return ESP8266_DISCONNECTED;
+}
+
+/* TCP连接管理 */
+static bool tcp_connected = false;
+
+/**
+ * @brief 建立TCP连接
+ * @param host 主机名或IP地址
+ * @param port 端口号
+ * @retval ESP8266状态
+ */
+esp8266_status_t esp8266_tcp_connect(const char *host, uint16_t port)
+{
+    char cmd[128];
+    esp8266_status_t status;
+    
+    /* 设置单连接模式 */
+    status = esp8266_send_cmd("AT+CIPMUX=0", "OK", ESP8266_CMD_TIMEOUT_MS);
+    if (status != ESP8266_OK) {
+        return status;
+    }
+    
+    /* 建立TCP连接 */
+    snprintf(cmd, sizeof(cmd), "AT+CIPSTART=\"TCP\",\"%s\",%d", host, port);
+    status = esp8266_send_cmd(cmd, "OK", 10000);  /* TCP连接需要更长时间 */
+    
+    if (status == ESP8266_OK) {
+        tcp_connected = true;
+    }
+    
+    return status;
+}
+
+/**
+ * @brief 发送TCP数据
+ * @param data 要发送的数据
+ * @param len 数据长度
+ * @retval ESP8266状态
+ */
+esp8266_status_t esp8266_tcp_send(const uint8_t *data, uint16_t len)
+{
+    char cmd[32];
+    esp8266_status_t status;
+    
+    if (!tcp_connected) {
+        return ESP8266_ERROR;
+    }
+    
+    /* 准备发送数据 */
+    snprintf(cmd, sizeof(cmd), "AT+CIPSEND=%d", len);
+    status = esp8266_send_cmd(cmd, ">", 3000);
+    if (status != ESP8266_OK) {
+        return status;
+    }
+    
+    /* 发送实际数据 */
+    uart_write(ESP8266_UART_ID, data, len);
+    uart_poll_dma_tx(ESP8266_UART_ID);
+    
+    /* 等待发送完成确认 */
+    uint16_t resp_len = esp8266_read_response(esp8266_rx_buffer, ESP8266_RX_BUF_SIZE, 5000);
+    if (resp_len == 0 || !strstr(esp8266_rx_buffer, "SEND OK")) {
+        return ESP8266_ERROR;
+    }
+    
+    return ESP8266_OK;
+}
+
+/**
+ * @brief 接收TCP数据
+ * @param buffer 接收缓冲区
+ * @param max_len 缓冲区最大长度
+ * @param timeout_ms 超时时间
+ * @retval 实际接收到的字节数
+ */
+uint16_t esp8266_tcp_receive(uint8_t *buffer, uint16_t max_len, uint32_t timeout_ms)
+{
+    uint32_t start_time = HAL_GetTick();
+    uint16_t total_received = 0;
+    uint8_t temp_buffer[512];
+    
+    if (!tcp_connected || buffer == NULL) {
+        return 0;
+    }
+    
+    /* 等待接收数据 */
+    while ((HAL_GetTick() - start_time) < timeout_ms && total_received < max_len) {
+        /* 轮询串口发送 */
+        uart_poll_dma_tx(ESP8266_UART_ID);
+        
+        /* 从串口读取数据到临时缓冲区 */
+        uint16_t read_len = uart_read(ESP8266_UART_ID, temp_buffer, sizeof(temp_buffer));
+        
+        if (read_len > 0) {
+            /* 查找+IPD包头 */
+            uint16_t i = 0;
+            while (i < read_len) {
+                /* 检查是否为+IPD包头 */
+                if (i + 4 < read_len && 
+                    temp_buffer[i] == '+' && 
+                    temp_buffer[i + 1] == 'I' &&
+                    temp_buffer[i + 2] == 'P' &&
+                    temp_buffer[i + 3] == 'D') {
+                    
+                    /* 查找逗号分隔符（+IPD,len:data格式） */
+                    uint16_t comma_pos = i + 4;
+                    while (comma_pos < read_len && temp_buffer[comma_pos] != ',') {
+                        comma_pos++;
+                    }
+                    
+                    if (comma_pos < read_len) {
+                        /* 查找冒号分隔符 */
+                        uint16_t colon_pos = comma_pos + 1;
+                        while (colon_pos < read_len && temp_buffer[colon_pos] != ':') {
+                            colon_pos++;
+                        }
+                        
+                        if (colon_pos < read_len) {
+                            /* 提取数据长度 */
+                            char len_str[16];
+                            uint16_t len_str_size = colon_pos - comma_pos - 1;
+                            if (len_str_size < sizeof(len_str)) {
+                                memcpy(len_str, &temp_buffer[comma_pos + 1], len_str_size);
+                                len_str[len_str_size] = '\0';
+                                uint16_t ipd_data_len = atoi(len_str);
+                                
+                                /* 复制实际数据到目标缓冲区 */
+                                uint16_t data_start = colon_pos + 1;
+                                uint16_t available_data = read_len - data_start;
+                                uint16_t copy_len = (ipd_data_len < available_data) ? ipd_data_len : available_data;
+                                copy_len = (copy_len < (max_len - total_received)) ? copy_len : (max_len - total_received);
+                                
+                                if (copy_len > 0) {
+                                    memcpy(&buffer[total_received], &temp_buffer[data_start], copy_len);
+                                    total_received += copy_len;
+                                }
+                                
+                                /* 跳过已处理的数据 */
+                                i = read_len; /* 跳出循环，处理下一次读取 */
+                                break;
+                            }
+                        }
+                    }
+                    /* 没有找到完整的+IPD头，跳过这个字符 */
+                    i++;
+                } else {
+                    /* 不是+IPD包头，可能是裸数据，直接复制 */
+                    if (total_received < max_len) {
+                        buffer[total_received++] = temp_buffer[i];
+                    }
+                    i++;
+                }
+            }
+            
+            /* 重置超时计时器，因为收到了数据 */
+            start_time = HAL_GetTick();
+        } else {
+            /* 没有收到数据，短暂延时 */
+            HAL_Delay(5);
+        }
+    }
+    
+    return total_received;
+}
+
+/**
+ * @brief 关闭TCP连接
+ * @retval ESP8266状态
+ */
+esp8266_status_t esp8266_tcp_close(void)
+{
+    esp8266_status_t status = esp8266_send_cmd("AT+CIPCLOSE", "OK", ESP8266_CMD_TIMEOUT_MS);
+    tcp_connected = false;
+    return status;
+}
+
+/* HTTP下载功能 */
+static esp8266_http_info_t current_http_info = {0};
+static uint16_t prefetch_data_len = 0;
+
+/**
+ * @brief 开始HTTP GET请求
+ * @param url 完整的HTTP URL
+ * @param info HTTP信息结构体指针
+ * @retval ESP8266状态
+ */
+esp8266_status_t esp8266_http_get_start(const char *url, esp8266_http_info_t *info)
+{
+    char host[64];
+    char path[128];
+    uint16_t port = 80;
+    char http_request[256];
+    esp8266_status_t status;
+    char *temp_ptr;
+    
+    if (url == NULL || info == NULL) {
+        return ESP8266_ERROR;
+    }
+    
+    /* 解析URL */
+    if (strncmp(url, "http://", 7) == 0) {
+        const char *url_start = url + 7; /* 跳过 "http://" */
+        
+        /* 提取主机名和路径 */
+        temp_ptr = strchr(url_start, '/');
+        if (temp_ptr != NULL) {
+            /* 有路径 */
+            uint16_t host_len = temp_ptr - url_start;
+            strncpy(host, url_start, host_len);
+            host[host_len] = '\0';
+            strcpy(path, temp_ptr);
+        } else {
+            /* 没有路径，使用根路径 */
+            strcpy(host, url_start);
+            strcpy(path, "/");
+        }
+        
+        /* 检查是否有端口号 */
+        temp_ptr = strchr(host, ':');
+        if (temp_ptr != NULL) {
+            *temp_ptr = '\0';
+            port = atoi(temp_ptr + 1);
+        }
+    } else {
+        return ESP8266_ERROR; /* 不支持的URL格式 */
+    }
+    
+    /* 建立TCP连接 */
+    status = esp8266_tcp_connect(host, port);
+    if (status != ESP8266_OK) {
+        return status;
+    }
+    
+    /* 构造HTTP GET请求 */
+    snprintf(http_request, sizeof(http_request),
+             "GET %s HTTP/1.1\r\n"
+             "Host: %s\r\n"
+             "Connection: close\r\n"
+             "\r\n",
+             path, host);
+    
+    /* 发送HTTP请求 */
+    status = esp8266_tcp_send((uint8_t *)http_request, strlen(http_request));
+    if (status != ESP8266_OK) {
+        esp8266_tcp_close();
+        return status;
+    }
+    
+    /* 给服务器一点时间处理请求 */
+    HAL_Delay(500);
+    
+    /* 读取HTTP响应头 */
+    uint32_t start_time = HAL_GetTick();
+    uint16_t response_len = 0;
+    bool header_complete = false;
+    char *header_end = NULL;
+    char *full_response = esp8266_rx_buffer;
+    
+    memset(esp8266_rx_buffer, 0, ESP8266_RX_BUF_SIZE);
+    
+    while ((HAL_GetTick() - start_time) < 15000 && !header_complete) { /* 15秒超时 */
+        uint16_t read_len = esp8266_tcp_receive((uint8_t *)&esp8266_rx_buffer[response_len], 
+                                              ESP8266_RX_BUF_SIZE - response_len - 1, 200);
+        if (read_len > 0) {
+            response_len += read_len;
+            esp8266_rx_buffer[response_len] = '\0';
+            
+            /* 检查是否收到完整HTTP头 */
+            header_end = strstr(esp8266_rx_buffer, "\r\n\r\n");
+            if (header_end != NULL) {
+                header_complete = true;
+            }
+        } else {
+            HAL_Delay(10);
+        }
+    }
+    
+    if (!header_complete) {
+        esp8266_tcp_close();
+        return ESP8266_TIMEOUT;
+    }
+    
+    /* 现在分离HTTP头和body数据 */
+    char *body_start = header_end + 4; /* 跳过 "\r\n\r\n" */
+    uint16_t header_actual_len = header_end - esp8266_rx_buffer;
+    uint16_t body_bytes_in_buffer = response_len - header_actual_len - 4;
+    
+    /* 保存预读取的body数据 */
+    if (body_bytes_in_buffer > 0) {
+        memmove(esp8266_rx_buffer, body_start, body_bytes_in_buffer);
+        prefetch_data_len = body_bytes_in_buffer;
+    } else {
+        prefetch_data_len = 0;
+    }
+    
+    /* 临时终止HTTP头以便解析 */
+    *header_end = '\0';
+    
+    /* 解析HTTP状态码（现在HTTP头已被null终止） */
+    if (strstr(full_response, "200 OK") == NULL) {
+        esp8266_tcp_close();
+        return ESP8266_ERROR; /* HTTP错误 */
+    }
+    
+    /* 解析Content-Length（从HTTP头中解析） */
+    temp_ptr = strstr(full_response, "Content-Length:");
+    if (temp_ptr != NULL) {
+        sscanf(temp_ptr, "Content-Length: %lu", &info->content_length);
+        info->chunked = false;
+    } else {
+        /* 检查是否为分块传输 */
+        temp_ptr = strstr(full_response, "Transfer-Encoding: chunked");
+        if (temp_ptr != NULL) {
+            info->chunked = true;
+            info->content_length = 0; /* 分块传输无法预知长度 */
+        } else {
+            info->content_length = 0;
+            info->chunked = false;
+        }
+    }
+    
+    info->downloaded = 0;
+    memcpy(&current_http_info, info, sizeof(esp8266_http_info_t));
+    
+    /* 注意：prefetch_data_len 在解析HTTP头时已经设置 */
+    
+    return ESP8266_OK;
+}
+
+/**
+ * @brief 获取HTTP数据
+ * @param buffer 接收缓冲区
+ * @param max_len 缓冲区最大长度
+ * @param timeout_ms 超时时间
+ * @retval 实际接收到的字节数，0表示传输结束
+ */
+uint16_t esp8266_http_get_data(uint8_t *buffer, uint16_t max_len, uint32_t timeout_ms)
+{
+    uint16_t received = 0;
+    
+    /* 先使用预取的数据 */
+    if (prefetch_data_len > 0) {
+        uint16_t copy_len = (prefetch_data_len < max_len) ? prefetch_data_len : max_len;
+        memcpy(buffer, esp8266_rx_buffer, copy_len);
+        received = copy_len;
+        
+        /* 更新预取数据 */
+        if (copy_len < prefetch_data_len) {
+            /* 还有剩余数据 */
+            memmove(esp8266_rx_buffer, &esp8266_rx_buffer[copy_len], prefetch_data_len - copy_len);
+            prefetch_data_len -= copy_len;
+        } else {
+            /* 预取数据用完 */
+            prefetch_data_len = 0;
+        }
+    }
+    
+    /* 如果缓冲区还有空间且没有预取数据，继续从TCP读取 */
+    if (received < max_len && prefetch_data_len == 0) {
+        uint16_t tcp_received = esp8266_tcp_receive(&buffer[received], max_len - received, timeout_ms);
+        received += tcp_received;
+    }
+    
+    current_http_info.downloaded += received;
+    return received;
+}
+
+/**
+ * @brief 结束HTTP GET请求
+ * @retval ESP8266状态
+ */
+esp8266_status_t esp8266_http_get_finish(void)
+{
+    return esp8266_tcp_close();
+}
+
+/**
+ * @brief 测试TCP连接
+ * @param host 主机名或IP
+ * @param port 端口号
+ * @retval ESP8266状态
+ */
+esp8266_status_t esp8266_test_connection(const char *host, uint16_t port)
+{
+    esp8266_status_t status;
+    
+    status = esp8266_tcp_connect(host, port);
+    if (status == ESP8266_OK) {
+        esp8266_tcp_close();
+    }
+    
+    return status;
 }
