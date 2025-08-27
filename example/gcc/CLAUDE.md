@@ -133,3 +133,4 @@ cmake --build build/Release
 - 修改内部flash的分区，内部flash只需要分两个区，因为我用的是stm32f103zet6，前64k是bootloader，后448k是app分区
 - 现在需要使用SPI2来驱动w25q64
 - 使用流式写入将固件写入外部flash，IAP使用zmodem
+- 在现有的功能下，优化代码，主要是将功能模块化，减小bootloader程序的大小，现在程序太大了

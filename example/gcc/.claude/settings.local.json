@@ -8,7 +8,10 @@
       "Read(/D:\\STM32\\stm32-uart-dma\\stm32f1-uart-dma\\Source\\App/**)",
       "Read(/D:\\STM32\\stm32-uart-dma\\stm32f1-uart-dma\\Source\\Bsp/**)",
       "Read(/D:\\STM32\\stm32-uart-dma\\stm32f1-uart-dma\\Source\\Bsp/**)",
-      "Read(/D:\\STM32\\stm32-uart-dma\\stm32f1-uart-dma\\Source\\Bsp/**)"
+      "Read(/D:\\STM32\\stm32-uart-dma\\stm32f1-uart-dma\\Source\\Bsp/**)",
+      "Bash(del CoreSrczmodem.c CoreInczmodem.h)",
+      "Bash(rm:*)",
+      "Bash(arm-none-eabi-size:*)"
     ],
     "deny": [],
     "ask": [],

@@ -6,45 +6,42 @@
 #include "xmodem.h"
 #include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
 
 /* 私有变量 */
 static bootloader_state_t bootloader_state = BOOT_STATE_IDLE;
-static char cmd_buffer[256];
-static uint16_t cmd_index = 0;
-static uint32_t boot_start_tick = 0;
+static char cmd_buffer[128];  // 减小缓冲区
+static uint8_t cmd_index = 0;
 
-/* 命令表 - 支持全名和缩写 */
+/* 命令表 */
 static const bootloader_cmd_t cmd_table[] = {
-    {"help",      "h",   "Show command list",              CMD_HELP,       cmd_help_handler},
-    {"update",    "u",   "Update firmware via UART",       CMD_UPDATE,     cmd_update_handler},
-    {"download",  "d",   "Download firmware to PC",        CMD_DOWNLOAD,   cmd_download_handler},
-    {"info",      "i",   "Show firmware information",      CMD_INFO,       cmd_info_handler},
-    {"erase",     "e",   "Erase application area",         CMD_ERASE,      cmd_erase_handler},
-    {"reset",     "r",   "Reset system",                   CMD_RESET,      cmd_reset_handler},
-    {"jump",      "j",   "Jump to application",            CMD_JUMP,       cmd_jump_handler},
-    {"extinfo",   "xi",  "Show external flash info",       CMD_EXTINFO,    cmd_extinfo_handler},
-    {"extbackup", "xb",  "Backup to external flash",       CMD_EXTBACKUP,  cmd_extbackup_handler},
-    {"extrestore","xr",  "Restore from external flash",    CMD_EXTRESTORE, cmd_extrestore_handler},
-    {"extlist",   "xl",  "List external flash backups",    CMD_EXTLIST,    cmd_extlist_handler},
+    {"help",    "h",  "Show command help",           CMD_HELP,       cmd_help_handler},
+    {"update",  "u",  "Update firmware via XMODEM", CMD_UPDATE,     cmd_update_handler},
+    {"info",    "i",  "Show system information",    CMD_INFO,       cmd_info_handler},
+    {"erase",   "e",  "Erase application area",     CMD_ERASE,      cmd_erase_handler},
+    {"reset",   "r",  "Reset system",               CMD_RESET,      cmd_reset_handler},
+    {"jump",    "j",  "Jump to application",        CMD_JUMP,       cmd_jump_handler},
+    {"xinfo",   "xi", "Show external flash info",   CMD_EXTINFO,    cmd_extinfo_handler},
+    {"xbackup", "xb", "Backup to external flash",   CMD_EXTBACKUP,  cmd_extbackup_handler},
+    {"xrestore","xr", "Restore from external flash",CMD_EXTRESTORE, cmd_extrestore_handler},
+    {"xlist",   "xl", "List external flash backups",CMD_EXTLIST,    cmd_extlist_handler},
 };
 
+#define CMD_TABLE_SIZE (sizeof(cmd_table)/sizeof(cmd_table[0]))
+
 /* 私有函数声明 */
-static void bootloader_print(const char* str);
-static void bootloader_printf(const char* format, ...);
-static void bootloader_process_cmd(char* cmd);
-static bool bootloader_check_button(void);
-static bool bootloader_check_uart_input(void);
-static void bootloader_show_banner(void);
+static void print_str(const char* str);
+static void print_hex(uint32_t val);
+static void print_dec(uint32_t val);
+static void process_cmd(char* cmd);
+static uint8_t read_char(void);
+static void show_progress(uint32_t current, uint32_t total, const char* prefix);
+static uint32_t calculate_firmware_size(w25q64_partition_id_t pid);
 
 /* 初始化Bootloader */
 void bootloader_init(void)
 {
-    boot_start_tick = HAL_GetTick();
     bootloader_state = BOOT_STATE_IDLE;
     cmd_index = 0;
-    memset(cmd_buffer, 0, sizeof(cmd_buffer));
 }
 
 /* 检查是否进入Bootloader命令模式 */
@@ -52,46 +49,37 @@ bool bootloader_check_entry(uint32_t timeout_ms)
 {
     uint32_t start_tick = HAL_GetTick();
     
-    bootloader_print("\r\n");
-    bootloader_print("========================================\r\n");
-    bootloader_print("   STM32 Bootloader v1.0.0\r\n");
-    bootloader_print("========================================\r\n");
-    bootloader_printf("Press any key or button within %d seconds to enter bootloader...\r\n", timeout_ms/1000);
+    print_str("\r\n===== STM32 Bootloader v1.0 =====\r\n");
+    print_str("Press any key within ");
+    print_dec(timeout_ms/1000);
+    print_str(" seconds...\r\n");
     
-    /* 清空串口接收缓冲区 */
-    uint8_t dummy[256];
+    /* 清空缓冲区 */
+    uint8_t dummy[64];
     while(uart_read(DEV_UART1, dummy, sizeof(dummy)) > 0);
     
     /* 等待超时或用户输入 */
     while((HAL_GetTick() - start_tick) < timeout_ms)
     {
-        /* 检查按键 - 假设使用PA0作为Boot按键 */
-        if(bootloader_check_button())
+        /* 检查PA0按键 */
+        if(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET)
         {
-            bootloader_print("\r\nButton detected! Entering bootloader mode...\r\n");
+            print_str("Button detected!\r\n");
             return true;
         }
         
         /* 检查串口输入 */
-        if(bootloader_check_uart_input())
+        uint8_t ch;
+        if(uart_read(DEV_UART1, &ch, 1) > 0)
         {
-            bootloader_print("\r\nUART input detected! Entering bootloader mode...\r\n");
+            print_str("UART input detected!\r\n");
             return true;
-        }
-        
-        /* 显示倒计时 */
-        static uint32_t last_second = 0;
-        uint32_t current_second = (timeout_ms - (HAL_GetTick() - start_tick)) / 1000;
-        if(current_second != last_second)
-        {
-            bootloader_printf("\rTime remaining: %d seconds... ", current_second);
-            last_second = current_second;
         }
         
         HAL_Delay(10);
     }
     
-    bootloader_print("\r\nTimeout! Jumping to application...\r\n");
+    print_str("Timeout! Starting app...\r\n");
     return false;
 }
 
@@ -100,60 +88,52 @@ void bootloader_cmd_mode(void)
 {
     bootloader_state = BOOT_STATE_CMD_MODE;
     
-    bootloader_show_banner();
-    bootloader_print("Type 'help' or 'h' for command list\r\n");
-    bootloader_print("BOOT> ");
+    print_str("\r\nBootloader Command Mode\r\n");
+    print_str("Type 'h' for help\r\n");
+    print_str("> ");
     
     while(bootloader_state == BOOT_STATE_CMD_MODE)
     {
         uint8_t ch;
-        uint16_t size = uart_read(DEV_UART1, &ch, 1);
-        
-        if(size > 0)
+        if(uart_read(DEV_UART1, &ch, 1) > 0)
         {
-            /* 回显字符 */
+            /* 回显 */
             uart_write(DEV_UART1, &ch, 1);
             uart_poll_dma_tx(DEV_UART1);
             
-            /* 处理回车 */
             if(ch == '\r' || ch == '\n')
             {
                 if(cmd_index > 0)
                 {
                     cmd_buffer[cmd_index] = '\0';
-                    bootloader_print("\r\n");
-                    bootloader_process_cmd(cmd_buffer);
+                    print_str("\r\n");
+                    process_cmd(cmd_buffer);
                     cmd_index = 0;
-                    memset(cmd_buffer, 0, sizeof(cmd_buffer));
                 }
                 else
                 {
-                    bootloader_print("\r\n");
+                    print_str("\r\n");
                 }
                 
                 if(bootloader_state == BOOT_STATE_CMD_MODE)
                 {
-                    bootloader_print("BOOT> ");
+                    print_str("> ");
                 }
             }
-            /* 处理退格 */
             else if(ch == '\b' || ch == 0x7F)
             {
                 if(cmd_index > 0)
                 {
                     cmd_index--;
-                    cmd_buffer[cmd_index] = '\0';
-                    bootloader_print(" \b");
+                    print_str(" \b");
                 }
             }
-            /* 普通字符 */
             else if(cmd_index < (sizeof(cmd_buffer) - 1))
             {
                 cmd_buffer[cmd_index++] = ch;
             }
         }
         
-        /* 轮询发送 */
         uart_poll_dma_tx(DEV_UART1);
     }
 }
@@ -161,327 +141,207 @@ void bootloader_cmd_mode(void)
 /* 跳转到应用程序 */
 void bootloader_jump_to_app(void)
 {
-    /* 检查应用程序是否有效 */
     if(!bootloader_validate_app())
     {
-        bootloader_print("Invalid application! Cannot jump.\r\n");
+        print_str("Invalid app!\r\n");
         return;
     }
     
-    bootloader_print("Jumping to application...\r\n");
+    print_str("Jumping to app...\r\n");
     HAL_Delay(100);
     
-    /* 关闭所有中断 */
     __disable_irq();
-    
-    /* 复位所有外设 */
     HAL_DeInit();
     
-    /* 获取应用程序栈指针和复位向量 */
     uint32_t app_stack = *(__IO uint32_t*)APP_START_ADDR;
     uint32_t app_reset = *(__IO uint32_t*)(APP_START_ADDR + 4);
     
-    /* 设置栈指针 */
     __set_MSP(app_stack);
-    
-    /* 设置向量表 */
     SCB->VTOR = APP_START_ADDR;
     
-    /* 跳转到应用程序 */
-    void (*app_reset_handler)(void) = (void (*)(void))app_reset;
-    app_reset_handler();
+    void (*app_entry)(void) = (void (*)(void))app_reset;
+    app_entry();
 }
 
 /* 验证应用程序 */
 bool bootloader_validate_app(void)
 {
     uint32_t app_stack = *(__IO uint32_t*)APP_START_ADDR;
-    
-    /* 检查栈指针是否在RAM范围内 */
-    if((app_stack < 0x20000000) || (app_stack > 0x20010000))
-    {
-        return false;
-    }
-    
-    /* 检查复位向量是否在Flash范围内 */
     uint32_t app_reset = *(__IO uint32_t*)(APP_START_ADDR + 4);
-    if((app_reset < APP_START_ADDR) || (app_reset > (APP_START_ADDR + APP_MAX_SIZE)))
-    {
-        return false;
-    }
     
-    return true;
+    return ((app_stack >= 0x20000000) && (app_stack <= 0x20010000) &&
+            (app_reset >= APP_START_ADDR) && (app_reset <= (APP_START_ADDR + APP_MAX_SIZE)));
 }
 
-/* 命令处理函数实现 */
+/* 命令处理函数 */
 void cmd_help_handler(void)
 {
-    bootloader_print("\r\nAvailable commands:\r\n");
-    bootloader_print("=======================================================\r\n");
-    bootloader_printf("  %-12s %-8s %s\r\n", "Command", "Short", "Description");
-    bootloader_print("  ----------------------------------------------------\r\n");
+    print_str("\r\n==================== HELP ====================\r\n");
+    print_str("Available commands:\r\n\r\n");
     
-    for(uint32_t i = 0; i < sizeof(cmd_table)/sizeof(cmd_table[0]); i++)
+    for(uint8_t i = 0; i < CMD_TABLE_SIZE; i++)
     {
-        bootloader_printf("  %-12s %-8s %s\r\n", 
-                         cmd_table[i].name, 
-                         cmd_table[i].short_name,
-                         cmd_table[i].description);
+        print_str("  ");
+        print_str(cmd_table[i].short_name);
+        print_str(" / ");
+        print_str(cmd_table[i].name);
+        
+        /* 对齐格式 */
+        uint8_t len = strlen(cmd_table[i].short_name) + strlen(cmd_table[i].name) + 3;
+        for(uint8_t j = len; j < 20; j++) {
+            print_str(" ");
+        }
+        
+        print_str("- ");
+        print_str(cmd_table[i].description);
+        print_str("\r\n");
     }
     
-    bootloader_print("=======================================================\r\n");
-    bootloader_print("Note: You can use either full command or short form\r\n");
+    print_str("\r\nExamples:\r\n");
+    print_str("  h          - Show this help\r\n");
+    print_str("  u          - Update firmware (internal/external)\r\n");
+    print_str("  i          - Show system info\r\n");
+    print_str("  xb         - Backup current firmware to slot 1-3\r\n");
+    print_str("  xr         - Restore firmware from slot 1-3\r\n");
+    print_str("  xl         - List all backup slots status\r\n");
+    print_str("===============================================\r\n");
 }
 
 void cmd_update_handler(void)
 {
-    bootloader_print("Starting firmware update via XMODEM...\r\n");
-    bootloader_print("Select target:\r\n");
-    bootloader_print("  1. Internal Flash (Direct update)\r\n");
-    bootloader_print("  2. External Flash Download area\r\n");
-    bootloader_print("  3. External Flash Backup slot 1\r\n");
-    bootloader_print("  4. External Flash Backup slot 2\r\n");
-    bootloader_print("  5. External Flash Backup slot 3\r\n");
-    bootloader_print("Select (1-5): ");
+    print_str("Firmware update via XMODEM\r\n");
+    print_str("1=Internal 2=External: ");
     
-    char choice[10];
-    uint16_t choice_index = 0;
+    uint8_t ch = read_char();
+    print_str("\r\n");
     
-    while(1)
+    if(ch == '1')
     {
-        uint8_t ch;
-        if(uart_read(DEV_UART1, &ch, 1) > 0)
+        print_str("WARNING! Update internal flash? (y/n): ");
+        if(read_char() != 'y')
         {
-            uart_write(DEV_UART1, &ch, 1);
-            uart_poll_dma_tx(DEV_UART1);
-            
-            if(ch == '\r' || ch == '\n')
-            {
-                choice[choice_index] = '\0';
-                bootloader_print("\r\n");
-                break;
-            }
-            else if(choice_index < 9)
-            {
-                choice[choice_index++] = ch;
-            }
-        }
-    }
-    
-    int target = atoi(choice);
-    if(target < 1 || target > 5)
-    {
-        bootloader_print("Invalid choice!\r\n");
-        return;
-    }
-    
-    bootloader_print("\r\n");
-    
-    if(target == 1)
-    {
-        /* 直接更新到内部Flash */
-        bootloader_print("WARNING: This will directly update the application!\r\n");
-        bootloader_print("Type 'YES' to confirm: ");
-        
-        char confirm[10];
-        uint16_t confirm_index = 0;
-        
-        while(1)
-        {
-            uint8_t ch;
-            if(uart_read(DEV_UART1, &ch, 1) > 0)
-            {
-                uart_write(DEV_UART1, &ch, 1);
-                uart_poll_dma_tx(DEV_UART1);
-                
-                if(ch == '\r' || ch == '\n')
-                {
-                    confirm[confirm_index] = '\0';
-                    bootloader_print("\r\n");
-                    break;
-                }
-                else if(confirm_index < 9)
-                {
-                    confirm[confirm_index++] = ch;
-                }
-            }
-        }
-        
-        if(strcmp(confirm, "YES") != 0)
-        {
-            bootloader_print("Operation cancelled.\r\n");
+            print_str("\r\nCancelled\r\n");
             return;
         }
+        print_str("\r\n");
         
-        bootloader_print("Erasing application area...\r\n");
+        print_str("Erasing...\r\n");
         if(!bootloader_flash_erase(APP_START_ADDR, APP_MAX_SIZE))
         {
-            bootloader_print("Failed to erase application area!\r\n");
+            print_str("Erase failed!\r\n");
             return;
         }
         
-        bootloader_print("Ready to receive firmware via XMODEM-1K...\r\n");
-        bootloader_print("Please start XMODEM transfer now\r\n");
-        bootloader_print("(SecureCRT: Transfer->Send File->Xmodem-1K)\r\n");
-        bootloader_print("(Linux: sx -k firmware.bin)\r\n\r\n");
-        
-        int result = xmodem_receive(APP_START_ADDR, false, 0, true);  // 使用XMODEM-1K
+        print_str("Start XMODEM transfer\r\n");
+        int result = xmodem_receive(APP_START_ADDR, false, 0, true);
         if(result > 0)
         {
-            bootloader_printf("Successfully received %d bytes\r\n", result);
-            
-            if(bootloader_validate_app())
-            {
-                bootloader_print("Firmware validation passed!\r\n");
-            }
-            else
-            {
-                bootloader_print("WARNING: Firmware validation failed!\r\n");
-            }
+            print_str("Success: ");
+            print_dec(result);
+            print_str(" bytes\r\n");
         }
         else
         {
-            bootloader_print("Firmware update failed!\r\n");
+            print_str("Transfer failed!\r\n");
         }
     }
-    else
+    else if(ch == '2')
     {
-        /* 更新到外部Flash */
-        uint8_t partition_id;
+        print_str("Slot (1-3): ");
+        ch = read_char() - '0';
+        print_str("\r\n");
         
-        switch(target)
+        if(ch < 1 || ch > 3)
         {
-            case 2: partition_id = W25Q64_PARTITION_DOWNLOAD; break;
-            case 3: partition_id = W25Q64_PARTITION_BACKUP1; break;
-            case 4: partition_id = W25Q64_PARTITION_BACKUP2; break;
-            case 5: partition_id = W25Q64_PARTITION_BACKUP3; break;
-            default: return;
+            print_str("Invalid slot!\r\n");
+            return;
         }
         
-        bootloader_printf("Updating to external flash partition %d...\r\n", partition_id);
-        
-        bootloader_print("Ready to receive firmware via XMODEM-1K...\r\n");
-        bootloader_print("Please start XMODEM transfer now\r\n");
-        bootloader_print("(SecureCRT: Transfer->Send File->Xmodem-1K)\r\n");
-        bootloader_print("(Linux: sx -k firmware.bin)\r\n\r\n");
-        
-        int result = xmodem_receive(0, true, partition_id, true);  // 使用XMODEM-1K
+        print_str("Start XMODEM transfer\r\n");
+        int result = xmodem_receive(0, true, W25Q64_PARTITION_BACKUP1 + ch - 1, true);
         if(result > 0)
         {
-            bootloader_printf("Successfully received %d bytes to external flash\r\n", result);
-            bootloader_print("Use 'extrestore' or 'xr' to update firmware from this backup\r\n");
+            print_str("Success: ");
+            print_dec(result);
+            print_str(" bytes\r\n");
         }
         else
         {
-            bootloader_print("Transfer failed!\r\n");
+            print_str("Transfer failed!\r\n");
         }
     }
-}
-
-void cmd_download_handler(void)
-{
-    bootloader_print("Starting firmware download...\r\n");
-    
-    if(!bootloader_validate_app())
-    {
-        bootloader_print("No valid application found!\r\n");
-        return;
-    }
-    
-    bootloader_print("Ready to send firmware via XMODEM protocol\r\n");
-    bootloader_print("(This feature will be implemented with XMODEM protocol)\r\n");
-    // TODO: 实现XMODEM协议发送固件
-}
-
-void cmd_backup_handler(void)
-{
-    bootloader_print("Backup function not available in this configuration.\r\n");
-    bootloader_print("Flash is divided into Bootloader (64KB) and Application (448KB) only.\r\n");
-}
-
-void cmd_restore_handler(void)
-{
-    bootloader_print("Restore function not available in this configuration.\r\n");
-    bootloader_print("Flash is divided into Bootloader (64KB) and Application (448KB) only.\r\n");
 }
 
 void cmd_info_handler(void)
 {
-    bootloader_print("\r\n========== System Information ==========\r\n");
-    bootloader_printf("MCU Type           : STM32F103ZET6\r\n");
-    bootloader_printf("Flash Total Size   : %d KB\r\n", FLASH_TOTAL_SIZE / 1024);
-    bootloader_print("----------------------------------------\r\n");
-    bootloader_printf("Bootloader Version : v1.0.0\r\n");
-    bootloader_printf("Bootloader Size    : %d KB\r\n", BOOTLOADER_SIZE / 1024);
-    bootloader_printf("Bootloader Address : 0x%08X - 0x%08X\r\n", FLASH_BASE_ADDR, FLASH_BASE_ADDR + BOOTLOADER_SIZE - 1);
-    bootloader_print("----------------------------------------\r\n");
-    bootloader_printf("Application Address: 0x%08X - 0x%08X\r\n", APP_START_ADDR, APP_START_ADDR + APP_MAX_SIZE - 1);
-    bootloader_printf("Application Size   : %d KB\r\n", APP_MAX_SIZE / 1024);
+    print_str("\r\n=== System Info ===\r\n");
+    print_str("MCU: STM32F103ZET6\r\n");
+    print_str("Flash: 512KB\r\n");
+    print_str("Boot: 0x08000000 (64KB)\r\n");
+    print_str("App: 0x08010000 (448KB)\r\n");
     
     if(bootloader_validate_app())
     {
-        bootloader_print("Application Status : VALID\r\n");
-        uint32_t app_crc = bootloader_calc_crc32(APP_START_ADDR, 0x10000);  // Calculate CRC for first 64KB of app
-        bootloader_printf("Application CRC32  : 0x%08X (first 64KB)\r\n", app_crc);
+        print_str("App Status: VALID\r\n");
     }
     else
     {
-        bootloader_print("Application Status : INVALID or NOT FOUND\r\n");
+        print_str("App Status: INVALID\r\n");
     }
-    
-    bootloader_print("========================================\r\n");
 }
 
 void cmd_erase_handler(void)
 {
-    bootloader_print("WARNING: This will erase the application area!\r\n");
-    bootloader_print("Type 'YES' to confirm: ");
-    
-    /* 等待用户确认 */
-    char confirm[10];
-    uint16_t confirm_index = 0;
-    
-    while(1)
+    print_str("Erase app? (y/n): ");
+    if(read_char() != 'y')
     {
-        uint8_t ch;
-        if(uart_read(DEV_UART1, &ch, 1) > 0)
+        print_str("\r\nCancelled\r\n");
+        return;
+    }
+    print_str("\r\n");
+    
+    print_str("Erasing application area...\r\n");
+    
+    /* 分页擦除以显示进度 */
+    uint32_t total_pages = APP_MAX_SIZE / FLASH_PAGE_SIZE;
+    uint32_t addr = APP_START_ADDR;
+    
+    HAL_FLASH_Unlock();
+    
+    for(uint32_t page = 0; page < total_pages; page++)
+    {
+        show_progress(page + 1, total_pages, "Erasing");
+        
+        FLASH_EraseInitTypeDef erase;
+        uint32_t error = 0;
+        
+        erase.TypeErase = FLASH_TYPEERASE_PAGES;
+        erase.PageAddress = addr + (page * FLASH_PAGE_SIZE);
+        erase.NbPages = 1;
+        
+        if(HAL_FLASHEx_Erase(&erase, &error) != HAL_OK)
         {
-            uart_write(DEV_UART1, &ch, 1);
-            uart_poll_dma_tx(DEV_UART1);
-            
-            if(ch == '\r' || ch == '\n')
-            {
-                confirm[confirm_index] = '\0';
-                bootloader_print("\r\n");
-                break;
-            }
-            else if(confirm_index < 9)
-            {
-                confirm[confirm_index++] = ch;
-            }
+            HAL_FLASH_Lock();
+            print_str("\r\nErase failed at page ");
+            print_dec(page);
+            print_str("!\r\n");
+            return;
+        }
+        
+        /* 每隔几页更新一次进度，避免刷新太频繁 */
+        if((page % 10) == 0 || page == (total_pages - 1))
+        {
+            HAL_Delay(1); /* 给串口时间输出 */
         }
     }
     
-    if(strcmp(confirm, "YES") != 0)
-    {
-        bootloader_print("Operation cancelled.\r\n");
-        return;
-    }
-    
-    bootloader_print("Erasing application area...\r\n");
-    if(bootloader_flash_erase(APP_START_ADDR, APP_MAX_SIZE))
-    {
-        bootloader_print("Application area erased successfully!\r\n");
-    }
-    else
-    {
-        bootloader_print("Failed to erase application area!\r\n");
-    }
+    HAL_FLASH_Lock();
+    print_str("\r\nErase completed successfully!\r\n");
 }
 
 void cmd_reset_handler(void)
 {
-    bootloader_print("Resetting system...\r\n");
+    print_str("Resetting...\r\n");
     HAL_Delay(100);
     HAL_NVIC_SystemReset();
 }
@@ -492,144 +352,275 @@ void cmd_jump_handler(void)
     bootloader_jump_to_app();
 }
 
-/* 私有函数实现 */
-static void bootloader_print(const char* str)
+void cmd_extinfo_handler(void)
 {
-    uart_write(DEV_UART1, (uint8_t*)str, strlen(str));
-    uart_poll_dma_tx(DEV_UART1);
-}
-
-static void bootloader_printf(const char* format, ...)
-{
-    char buffer[256];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-    bootloader_print(buffer);
-}
-
-static void bootloader_process_cmd(char* cmd)
-{
-    /* 去除前后空格 */
-    while(*cmd == ' ') cmd++;
-    char* end = cmd + strlen(cmd) - 1;
-    while(end > cmd && *end == ' ') *end-- = '\0';
+    w25q64_init();
+    uint32_t id = w25q64_read_id();
     
-    /* 转换为小写 */
-    char cmd_lower[256];
-    uint32_t j = 0;
-    while(cmd[j] && j < 255)
+    print_str("\r\n=== W25Q64 Info ===\r\n");
+    print_str("ID: 0x");
+    print_hex(id);
+    print_str("\r\nSize: 8MB\r\n");
+    print_str("Partitions:\r\n");
+    print_str("  Download: 1MB\r\n");
+    print_str("  Backup1-3: 1MB each\r\n");
+}
+
+void cmd_extbackup_handler(void)
+{
+    if(!bootloader_validate_app())
     {
-        cmd_lower[j] = (cmd[j] >= 'A' && cmd[j] <= 'Z') ? cmd[j] + 32 : cmd[j];
-        j++;
+        print_str("No valid app!\r\n");
+        return;
     }
-    cmd_lower[j] = '\0';
     
-    /* 查找命令 - 支持全名、缩写和部分匹配 */
-    for(uint32_t i = 0; i < sizeof(cmd_table)/sizeof(cmd_table[0]); i++)
+    print_str("Slot (1-3): ");
+    uint8_t slot = read_char() - '0';
+    print_str("\r\n");
+    
+    if(slot < 1 || slot > 3)
     {
-        /* 完全匹配缩写 */
-        if(strcmp(cmd_lower, cmd_table[i].short_name) == 0)
+        print_str("Invalid slot!\r\n");
+        return;
+    }
+    
+    w25q64_init();
+    w25q64_partition_id_t pid = W25Q64_PARTITION_BACKUP1 + slot - 1;
+    
+    print_str("Erasing...\r\n");
+    if(!w25q64_erase_partition(pid))
+    {
+        print_str("Erase failed!\r\n");
+        return;
+    }
+    
+    /* 计算当前固件实际大小 */
+    print_str("Calculating current firmware size...\r\n");
+    uint32_t current_fw_size = 0;
+    uint8_t *fw_ptr = (uint8_t*)APP_START_ADDR;
+    
+    /* 从后往前查找最后一个非0xFF字节 */
+    for(int32_t i = APP_MAX_SIZE - 1; i >= 0; i--)
+    {
+        if(fw_ptr[i] != 0xFF)
         {
-            cmd_table[i].handler();
+            current_fw_size = i + 1;
+            break;
+        }
+    }
+    
+    if(current_fw_size == 0)
+    {
+        print_str("No valid firmware found!\r\n");
+        return;
+    }
+    
+    /* 对齐到1KB边界 */
+    current_fw_size = (current_fw_size + 1023) & ~1023;
+    
+    print_str("Firmware size: ");
+    print_dec(current_fw_size / 1024);
+    print_str("KB\r\n");
+    
+    print_str("Backing up firmware...\r\n");
+    uint8_t buf[1024]; /* 使用更大缓冲区 */
+    uint32_t offset = 0;
+    uint32_t total = current_fw_size; /* 只备份实际大小 */
+    
+    while(offset < total)
+    {
+        uint32_t size = (total - offset) > 1024 ? 1024 : (total - offset);
+        memcpy(buf, (uint8_t*)(APP_START_ADDR + offset), size);
+        
+        if(!w25q64_write_partition(pid, offset, buf, size))
+        {
+            print_str("\r\nWrite failed!\r\n");
             return;
         }
         
-        /* 完全匹配全名 */
-        if(strcmp(cmd_lower, cmd_table[i].name) == 0)
+        offset += size;
+        
+        /* 每4KB更新一次进度 */
+        if((offset % 0x1000) == 0 || offset >= total)
         {
-            cmd_table[i].handler();
+            show_progress(offset, total, "Backup");
+        }
+    }
+    
+    print_str("\r\nBackup completed successfully!\r\n");
+}
+
+void cmd_extrestore_handler(void)
+{
+    print_str("Slot (1-3): ");
+    uint8_t slot = read_char() - '0';
+    print_str("\r\n");
+    
+    if(slot < 1 || slot > 3)
+    {
+        print_str("Invalid slot!\r\n");
+        return;
+    }
+    
+    w25q64_init();
+    w25q64_partition_id_t pid = W25Q64_PARTITION_BACKUP1 + slot - 1;
+    
+    /* 验证备份 */
+    uint8_t buf[256];
+    if(!w25q64_read_partition(pid, 0, buf, 256))
+    {
+        print_str("Read failed!\r\n");
+        return;
+    }
+    
+    uint32_t stack = *((uint32_t*)buf);
+    if(stack < 0x20000000 || stack > 0x20010000)
+    {
+        print_str("Invalid backup!\r\n");
+        return;
+    }
+    
+    /* 计算固件实际大小 */
+    print_str("Calculating firmware size...\r\n");
+    uint32_t firmware_size = calculate_firmware_size(pid);
+    if(firmware_size == 0)
+    {
+        print_str("Cannot determine firmware size!\r\n");
+        return;
+    }
+    
+    print_str("Firmware size: ");
+    print_dec(firmware_size / 1024);
+    print_str("KB\r\n");
+    
+    /* 只擦除需要的页数 */
+    uint32_t pages_needed = (firmware_size + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE;
+    uint32_t erase_size = pages_needed * FLASH_PAGE_SIZE;
+    
+    print_str("Erasing ");
+    print_dec(pages_needed);
+    print_str(" pages (");
+    print_dec(erase_size / 1024);
+    print_str("KB)...\r\n");
+    
+    if(!bootloader_flash_erase(APP_START_ADDR, erase_size))
+    {
+        print_str("Erase failed!\r\n");
+        return;
+    }
+    
+    print_str("Restoring firmware...\r\n");
+    uint32_t offset = 0;
+    uint32_t total = firmware_size; /* 只恢复实际固件大小 */
+    uint8_t large_buf[1024]; /* 使用更大的缓冲区提高速度 */
+    
+    while(offset < total)
+    {
+        uint32_t size = (total - offset) > 1024 ? 1024 : (total - offset);
+        
+        if(!w25q64_read_partition(pid, offset, large_buf, size))
+        {
+            print_str("\r\nRead failed!\r\n");
             return;
         }
         
-        /* 部分匹配全名（至少两个字符） */
-        if(strlen(cmd_lower) >= 2 && strncmp(cmd_lower, cmd_table[i].name, strlen(cmd_lower)) == 0)
+        if(!bootloader_flash_write(APP_START_ADDR + offset, large_buf, size))
         {
-            /* 检查是否唯一匹配 */
-            uint32_t match_count = 0;
-            uint32_t match_index = i;
-            for(uint32_t k = 0; k < sizeof(cmd_table)/sizeof(cmd_table[0]); k++)
+            print_str("\r\nWrite failed!\r\n");
+            return;
+        }
+        
+        offset += size;
+        
+        /* 每4KB更新一次进度 */
+        if((offset % 0x1000) == 0 || offset >= total)
+        {
+            show_progress(offset, total, "Restore");
+        }
+    }
+    
+    print_str("\r\nRestore completed successfully!\r\n");
+}
+
+void cmd_extlist_handler(void)
+{
+    print_str("\r\n========== External Flash Backup List ==========\r\n");
+    
+    w25q64_init();
+    
+    /* 检查每个备份槽 */
+    for(uint8_t slot = 1; slot <= 3; slot++)
+    {
+        w25q64_partition_id_t pid = W25Q64_PARTITION_BACKUP1 + slot - 1;
+        
+        print_str("\nSlot ");
+        print_dec(slot);
+        print_str(": ");
+        
+        /* 读取前256字节验证 */
+        uint8_t buf[256];
+        if(!w25q64_read_partition(pid, 0, buf, 256))
+        {
+            print_str("Read error\r\n");
+            continue;
+        }
+        
+        /* 检查栈指针 */
+        uint32_t stack = *((uint32_t*)buf);
+        if((stack >= 0x20000000) && (stack <= 0x20010000))
+        {
+            /* 有效固件 */
+            print_str("Valid firmware\r\n");
+            print_str("  Stack: 0x");
+            print_hex(stack);
+            
+            /* 计算固件实际大小 */
+            uint32_t fw_size = calculate_firmware_size(pid);
+            print_str("\r\n  Size: ");
+            print_dec(fw_size / 1024);
+            print_str("KB\r\n");
+            
+            /* 简化的CRC计算 - 只计算前256字节 */
+            uint32_t crc = 0xFFFFFFFF;
+            for(uint32_t i = 0; i < 256; i++)
             {
-                if(strncmp(cmd_lower, cmd_table[k].name, strlen(cmd_lower)) == 0)
+                crc ^= buf[i];
+                for(uint8_t j = 0; j < 8; j++)
                 {
-                    match_count++;
-                    if(match_count > 1) break;
+                    if(crc & 1)
+                        crc = (crc >> 1) ^ 0xEDB88320;
+                    else
+                        crc = crc >> 1;
                 }
             }
+            crc = ~crc;
             
-            if(match_count == 1)
-            {
-                cmd_table[match_index].handler();
-                return;
-            }
-            else if(match_count > 1)
-            {
-                bootloader_printf("Ambiguous command: '%s'. Matches multiple commands.\r\n", cmd);
-                bootloader_print("Type 'help' or 'h' for command list.\r\n");
-                return;
-            }
+            print_str("  CRC32: 0x");
+            print_hex(crc);
+            print_str(" (first 256B)\r\n");
         }
-    }
-    
-    bootloader_printf("Unknown command: '%s'. Type 'help' or 'h' for command list.\r\n", cmd);
-}
-
-static bool bootloader_check_button(void)
-{
-    /* 检查PA0按键 - 低电平有效 */
-    return (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_RESET);
-}
-
-static bool bootloader_check_uart_input(void)
-{
-    uint8_t dummy;
-    return (uart_read(DEV_UART1, &dummy, 1) > 0);
-}
-
-static void bootloader_show_banner(void)
-{
-    bootloader_print("\r\n");
-    bootloader_print("*******************************************\r\n");
-    bootloader_print("*       STM32F103 Bootloader v1.0.0      *\r\n");
-    bootloader_print("*       (c) 2025 - OpenLoad Project      *\r\n");
-    bootloader_print("*******************************************\r\n");
-    bootloader_print("\r\n");
-}
-
-/* Flash操作函数实现 */
-uint32_t bootloader_calc_crc32(uint32_t addr, uint32_t size)
-{
-    uint32_t crc = 0xFFFFFFFF;
-    uint8_t* data = (uint8_t*)addr;
-    
-    for(uint32_t i = 0; i < size; i++)
-    {
-        crc ^= data[i];
-        for(uint8_t j = 0; j < 8; j++)
+        else
         {
-            if(crc & 1)
-                crc = (crc >> 1) ^ 0xEDB88320;
-            else
-                crc = crc >> 1;
+            print_str("Empty or invalid\r\n");
         }
     }
     
-    return ~crc;
+    print_str("=================================================\r\n");
 }
 
+/* Flash操作函数 */
 bool bootloader_flash_erase(uint32_t addr, uint32_t size)
 {
     HAL_FLASH_Unlock();
     
-    FLASH_EraseInitTypeDef erase_init;
-    uint32_t page_error = 0;
+    FLASH_EraseInitTypeDef erase;
+    uint32_t error = 0;
     
-    erase_init.TypeErase = FLASH_TYPEERASE_PAGES;
-    erase_init.PageAddress = addr;
-    erase_init.NbPages = size / FLASH_PAGE_SIZE;
+    erase.TypeErase = FLASH_TYPEERASE_PAGES;
+    erase.PageAddress = addr;
+    erase.NbPages = size / FLASH_PAGE_SIZE;
     
-    if(HAL_FLASHEx_Erase(&erase_init, &page_error) != HAL_OK)
+    if(HAL_FLASHEx_Erase(&erase, &error) != HAL_OK)
     {
         HAL_FLASH_Lock();
         return false;
@@ -645,10 +636,11 @@ bool bootloader_flash_write(uint32_t addr, const uint8_t* data, uint32_t size)
     
     for(uint32_t i = 0; i < size; i += 4)
     {
-        uint32_t word_data = 0;
-        memcpy(&word_data, &data[i], (size - i) >= 4 ? 4 : (size - i));
+        uint32_t word = 0;
+        uint32_t len = (size - i) >= 4 ? 4 : (size - i);
+        memcpy(&word, &data[i], len);
         
-        if(HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word_data) != HAL_OK)
+        if(HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, addr + i, word) != HAL_OK)
         {
             HAL_FLASH_Lock();
             return false;
@@ -659,318 +651,145 @@ bool bootloader_flash_write(uint32_t addr, const uint8_t* data, uint32_t size)
     return true;
 }
 
-bool bootloader_flash_read(uint32_t addr, uint8_t* data, uint32_t size)
+/* 私有函数实现 */
+static void print_str(const char* str)
 {
-    memcpy(data, (uint8_t*)addr, size);
-    return true;
+    uart_write(DEV_UART1, (uint8_t*)str, strlen(str));
+    uart_poll_dma_tx(DEV_UART1);
 }
 
-/* 外部Flash命令处理函数 */
-void cmd_extinfo_handler(void)
+static void print_hex(uint32_t val)
 {
-    /* 初始化W25Q64 */
-    w25q64_init();
-    
-    /* 读取芯片ID */
-    uint32_t chip_id = w25q64_read_id();
-    
-    bootloader_print("\r\n========== External Flash Information ==========\r\n");
-    bootloader_printf("Chip Type          : W25Q64\r\n");
-    bootloader_printf("Chip ID            : 0x%06X\r\n", chip_id);
-    bootloader_printf("Total Size         : 8MB (0x%08X bytes)\r\n", W25Q64_CHIP_SIZE);
-    bootloader_printf("Block Size         : 64KB\r\n");
-    bootloader_printf("Sector Size        : 4KB\r\n");
-    bootloader_printf("Page Size          : 256 bytes\r\n");
-    bootloader_print("------------------------------------------------\r\n");
-    
-    /* 打印分区信息 */
-    bootloader_print("Partition Table:\r\n");
-    bootloader_print("------------------------------------------------\r\n");
-    bootloader_printf("%-12s %-10s %-10s %s\r\n", "Name", "Start", "Size", "Description");
-    bootloader_print("------------------------------------------------\r\n");
-    
-    for(uint32_t i = 0; i < W25Q64_PARTITION_MAX; i++)
+    char buf[9];
+    for(int i = 7; i >= 0; i--)
     {
-        const w25q64_partition_t* p = w25q64_get_partition(i);
-        if(p)
-        {
-            bootloader_printf("%-12s 0x%08X ", p->name, p->start_addr);
-            
-            if(p->size >= 0x100000)
-            {
-                bootloader_printf("%4dMB     ", p->size / 0x100000);
-            }
-            else
-            {
-                bootloader_printf("%4dKB     ", p->size / 0x400);
-            }
-            
-            bootloader_printf("%s\r\n", p->description);
-        }
+        uint8_t digit = val & 0xF;
+        buf[i] = digit < 10 ? '0' + digit : 'A' + digit - 10;
+        val >>= 4;
     }
-    
-    bootloader_print("================================================\r\n");
+    buf[8] = '\0';
+    print_str(buf);
 }
 
-void cmd_extbackup_handler(void)
+static void print_dec(uint32_t val)
 {
-    bootloader_print("Backup firmware to external flash...\r\n");
+    char buf[11];
+    int i = 9;
+    buf[10] = '\0';
     
-    /* 验证应用程序 */
-    if(!bootloader_validate_app())
-    {
-        bootloader_print("No valid application to backup!\r\n");
-        return;
-    }
+    do {
+        buf[i--] = '0' + (val % 10);
+        val /= 10;
+    } while(val && i >= 0);
     
-    /* 初始化W25Q64 */
-    w25q64_init();
-    
-    /* 选择备份槽位 */
-    bootloader_print("Select backup slot (1-3): ");
-    
-    char slot_input[10];
-    uint16_t slot_index = 0;
-    
-    while(1)
-    {
-        uint8_t ch;
-        if(uart_read(DEV_UART1, &ch, 1) > 0)
-        {
-            uart_write(DEV_UART1, &ch, 1);
-            uart_poll_dma_tx(DEV_UART1);
-            
-            if(ch == '\r' || ch == '\n')
-            {
-                slot_input[slot_index] = '\0';
-                bootloader_print("\r\n");
-                break;
-            }
-            else if(slot_index < 9)
-            {
-                slot_input[slot_index++] = ch;
-            }
-        }
-    }
-    
-    int slot = atoi(slot_input);
-    if(slot < 1 || slot > 3)
-    {
-        bootloader_print("Invalid slot number!\r\n");
-        return;
-    }
-    
-    w25q64_partition_id_t partition_id = W25Q64_PARTITION_BACKUP1 + (slot - 1);
-    
-    /* 擦除备份分区 */
-    bootloader_printf("Erasing backup slot %d...\r\n", slot);
-    if(!w25q64_erase_partition(partition_id))
-    {
-        bootloader_print("Failed to erase backup partition!\r\n");
-        return;
-    }
-    
-    /* 备份固件 */
-    bootloader_print("Backing up firmware...\r\n");
-    uint8_t buffer[W25Q64_PAGE_SIZE];
-    uint32_t total_size = APP_MAX_SIZE;
-    uint32_t offset = 0;
-    
-    while(offset < total_size)
-    {
-        uint32_t chunk_size = (total_size - offset) > W25Q64_PAGE_SIZE ? W25Q64_PAGE_SIZE : (total_size - offset);
-        
-        /* 从内部Flash读取 */
-        if(!bootloader_flash_read(APP_START_ADDR + offset, buffer, chunk_size))
-        {
-            bootloader_print("Failed to read internal flash!\r\n");
-            return;
-        }
-        
-        /* 写入外部Flash */
-        if(!w25q64_write_partition(partition_id, offset, buffer, chunk_size))
-        {
-            bootloader_print("Failed to write external flash!\r\n");
-            return;
-        }
-        
-        offset += chunk_size;
-        bootloader_printf("Progress: %d%%\r", (offset * 100) / total_size);
-    }
-    
-    bootloader_printf("\r\nBackup to slot %d completed successfully!\r\n", slot);
-    
-    /* 计算并保存CRC */
-    uint32_t crc = bootloader_calc_crc32(APP_START_ADDR, 0x10000);
-    bootloader_printf("Firmware CRC32: 0x%08X\r\n", crc);
+    print_str(&buf[i + 1]);
 }
 
-void cmd_extrestore_handler(void)
+static void process_cmd(char* cmd)
 {
-    bootloader_print("Restore firmware from external flash...\r\n");
-    
-    /* 初始化W25Q64 */
-    w25q64_init();
-    
-    /* 选择恢复槽位 */
-    bootloader_print("Select backup slot to restore (1-3): ");
-    
-    char slot_input[10];
-    uint16_t slot_index = 0;
-    
-    while(1)
+    /* 转小写 */
+    for(char* p = cmd; *p; p++)
     {
-        uint8_t ch;
-        if(uart_read(DEV_UART1, &ch, 1) > 0)
+        if(*p >= 'A' && *p <= 'Z') *p += 32;
+    }
+    
+    /* 查找命令 */
+    for(uint8_t i = 0; i < CMD_TABLE_SIZE; i++)
+    {
+        if(strcmp(cmd, cmd_table[i].short_name) == 0 ||
+           strcmp(cmd, cmd_table[i].name) == 0)
         {
-            uart_write(DEV_UART1, &ch, 1);
-            uart_poll_dma_tx(DEV_UART1);
-            
-            if(ch == '\r' || ch == '\n')
-            {
-                slot_input[slot_index] = '\0';
-                bootloader_print("\r\n");
-                break;
-            }
-            else if(slot_index < 9)
-            {
-                slot_input[slot_index++] = ch;
-            }
-        }
-    }
-    
-    int slot = atoi(slot_input);
-    if(slot < 1 || slot > 3)
-    {
-        bootloader_print("Invalid slot number!\r\n");
-        return;
-    }
-    
-    w25q64_partition_id_t partition_id = W25Q64_PARTITION_BACKUP1 + (slot - 1);
-    
-    /* 验证备份 */
-    bootloader_printf("Verifying backup slot %d...\r\n", slot);
-    uint8_t test_buffer[256];
-    if(!w25q64_read_partition(partition_id, 0, test_buffer, 256))
-    {
-        bootloader_print("Failed to read backup!\r\n");
-        return;
-    }
-    
-    /* 检查栈指针 */
-    uint32_t stack_ptr = *((uint32_t*)test_buffer);
-    if((stack_ptr < 0x20000000) || (stack_ptr > 0x20010000))
-    {
-        bootloader_printf("No valid firmware in slot %d!\r\n", slot);
-        return;
-    }
-    
-    /* 擦除内部Flash应用区 */
-    bootloader_print("Erasing application area...\r\n");
-    if(!bootloader_flash_erase(APP_START_ADDR, APP_MAX_SIZE))
-    {
-        bootloader_print("Failed to erase application area!\r\n");
-        return;
-    }
-    
-    /* 恢复固件 */
-    bootloader_print("Restoring firmware...\r\n");
-    uint8_t buffer[W25Q64_PAGE_SIZE];
-    uint32_t total_size = APP_MAX_SIZE;
-    uint32_t offset = 0;
-    
-    while(offset < total_size)
-    {
-        uint32_t chunk_size = (total_size - offset) > W25Q64_PAGE_SIZE ? W25Q64_PAGE_SIZE : (total_size - offset);
-        
-        /* 从外部Flash读取 */
-        if(!w25q64_read_partition(partition_id, offset, buffer, chunk_size))
-        {
-            bootloader_print("Failed to read external flash!\r\n");
+            cmd_table[i].handler();
             return;
         }
-        
-        /* 写入内部Flash */
-        if(!bootloader_flash_write(APP_START_ADDR + offset, buffer, chunk_size))
-        {
-            bootloader_print("Failed to write internal flash!\r\n");
-            return;
-        }
-        
-        offset += chunk_size;
-        bootloader_printf("Progress: %d%%\r", (offset * 100) / total_size);
     }
     
-    bootloader_printf("\r\nRestore from slot %d completed successfully!\r\n", slot);
-    
-    /* 验证恢复的固件 */
-    if(bootloader_validate_app())
-    {
-        bootloader_print("Firmware restored and validated successfully!\r\n");
-    }
-    else
-    {
-        bootloader_print("WARNING: Restored firmware validation failed!\r\n");
-    }
+    print_str("Unknown command\r\n");
 }
 
-void cmd_extlist_handler(void)
+static uint8_t read_char(void)
 {
-    bootloader_print("\r\n========== External Flash Backup List ==========\r\n");
+    uint8_t ch;
+    while(uart_read(DEV_UART1, &ch, 1) == 0);
+    uart_write(DEV_UART1, &ch, 1);
+    uart_poll_dma_tx(DEV_UART1);
+    return ch;
+}
+
+static void show_progress(uint32_t current, uint32_t total, const char* prefix)
+{
+    uint32_t percent = (current * 100) / total;
+    uint32_t bar_len = (current * 30) / total; /* 30个字符的进度条 */
     
-    /* 初始化W25Q64 */
-    w25q64_init();
+    print_str("\r");
+    print_str(prefix);
+    print_str(": [");
     
-    /* 检查每个备份槽 */
-    for(int slot = 1; slot <= 3; slot++)
+    /* 绘制进度条 */
+    for(uint32_t i = 0; i < 30; i++)
     {
-        w25q64_partition_id_t partition_id = W25Q64_PARTITION_BACKUP1 + (slot - 1);
-        
-        bootloader_printf("\nSlot %d: ", slot);
-        
-        /* 读取前256字节验证 */
-        uint8_t test_buffer[256];
-        if(!w25q64_read_partition(partition_id, 0, test_buffer, 256))
-        {
-            bootloader_print("Read error\r\n");
-            continue;
-        }
-        
-        /* 检查栈指针 */
-        uint32_t stack_ptr = *((uint32_t*)test_buffer);
-        if((stack_ptr >= 0x20000000) && (stack_ptr <= 0x20010000))
-        {
-            /* 有效固件 */
-            bootloader_print("Valid firmware\r\n");
-            
-            /* 计算CRC (只计算前64KB) */
-            uint8_t crc_buffer[1024];
-            uint32_t crc = 0xFFFFFFFF;
-            for(uint32_t i = 0; i < 0x10000; i += sizeof(crc_buffer))
-            {
-                w25q64_read_partition(partition_id, i, crc_buffer, sizeof(crc_buffer));
-                for(uint32_t j = 0; j < sizeof(crc_buffer); j++)
-                {
-                    crc ^= crc_buffer[j];
-                    for(uint8_t k = 0; k < 8; k++)
-                    {
-                        if(crc & 1)
-                            crc = (crc >> 1) ^ 0xEDB88320;
-                        else
-                            crc = crc >> 1;
-                    }
-                }
-            }
-            crc = ~crc;
-            
-            bootloader_printf("  Stack Pointer: 0x%08X\r\n", stack_ptr);
-            bootloader_printf("  CRC32: 0x%08X (first 64KB)\r\n", crc);
-        }
+        if(i < bar_len)
+            print_str("#");
         else
-        {
-            bootloader_print("Empty or invalid\r\n");
-        }
+            print_str(" ");
     }
     
-    bootloader_print("=================================================\r\n");
+    print_str("] ");
+    print_dec(percent);
+    print_str("% (");
+    print_dec(current / 1024); /* KB */
+    print_str("/");
+    print_dec(total / 1024); /* KB */
+    print_str("KB)");
+    
+    /* 如果完成，换行 */
+    if(current >= total)
+    {
+        print_str("\r\n");
+    }
+}
+
+static uint32_t calculate_firmware_size(w25q64_partition_id_t pid)
+{
+    uint8_t buf[1024];
+    uint32_t firmware_size = 0;
+    uint32_t check_size = APP_MAX_SIZE;
+    
+    /* 从外部flash分块读取，从后往前查找最后一个非0xFF的数据 */
+    for(int32_t offset = check_size - 1024; offset >= 0; offset -= 1024)
+    {
+        uint32_t read_size = 1024;
+        if(offset < 0)
+        {
+            read_size += offset; /* 处理边界情况 */
+            offset = 0;
+        }
+        
+        if(!w25q64_read_partition(pid, offset, buf, read_size))
+        {
+            continue; /* 读取失败，跳过这个块 */
+        }
+        
+        /* 从这个块的末尾开始向前查找 */
+        for(int32_t i = read_size - 1; i >= 0; i--)
+        {
+            if(buf[i] != 0xFF)
+            {
+                firmware_size = offset + i + 1;
+                
+                /* 对齐到1KB边界 */
+                firmware_size = (firmware_size + 1023) & ~1023;
+                
+                /* 最少8KB，因为至少要包含向量表等基础内容 */
+                if(firmware_size < 8192) firmware_size = 8192;
+                
+                return firmware_size;
+            }
+        }
+        
+        if(offset == 0) break; /* 已经检查到开头了 */
+    }
+    
+    /* 如果没找到有效数据，返回最小固件大小 */
+    return 8192;
 }
