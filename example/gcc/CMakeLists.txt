@@ -48,6 +48,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/dev_usart.c
     Core/Src/ringbuff.c
     Core/Src/bootloader_cmd.c
+    Core/Src/w25q64.c
+    Core/Src/xmodem.c
 )
 
 # Add include paths

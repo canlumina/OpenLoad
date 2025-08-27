@@ -25,12 +25,16 @@ STM32F103ZET6 拥有 512KB 内部 Flash，分区如下：
 | 命令 | 缩写 | 功能描述 |
 |------|------|----------|
 | `help` | `h` | 显示命令帮助信息 |
-| `update` | `u` | 通过串口更新固件（XMODEM协议） |
+| `update` | `u` | 通过串口更新固件（XMODEM-1K协议） |
 | `download` | `d` | 下载当前固件到PC |
 | `info` | `i` | 显示固件信息（版本、大小、CRC等） |
 | `erase` | `e` | 擦除应用程序区域 |
 | `reset` | `r` | 复位系统 |
 | `jump` | `j` | 跳转到应用程序 |
+| `extinfo` | `xi` | 显示外部Flash信息 |
+| `extbackup` | `xb` | 备份固件到外部Flash |
+| `extrestore` | `xr` | 从外部Flash恢复固件 |
+| `extlist` | `xl` | 列出外部Flash备份 |
 
 ### 命令输入方式
 
@@ -102,7 +106,64 @@ Available commands:
 Note: You can use either full command or short form
 ```
 
-### 4. 擦除应用程序
+### 4. 更新固件（XMODEM）
+
+```
+BOOT> u
+Starting firmware update via XMODEM...
+Select target:
+  1. Internal Flash (Direct update)
+  2. External Flash Download area
+  3. External Flash Backup slot 1
+  4. External Flash Backup slot 2
+  5. External Flash Backup slot 3
+Select (1-5): 2
+
+Updating to external flash partition 0...
+Ready to receive firmware via XMODEM-1K...
+Please start XMODEM transfer now
+(SecureCRT: Transfer->Send File->Xmodem-1K)
+(Linux: sx -k firmware.bin)
+
+XMODEM: Ready to receive, using XMODEM-1K mode
+CCCCCCC
+[... 传输进度 ...]
+####....####....####
+XMODEM: Transfer complete, received 245760 bytes
+Successfully received 245760 bytes to external flash
+Use 'extrestore' or 'xr' to update firmware from this backup
+```
+
+#### XMODEM 传输方法
+
+**SecureCRT （推荐）:**
+1. 点击菜单: Transfer -> Send File
+2. Protocol: 选择 Xmodem-1K
+3. 选择固件文件 (.bin)
+4. 点击 Send
+
+**Linux/Mac 终端:**
+```bash
+# 安装 lrzsz
+sudo apt-get install lrzsz  # Ubuntu/Debian
+brew install lrzsz          # Mac
+
+# 使用 sx 命令发送文件
+sx -k firmware.bin          # XMODEM-1K （推荐）
+sx firmware.bin             # XMODEM-128
+```
+
+**Xshell:**
+1. 文件 -> 传输 -> 发送文件
+2. 协议选择 Xmodem-1K
+3. 选择固件文件
+
+**minicom:**
+- Ctrl+A -> S -> 选择 xmodem-1k -> 选择文件
+
+**注意:** XMODEM-1K 比 XMODEM-128 快8倍，推荐使用XMODEM-1K
+
+### 5. 擦除应用程序
 
 ```
 BOOT> e          # 使用缩写

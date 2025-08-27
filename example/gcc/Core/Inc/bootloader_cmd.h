@@ -46,6 +46,10 @@ typedef enum {
     CMD_ERASE,
     CMD_RESET,
     CMD_JUMP,
+    CMD_EXTINFO,    // 外部Flash信息
+    CMD_EXTBACKUP,  // 备份到外部Flash
+    CMD_EXTRESTORE, // 从外部Flash恢复
+    CMD_EXTLIST,    // 列出外部Flash备份
     CMD_UNKNOWN
 } cmd_id_t;
 
@@ -75,6 +79,10 @@ void cmd_info_handler(void);
 void cmd_erase_handler(void);
 void cmd_reset_handler(void);
 void cmd_jump_handler(void);
+void cmd_extinfo_handler(void);
+void cmd_extbackup_handler(void);
+void cmd_extrestore_handler(void);
+void cmd_extlist_handler(void);
 
 /* 工具函数 */
 uint32_t bootloader_calc_crc32(uint32_t addr, uint32_t size);
