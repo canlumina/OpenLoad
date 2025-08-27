@@ -685,6 +685,22 @@ static void print_dec(uint32_t val)
     print_str(&buf[i + 1]);
 }
 
+/* 公共输出函数 - 供其他模块使用 */
+void bootloader_print(const char* str)
+{
+    print_str(str);
+}
+
+void bootloader_print_hex(uint32_t val)
+{
+    print_hex(val);
+}
+
+void bootloader_print_dec(uint32_t val)
+{
+    print_dec(val);
+}
+
 static void process_cmd(char* cmd)
 {
     /* 转小写 */

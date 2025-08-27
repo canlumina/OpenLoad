@@ -3,7 +3,6 @@
 #include "w25q64.h"
 #include "bootloader_cmd.h"
 #include <string.h>
-#include <stdio.h>
 
 /* XMODEM 控制字符 */
 #define SOH  0x01  // 128字节数据包开始
@@ -245,14 +244,16 @@ int xmodem_receive(uint32_t dest_addr, bool use_external_flash, uint8_t partitio
         stream_writer_set_partition(&writer, partition_id);
         w25q64_init();
         /* 先擦除目标分区 */
-        printf("XMODEM: Erasing target partition...\r\n");
+        bootloader_print("XMODEM: Erasing target partition...\r\n");
         w25q64_erase_partition(partition_id);
     }
     
     /* 清空串口缓冲区 */
     flush_uart();
     
-    printf("XMODEM: Ready to receive, using %s mode\r\n", use_1k ? "XMODEM-1K" : "XMODEM-128");
+    bootloader_print("XMODEM: Ready to receive, using ");
+    bootloader_print(use_1k ? "XMODEM-1K" : "XMODEM-128");
+    bootloader_print(" mode\r\n");
     
     /* 发送初始字符开始传输 */
     retry_count = 0;
@@ -287,13 +288,13 @@ int xmodem_receive(uint32_t dest_addr, bool use_external_flash, uint8_t partitio
                 {
                     /* 没有数据传输 */
                     uart_putc(ACK);
-                    printf("XMODEM: No data received\r\n");
+                    bootloader_print("XMODEM: No data received\r\n");
                     return 0;
                 }
                 else if(ch == CAN)
                 {
                     /* 发送方取消 */
-                    printf("XMODEM: Transfer cancelled by sender\r\n");
+                    bootloader_print("XMODEM: Transfer cancelled by sender\r\n");
                     return -1;
                 }
                 /* 忽略其他字符，继续等待 */
@@ -306,22 +307,21 @@ int xmodem_receive(uint32_t dest_addr, bool use_external_flash, uint8_t partitio
         if(retry_count == 3 && use_crc)
         {
             use_crc = false;
-            printf("XMODEM: Switching to checksum mode for compatibility\r\n");
+            bootloader_print("XMODEM: Switching to checksum mode for compatibility\r\n");
         }
         
         /* 打印进度 */
         if(use_crc)
         {
-            printf("C");
+            bootloader_print("C");
         }
         else
         {
-            printf(".");
+            bootloader_print(".");
         }
-        fflush(stdout);
     }
     
-    printf("XMODEM: Timeout waiting for sender\r\n");
+    bootloader_print("XMODEM: Timeout waiting for sender\r\n");
     return -1;
     
 start_transfer:
@@ -336,7 +336,9 @@ start_transfer:
             /* 传输结束 */
             uart_putc(ACK);
             stream_writer_flush(&writer);
-            printf("\r\nXMODEM: Transfer complete, received %d bytes\r\n", total_received);
+            bootloader_print("\r\nXMODEM: Transfer complete, received ");
+            bootloader_print_dec(total_received);
+            bootloader_print(" bytes\r\n");
             return total_received;
         }
         else if(header == CAN)
@@ -344,7 +346,7 @@ start_transfer:
             /* 接收到取消 */
             if(uart_getc_timeout(&ch, 1000) && ch == CAN)
             {
-                printf("\r\nXMODEM: Transfer cancelled by sender\r\n");
+                bootloader_print("\r\nXMODEM: Transfer cancelled by sender\r\n");
                 return -1;
             }
         }
@@ -364,7 +366,7 @@ start_transfer:
             if(!uart_getc_timeout(&packet_buffer[1], 1000) ||
                !uart_getc_timeout(&packet_buffer[2], 1000))
             {
-                printf("XMODEM: Timeout reading packet number\r\n");
+                bootloader_print("XMODEM: Timeout reading packet number\r\n");
                 uart_putc(NAK);
                 error_count++;
                 if(error_count > MAX_RETRIES)
@@ -379,7 +381,7 @@ start_transfer:
             {
                 if(!uart_getc_timeout(&packet_buffer[3 + i], 1000))
                 {
-                    printf("XMODEM: Timeout reading data\r\n");
+                    bootloader_print("XMODEM: Timeout reading data\r\n");
                     uart_putc(NAK);
                     error_count++;
                     if(error_count > MAX_RETRIES)
@@ -396,7 +398,7 @@ start_transfer:
                 if(!uart_getc_timeout(&packet_buffer[3 + packet_size], 1000) ||
                    !uart_getc_timeout(&packet_buffer[4 + packet_size], 1000))
                 {
-                    printf("XMODEM: Timeout reading CRC\r\n");
+                    bootloader_print("XMODEM: Timeout reading CRC\r\n");
                     uart_putc(NAK);
                     error_count++;
                     if(error_count > MAX_RETRIES)
@@ -410,7 +412,7 @@ start_transfer:
             {
                 if(!uart_getc_timeout(&packet_buffer[3 + packet_size], 1000))
                 {
-                    printf("XMODEM: Timeout reading checksum\r\n");
+                    bootloader_print("XMODEM: Timeout reading checksum\r\n");
                     uart_putc(NAK);
                     error_count++;
                     if(error_count > MAX_RETRIES)
@@ -425,7 +427,7 @@ start_transfer:
             packet_num_comp = packet_buffer[2];
             if(packet_buffer[1] != packet_num || packet_num_comp != (255 - packet_num))
             {
-                printf("XMODEM: Packet number error\r\n");
+                bootloader_print("XMODEM: Packet number error\r\n");
                 uart_putc(NAK);
                 error_count++;
                 if(error_count > MAX_RETRIES)
@@ -444,14 +446,18 @@ start_transfer:
                 if(crc != recv_crc)
                 {
                     /* CRC错误 */
-                    printf("\r\nXMODEM: CRC error (expected: 0x%04X, got: 0x%04X)\r\n", crc, recv_crc);
+                    bootloader_print("\r\nXMODEM: CRC error (expected: 0x");
+                    bootloader_print_hex(crc);
+                    bootloader_print(", got: 0x");
+                    bootloader_print_hex(recv_crc);
+                    bootloader_print(")\r\n");
                     uart_putc(NAK);
                     error_count++;
                     if(error_count > MAX_RETRIES)
                     {
                         /* 发送取消序列 */
                         for(int i = 0; i < 8; i++) uart_putc(CAN);
-                        printf("XMODEM: Too many errors, transfer cancelled\r\n");
+                        bootloader_print("XMODEM: Too many errors, transfer cancelled\r\n");
                         return -1;
                     }
                     flush_uart();
@@ -465,14 +471,18 @@ start_transfer:
                 if(checksum != packet_buffer[3 + packet_size])
                 {
                     /* Checksum错误 */
-                    printf("\r\nXMODEM: Checksum error (expected: 0x%02X, got: 0x%02X)\r\n", checksum, packet_buffer[3 + packet_size]);
+                    bootloader_print("\r\nXMODEM: Checksum error (expected: 0x");
+                    bootloader_print_hex(checksum);
+                    bootloader_print(", got: 0x");
+                    bootloader_print_hex(packet_buffer[3 + packet_size]);
+                    bootloader_print(")\r\n");
                     uart_putc(NAK);
                     error_count++;
                     if(error_count > MAX_RETRIES)
                     {
                         /* 发送取消序列 */
                         for(int i = 0; i < 8; i++) uart_putc(CAN);
-                        printf("XMODEM: Too many errors, transfer cancelled\r\n");
+                        bootloader_print("XMODEM: Too many errors, transfer cancelled\r\n");
                         return -1;
                     }
                     flush_uart();
@@ -483,7 +493,7 @@ start_transfer:
             /* 写入数据 */
             if(stream_writer_write(&writer, &packet_buffer[3], packet_size) < 0)
             {
-                printf("XMODEM: Write error\r\n");
+                bootloader_print("XMODEM: Write error\r\n");
                 return -1;
             }
             
@@ -497,26 +507,26 @@ start_transfer:
             /* 显示进度 */
             if((packet_num % 32) == 0)
             {
-                printf("#");
-                fflush(stdout);
+                bootloader_print("#");
             }
             else if((packet_num % 8) == 0)
             {
-                printf(".");
-                fflush(stdout);
+                bootloader_print(".");
             }
         }
         else
         {
             /* 未知字符，忽略 */
-            printf("XMODEM: Unknown char 0x%02X\r\n", header);
+            bootloader_print("XMODEM: Unknown char 0x");
+            bootloader_print_hex(header);
+            bootloader_print("\r\n");
         }
         
 wait_next_packet:
         /* 等待下一个包 */
         if(!uart_getc_timeout(&packet_buffer[0], 5000))  // 5秒超时
         {
-            printf("\r\nXMODEM: Timeout waiting for next packet\r\n");
+            bootloader_print("\r\nXMODEM: Timeout waiting for next packet\r\n");
             return -1;
         }
     }

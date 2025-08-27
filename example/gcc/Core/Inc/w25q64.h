@@ -103,7 +103,7 @@ const w25q64_partition_t* w25q64_get_partition(w25q64_partition_id_t id);
 bool w25q64_erase_partition(w25q64_partition_id_t id);
 bool w25q64_read_partition(w25q64_partition_id_t id, uint32_t offset, uint8_t* buffer, uint32_t size);
 bool w25q64_write_partition(w25q64_partition_id_t id, uint32_t offset, const uint8_t* data, uint32_t size);
-void w25q64_print_partition_info(void);
+// void w25q64_print_partition_info(void);  // 已注释掉以节省代码空间
 
 /* 电源管理 */
 void w25q64_power_down(void);

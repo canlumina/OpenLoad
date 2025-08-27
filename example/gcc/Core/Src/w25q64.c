@@ -359,34 +359,44 @@ bool w25q64_write_partition(w25q64_partition_id_t id, uint32_t offset, const uin
     return w25q64_write(partition->start_addr + offset, data, size);
 }
 
-/* 打印分区信息 */
+/* 打印分区信息 - bootloader中不使用，节省空间 */
+/*
 void w25q64_print_partition_info(void)
 {
-    printf("\r\n========== W25Q64 Partition Table ==========\r\n");
-    printf("Total Size: 8MB (0x%08X)\r\n", W25Q64_CHIP_SIZE);
-    printf("---------------------------------------------\r\n");
-    printf("%-10s | %-10s | %-10s | %s\r\n", "Name", "Start", "Size", "Description");
-    printf("---------------------------------------------\r\n");
+    bootloader_print("\r\n========== W25Q64 Partition Table ==========\r\n");
+    bootloader_print("Total Size: 8MB (0x");
+    bootloader_print_hex(W25Q64_CHIP_SIZE);
+    bootloader_print(")\r\n");
+    bootloader_print("---------------------------------------------\r\n");
+    bootloader_print("Name       | Start      | Size       | Description\r\n");
+    bootloader_print("---------------------------------------------\r\n");
     
     for(uint32_t i = 0; i < W25Q64_PARTITION_MAX; i++)
     {
         const w25q64_partition_t* p = &w25q64_partitions[i];
-        printf("%-10s | 0x%08X | ", p->name, p->start_addr);
+        bootloader_print(p->name);
+        bootloader_print(" | 0x");
+        bootloader_print_hex(p->start_addr);
+        bootloader_print(" | ");
         
         if(p->size >= 0x100000)
         {
-            printf("%4dMB     | ", p->size / 0x100000);
+            bootloader_print_dec(p->size / 0x100000);
+            bootloader_print("MB     | ");
         }
         else
         {
-            printf("%4dKB     | ", p->size / 0x400);
+            bootloader_print_dec(p->size / 0x400);
+            bootloader_print("KB     | ");
         }
         
-        printf("%s\r\n", p->description);
+        bootloader_print(p->description);
+        bootloader_print("\r\n");
     }
     
-    printf("=============================================\r\n");
+    bootloader_print("=============================================\r\n");
 }
+*/
 
 /* 电源关闭 */
 void w25q64_power_down(void)
