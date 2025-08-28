@@ -7,6 +7,7 @@
 #include "esp8266.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 /* 私有变量 */
 static bootloader_state_t bootloader_state = BOOT_STATE_IDLE;
@@ -25,12 +26,10 @@ static const bootloader_cmd_t cmd_table[] = {
     {"xbackup", "xb", "Backup to external flash",   CMD_EXTBACKUP,  cmd_extbackup_handler},
     {"xrestore","xr", "Restore from external flash",CMD_EXTRESTORE, cmd_extrestore_handler},
     {"xlist",   "xl", "List external flash backups",CMD_EXTLIST,    cmd_extlist_handler},
-    {"espinit", "ei", "Initialize ESP8266 module",  CMD_ESP_INIT,   cmd_esp_init_handler},
-    {"esptest", "et", "Test ESP8266 communication", CMD_ESP_TEST,   cmd_esp_test_handler},
-    {"espwifi", "ew", "Connect to WiFi network",    CMD_ESP_WIFI,   cmd_esp_wifi_handler},
-    {"espinfo", "ef", "Show ESP8266 information",   CMD_ESP_INFO,   cmd_esp_info_handler},
-    {"espping", "ep", "Test network connectivity",  CMD_ESP_PING,   cmd_esp_ping_handler},
-    {"httptest", "ht", "Test HTTP request debug",   CMD_HTTP_TEST,  cmd_http_test_handler},
+    {"wifi",    "w",  "WiFi connect/disconnect",   CMD_WIFI,       cmd_wifi_handler},
+    {"winfo",   "wi", "WiFi/ESP8266 information",  CMD_WIFI_INFO,  cmd_wifi_info_handler},
+    {"ota",     "o",  "OTA firmware update",       CMD_OTA,        cmd_ota_handler},
+    {"otadebug","od", "OTA debug mode",            CMD_OTA_DEBUG,  cmd_ota_debug_handler},
 };
 
 #define CMD_TABLE_SIZE (sizeof(cmd_table)/sizeof(cmd_table[0]))
@@ -214,9 +213,6 @@ void cmd_help_handler(void)
     print_str("===============================================\r\n");
 }
 
-/* OTA更新函数声明 */
-static void ota_update_internal(const char *url);
-static void ota_update_external(const char *url, uint8_t slot);
 
 void cmd_update_handler(void)
 {
@@ -289,124 +285,11 @@ void cmd_update_handler(void)
             print_str("Transfer failed!\r\n");
         }
     }
-    else if(ch == '3')
+    else if(ch == '3' || ch == '4')
     {
-        /* OTA到内部Flash */
-        char url[256];
-        uint8_t url_len = 0;
-        
-        print_str("Enter firmware URL or 'latest': ");
-        while(url_len < sizeof(url) - 1)
-        {
-            ch = read_char();
-            if(ch == '\r' || ch == '\n')
-            {
-                break;
-            }
-            else if(ch == '\b' || ch == 0x7F)
-            {
-                if(url_len > 0)
-                {
-                    url_len--;
-                    print_str(" \b");
-                }
-            }
-            else
-            {
-                url[url_len++] = ch;
-            }
-        }
-        url[url_len] = '\0';
-        print_str("\r\n");
-        
-        if(url_len == 0)
-        {
-            print_str("URL cannot be empty!\r\n");
-            return;
-        }
-        
-        /* 如果用户只输入"latest"，构造完整URL */
-        if(strcmp(url, "latest") == 0)
-        {
-            strcpy(url, "http://115.190.137.231:3685/api/firmware/download/latest");
-        }
-        /* 修正常见的URL错误：将/latest改为/download/latest */
-        else if(strstr(url, "/api/firmware/latest") != NULL && strstr(url, "/download/") == NULL)
-        {
-            char temp_url[256];
-            char *latest_pos = strstr(url, "/api/firmware/latest");
-            strncpy(temp_url, url, latest_pos - url);
-            temp_url[latest_pos - url] = '\0';
-            strcat(temp_url, "/api/firmware/download/latest");
-            strcpy(url, temp_url);
-        }
-        
-        ota_update_internal(url);
-    }
-    else if(ch == '4')
-    {
-        /* OTA到外部Flash */
-        char url[256];
-        uint8_t url_len = 0;
-        uint8_t slot;
-        
-        print_str("Slot (1-3): ");
-        slot = read_char() - '0';
-        print_str("\r\n");
-        
-        if(slot < 1 || slot > 3)
-        {
-            print_str("Invalid slot!\r\n");
-            return;
-        }
-        
-        print_str("Enter firmware URL or 'latest': ");
-        while(url_len < sizeof(url) - 1)
-        {
-            ch = read_char();
-            if(ch == '\r' || ch == '\n')
-            {
-                break;
-            }
-            else if(ch == '\b' || ch == 0x7F)
-            {
-                if(url_len > 0)
-                {
-                    url_len--;
-                    print_str(" \b");
-                }
-            }
-            else
-            {
-                url[url_len++] = ch;
-            }
-        }
-        url[url_len] = '\0';
-        print_str("\r\n");
-        
-        if(url_len == 0)
-        {
-            print_str("URL cannot be empty!\r\n");
-            return;
-        }
-        
-        /* 如果用户只输入"latest"，构造完整URL */
-        if(strcmp(url, "latest") == 0)
-        {
-            strcpy(url, "http://115.190.137.231:3685/api/firmware/download/latest");
-        }
-        /* 修正常见的URL错误：将/latest改为/download/latest */
-        else if(strstr(url, "/api/firmware/latest") != NULL && strstr(url, "/download/") == NULL)
-        {
-            char temp_url[256];
-            char *latest_pos = strstr(url, "/api/firmware/latest");
-            strncpy(temp_url, url, latest_pos - url);
-            temp_url[latest_pos - url] = '\0';
-            strcat(temp_url, "/api/firmware/download/latest");
-            strcpy(url, temp_url);
-        }
-        
-        ota_update_external(url, slot);
+        /* OTA更新已移至新的 cmd_ota_handler() */
+        print_str("OTA update has been moved to 'o' command.\r\n");
+        print_str("Use 'o' for OTA firmware updates.\r\n");
     }
     else
     {
@@ -952,49 +835,11 @@ static uint32_t calculate_firmware_size(w25q64_partition_id_t pid)
     return 8192;
 }
 
-/* ESP8266命令处理函数 */
-void cmd_esp_init_handler(void)
-{
-    print_str("\r\n=== ESP8266 Initialization ===\r\n");
-    
-    esp8266_status_t status = esp8266_init();
-    
-    if(status == ESP8266_OK)
-    {
-        print_str("ESP8266 initialized successfully!\r\n");
-    }
-    else if(status == ESP8266_TIMEOUT)
-    {
-        print_str("ESP8266 initialization timeout!\r\n");
-        print_str("Check module connection and power.\r\n");
-    }
-    else
-    {
-        print_str("ESP8266 initialization failed!\r\n");
-    }
-}
+/* WiFi和OTA命令处理函数声明 - 实现在 bootloader_cmd_esp.c */
 
-void cmd_esp_test_handler(void)
-{
-    print_str("\r\n=== ESP8266 Communication Test ===\r\n");
-    
-    esp8266_status_t status = esp8266_test();
-    
-    if(status == ESP8266_OK)
-    {
-        print_str("ESP8266 communication test passed!\r\n");
-    }
-    else if(status == ESP8266_TIMEOUT)
-    {
-        print_str("ESP8266 communication timeout!\r\n");
-        print_str("Check serial connection and baud rate.\r\n");
-    }
-    else
-    {
-        print_str("ESP8266 communication test failed!\r\n");
-    }
-}
 
+/* 以下旧的ESP8266处理函数已移除，使用新的实现 */
+#if 0
 void cmd_esp_wifi_handler(void)
 {
     char ssid[64];
@@ -1357,8 +1202,327 @@ void cmd_http_test_handler(void)
     print_dec(total_received);
     print_str(" bytes\r\n");
     
-    esp8266_tcp_close();
-    print_str("Connection closed.\r\n");
+    /* 使用软关闭，避免影响WiFi连接 */
+    esp8266_tcp_close_soft();
+    print_str("Connection closed (soft).\r\n");
+}
+
+/**
+ * @brief TCP连接详细测试
+ */
+void cmd_tcp_test_handler(void)
+{
+    esp8266_status_t status;
+    char host[64];
+    char port_str[16];
+    uint16_t port;
+    char cmd[128];
+    uint16_t resp_len;
+    uint32_t start_time;
+    
+    print_str("\r\n=== TCP Connection Test ===\r\n");
+    
+    /* 检查WiFi连接 */
+    if(!esp8266_is_connected())
+    {
+        print_str("ERROR: WiFi not connected!\r\n");
+        print_str("Use 'ew' command to connect first.\r\n");
+        return;
+    }
+    
+    /* 输入主机地址 */
+    print_str("Enter host (IP or domain): ");
+    uint8_t idx = 0;
+    uint8_t ch;
+    
+    while(idx < sizeof(host) - 1)
+    {
+        if(uart_read(DEV_UART1, &ch, 1) > 0)
+        {
+            if(ch == '\r' || ch == '\n')
+            {
+                break;
+            }
+            else if(ch == 0x08 || ch == 0x7F)  /* 退格键 */
+            {
+                if(idx > 0)
+                {
+                    idx--;
+                    print_str("\b \b");
+                }
+            }
+            else if(ch >= ' ' && ch <= '~')
+            {
+                host[idx++] = ch;
+                uart_write(DEV_UART1, &ch, 1);
+            }
+        }
+        HAL_Delay(10);
+    }
+    host[idx] = '\0';
+    print_str("\r\n");
+    
+    /* 输入端口 */
+    print_str("Enter port: ");
+    idx = 0;
+    
+    while(idx < sizeof(port_str) - 1)
+    {
+        if(uart_read(DEV_UART1, &ch, 1) > 0)
+        {
+            if(ch == '\r' || ch == '\n')
+            {
+                break;
+            }
+            else if(ch == 0x08 || ch == 0x7F)  /* 退格键 */
+            {
+                if(idx > 0)
+                {
+                    idx--;
+                    print_str("\b \b");
+                }
+            }
+            else if(ch >= '0' && ch <= '9')
+            {
+                port_str[idx++] = ch;
+                uart_write(DEV_UART1, &ch, 1);
+            }
+        }
+        HAL_Delay(10);
+    }
+    port_str[idx] = '\0';
+    port = atoi(port_str);
+    print_str("\r\n\r\n");
+    
+    print_str("Testing TCP connection to ");
+    print_str(host);
+    print_str(":");
+    print_dec(port);
+    print_str("\r\n");
+    print_str("========================================\r\n");
+    
+    /* Step 1: 测试AT命令响应 */
+    print_str("Step 1: Testing AT command...\r\n");
+    status = esp8266_send_cmd("AT", "OK", 1000);
+    if(status == ESP8266_OK)
+    {
+        print_str("  [OK] AT command works\r\n");
+    }
+    else
+    {
+        print_str("  [FAIL] AT command failed\r\n");
+        return;
+    }
+    
+    /* Step 2: 检查连接状态 */
+    print_str("\r\nStep 2: Checking connection status...\r\n");
+    status = esp8266_send_cmd("AT+CIPSTATUS", "OK", 2000);
+    print_str("  [OK] Status checked\r\n");
+    
+    /* Step 3: 关闭之前的连接 */
+    print_str("\r\nStep 3: Closing any existing connection...\r\n");
+    status = esp8266_send_cmd("AT+CIPCLOSE", "OK", 1000);
+    print_str("  [OK] Connection closed\r\n");
+    HAL_Delay(500);
+    
+    /* Step 4: 设置单连接模式 */
+    print_str("\r\nStep 4: Setting single connection mode...\r\n");
+    status = esp8266_send_cmd("AT+CIPMUX=0", "OK", 2000);
+    if(status == ESP8266_OK)
+    {
+        print_str("  [OK] Single connection mode set\r\n");
+    }
+    else
+    {
+        print_str("  [FAIL] Failed to set connection mode\r\n");
+        return;
+    }
+    
+    /* Step 5: 尝试建立TCP连接 */
+    print_str("\r\nStep 5: Establishing TCP connection...\r\n");
+    snprintf(cmd, sizeof(cmd), "AT+CIPSTART=\"TCP\",\"%s\",%d", host, port);
+    print_str("  Command: ");
+    print_str(cmd);
+    print_str("\r\n");
+    
+    /* 发送连接命令 */
+    uart_write(DEV_UART2, (uint8_t *)cmd, strlen(cmd));
+    uart_write(DEV_UART2, (uint8_t *)"\r\n", 2);
+    uart_poll_dma_tx(DEV_UART2);
+    
+    /* 等待响应 */
+    print_str("  Waiting for response...\r\n");
+    start_time = HAL_GetTick();
+    bool connected = false;
+    
+    while((HAL_GetTick() - start_time) < 20000)  /* 20秒超时 */
+    {
+        char response_buf[512];
+        resp_len = esp8266_read_response(response_buf, sizeof(response_buf), 1000);
+        if(resp_len > 0)
+        {
+            print_str("  Response: ");
+            print_str(response_buf);
+            print_str("\r\n");
+            
+            if(strstr(response_buf, "CONNECT"))
+            {
+                connected = true;
+                print_str("  [OK] TCP connection established!\r\n");
+                break;
+            }
+            else if(strstr(response_buf, "ERROR") || 
+                   strstr(response_buf, "CLOSED") ||
+                   strstr(response_buf, "FAIL"))
+            {
+                print_str("  [FAIL] Connection failed\r\n");
+                break;
+            }
+        }
+        else
+        {
+            print_str("  Still waiting... (");
+            print_dec((HAL_GetTick() - start_time) / 1000);
+            print_str("s)\r\n");
+        }
+    }
+    
+    if(!connected)
+    {
+        print_str("  [TIMEOUT] Connection timeout after 20 seconds\r\n");
+        
+        /* 尝试诊断问题 */
+        print_str("\r\n=== Diagnostics ===\r\n");
+        
+        /* 检查DNS解析（如果是域名） */
+        if((host[0] < '0' || host[0] > '9'))  /* 可能是域名 */
+        {
+            print_str("Testing DNS resolution...\r\n");
+            snprintf(cmd, sizeof(cmd), "AT+CIPDOMAIN=\"%s\"", host);
+            status = esp8266_send_cmd(cmd, "OK", 5000);
+            if(status == ESP8266_OK)
+            {
+                print_str("DNS resolution completed\r\n");
+            }
+        }
+        
+        /* 检查WiFi信号强度 */
+        print_str("\r\nChecking WiFi signal strength...\r\n");
+        status = esp8266_send_cmd("AT+CWJAP?", "OK", 2000);
+        if(status == ESP8266_OK)
+        {
+            print_str("WiFi connection info checked\r\n");
+        }
+    }
+    else
+    {
+        /* 连接成功，尝试发送测试数据 */
+        print_str("\r\nStep 6: Testing data transmission...\r\n");
+        
+        /* 发送HTTP GET请求作为测试 */
+        char test_data[] = "GET / HTTP/1.1\r\nHost: ";
+        char test_data2[] = "\r\nConnection: close\r\n\r\n";
+        
+        uint16_t test_len = strlen(test_data) + strlen(host) + strlen(test_data2);
+        snprintf(cmd, sizeof(cmd), "AT+CIPSEND=%d", test_len);
+        
+        print_str("  Preparing to send ");
+        print_dec(test_len);
+        print_str(" bytes...\r\n");
+        
+        uart_write(DEV_UART2, (uint8_t *)cmd, strlen(cmd));
+        uart_write(DEV_UART2, (uint8_t *)"\r\n", 2);
+        uart_poll_dma_tx(DEV_UART2);
+        
+        /* 等待 > 提示符 */
+        start_time = HAL_GetTick();
+        bool prompt_received = false;
+        
+        while((HAL_GetTick() - start_time) < 3000)
+        {
+            char prompt_buf[128];
+            resp_len = esp8266_read_response(prompt_buf, sizeof(prompt_buf), 500);
+            if(resp_len > 0)
+            {
+                if(strstr(prompt_buf, ">"))
+                {
+                    prompt_received = true;
+                    print_str("  [OK] Ready to send data\r\n");
+                    break;
+                }
+            }
+        }
+        
+        if(prompt_received)
+        {
+            /* 发送测试数据 */
+            uart_write(DEV_UART2, (uint8_t *)test_data, strlen(test_data));
+            uart_write(DEV_UART2, (uint8_t *)host, strlen(host));
+            uart_write(DEV_UART2, (uint8_t *)test_data2, strlen(test_data2));
+            uart_poll_dma_tx(DEV_UART2);
+            
+            /* 等待发送确认 */
+            start_time = HAL_GetTick();
+            bool send_ok = false;
+            
+            while((HAL_GetTick() - start_time) < 5000)
+            {
+                char send_resp[128];
+                resp_len = esp8266_read_response(send_resp, sizeof(send_resp), 500);
+                if(resp_len > 0)
+                {
+                    if(strstr(send_resp, "SEND OK"))
+                    {
+                        send_ok = true;
+                        print_str("  [OK] Data sent successfully\r\n");
+                        break;
+                    }
+                    else if(strstr(send_resp, "SEND FAIL"))
+                    {
+                        print_str("  [FAIL] Send failed\r\n");
+                        break;
+                    }
+                }
+            }
+            
+            if(send_ok)
+            {
+                /* 接收响应数据 */
+                print_str("\r\nStep 7: Receiving response...\r\n");
+                HAL_Delay(1000);
+                
+                uint16_t total_received = 0;
+                start_time = HAL_GetTick();
+                
+                while((HAL_GetTick() - start_time) < 5000 && total_received < 500)
+                {
+                    uint8_t buffer[256];
+                    uint16_t received = esp8266_tcp_receive(buffer, sizeof(buffer) - 1, 500);
+                    if(received > 0)
+                    {
+                        buffer[received] = '\0';
+                        print_str((char*)buffer);
+                        total_received += received;
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                
+                print_str("\r\n  Total received: ");
+                print_dec(total_received);
+                print_str(" bytes\r\n");
+            }
+        }
+        
+        /* 使用软关闭，避免影响WiFi连接 */
+        esp8266_tcp_close_soft();
+        print_str("\r\n[OK] Connection closed (soft)\r\n");
+    }
+    
+    print_str("\r\n========================================\r\n");
+    print_str("Test completed.\r\n");
 }
 
 /**
@@ -1680,3 +1844,5 @@ static void ota_update_external(const char *url, uint8_t slot)
         print_str("Firmware validation: READ ERROR\r\n");
     }
 }
+
+#endif

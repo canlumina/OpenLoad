@@ -48,9 +48,12 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/dev_usart.c
     Core/Src/ringbuff.c
     Core/Src/bootloader_cmd.c
+    Core/Src/bootloader_cmd_esp.c
     Core/Src/w25q64.c
     Core/Src/xmodem.c
     Core/Src/esp8266.c
+    Core/Src/ota_manager.c
+    Core/Src/ota_debug.c
 )
 
 # Add include paths

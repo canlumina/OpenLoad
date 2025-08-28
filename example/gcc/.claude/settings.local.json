@@ -15,7 +15,14 @@
       "Read(D:\\STM32\\ota_server/**)",
       "Read(D:\\STM32\\ota_server/**)",
       "Read(D:\\STM32\\ota_server/**)",
-      "Read(D:\\STM32\\ota_server/**)"
+      "Read(D:\\STM32\\ota_server/**)",
+      "Read(D:\\STM32\\ota_server/**)",
+      "Read(D:\\STM32\\ota_server/**)",
+      "Read(D:\\STM32\\OpenLoad/**)",
+      "Read(D:\\STM32\\OpenLoad/**)",
+      "Read(D:\\w601\\RT-Thread_W60X_SDK\\examples\\29_iot_ota_http/**)",
+      "Read(D:\\w601\\RT-Thread_W60X_SDK\\examples\\29_iot_ota_http\\applications/**)",
+      "Read(D:\\w601\\RT-Thread_W60X_SDK\\examples\\29_iot_ota_http/**)"
     ],
     "deny": [],
     "ask": [],
