@@ -4,7 +4,8 @@
 #include "gpio.h"
 #include "w25q64.h"
 #include "xmodem.h"
-#include "esp8266.h"
+#include "ota.h"
+#include "wifi.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,7 +18,7 @@ static uint8_t cmd_index = 0;
 /* 命令表 */
 static const bootloader_cmd_t cmd_table[] = {
     {"help",    "h",  "Show command help",           CMD_HELP,       cmd_help_handler},
-    {"update",  "u",  "Update firmware via XMODEM", CMD_UPDATE,     cmd_update_handler},
+    {"update",  "u",  "Update firmware (XMODEM/OTA)", CMD_UPDATE,     cmd_update_handler},
     {"info",    "i",  "Show system information",    CMD_INFO,       cmd_info_handler},
     {"erase",   "e",  "Erase application area",     CMD_ERASE,      cmd_erase_handler},
     {"reset",   "r",  "Reset system",               CMD_RESET,      cmd_reset_handler},
@@ -26,10 +27,6 @@ static const bootloader_cmd_t cmd_table[] = {
     {"xbackup", "xb", "Backup to external flash",   CMD_EXTBACKUP,  cmd_extbackup_handler},
     {"xrestore","xr", "Restore from external flash",CMD_EXTRESTORE, cmd_extrestore_handler},
     {"xlist",   "xl", "List external flash backups",CMD_EXTLIST,    cmd_extlist_handler},
-    {"wifi",    "w",  "WiFi connect/disconnect",   CMD_WIFI,       cmd_wifi_handler},
-    {"winfo",   "wi", "WiFi/ESP8266 information",  CMD_WIFI_INFO,  cmd_wifi_info_handler},
-    {"ota",     "o",  "OTA firmware update",       CMD_OTA,        cmd_ota_handler},
-    {"otadebug","od", "OTA debug mode",            CMD_OTA_DEBUG,  cmd_ota_debug_handler},
 };
 
 #define CMD_TABLE_SIZE (sizeof(cmd_table)/sizeof(cmd_table[0]))
@@ -285,11 +282,111 @@ void cmd_update_handler(void)
             print_str("Transfer failed!\r\n");
         }
     }
-    else if(ch == '3' || ch == '4')
+    else if(ch == '3')
     {
-        /* OTA更新已移至新的 cmd_ota_handler() */
-        print_str("OTA update has been moved to 'o' command.\r\n");
-        print_str("Use 'o' for OTA firmware updates.\r\n");
+        /* OTA到内部Flash */
+        print_str("WARNING! Update internal flash via OTA? (y/n): ");
+        if(read_char() != 'y')
+        {
+            print_str("\r\nCancelled\r\n");
+            return;
+        }
+        print_str("\r\n");
+        
+        print_str("Initializing WiFi module...\r\n");
+        ota_error_t init_result = ota_init();
+        if(init_result != OTA_OK)
+        {
+            print_str("WiFi module init failed! Error: ");
+            print_dec(init_result);
+            print_str("\r\n");
+            return;
+        }
+        print_str("WiFi module initialized successfully\r\n");
+        
+        /* 设置进度回调 - 暂时不使用回调函数 */
+        ota_set_progress_callback(NULL);
+        ota_set_state_callback(NULL);
+        
+        print_str("Starting OTA download...\r\n");
+        print_str("Server: ");
+        print_str(OTA_SERVER_IP);
+        print_str(":");
+        print_dec(OTA_SERVER_PORT);
+        print_str("\r\n");
+        
+        ota_error_t result = ota_download_firmware("/api/firmware/download/latest", APP_START_ADDR, true);
+        
+        if(result == OTA_OK)
+        {
+            print_str("OTA update completed successfully!\r\n");
+        }
+        else
+        {
+            print_str("OTA update failed with error: ");
+            print_dec(result);
+            print_str("\r\n");
+        }
+    }
+    else if(ch == '4')
+    {
+        /* OTA到外部Flash */
+        print_str("Slot (1-3): ");
+        ch = read_char() - '0';
+        print_str("\r\n");
+        
+        if(ch < 1 || ch > 3)
+        {
+            print_str("Invalid slot!\r\n");
+            return;
+        }
+        
+        print_str("Initializing WiFi module...\r\n");
+        ota_error_t init_result = ota_init();
+        if(init_result != OTA_OK)
+        {
+            print_str("WiFi module init failed! Error: ");
+            print_dec(init_result);
+            print_str("\r\n");
+            return;
+        }
+        print_str("WiFi module initialized successfully\r\n");
+        
+        /* 设置进度回调 - 暂时不使用回调函数 */
+        ota_set_progress_callback(NULL);
+        ota_set_state_callback(NULL);
+        
+        w25q64_partition_id_t partition = W25Q64_PARTITION_BACKUP1 + ch - 1;
+        /* 获取分区地址 */
+        uint32_t ext_addr = 0;
+        if(partition == W25Q64_PARTITION_BACKUP1) ext_addr = 0x200000;
+        else if(partition == W25Q64_PARTITION_BACKUP2) ext_addr = 0x400000;
+        else if(partition == W25Q64_PARTITION_BACKUP3) ext_addr = 0x600000;
+        
+        print_str("Starting OTA download to slot ");
+        print_dec(ch);
+        print_str("...\r\n");
+        print_str("Connecting to WiFi: ");
+        print_str(WIFI_SSID);
+        print_str("\r\n");
+        print_str("Server: ");
+        print_str(OTA_SERVER_IP);
+        print_str(":");
+        print_dec(OTA_SERVER_PORT);
+        print_str("\r\n");
+        
+        ota_error_t result = ota_download_firmware("/api/firmware/download/latest", ext_addr, false);
+        
+        if(result == OTA_OK)
+        {
+            print_str("OTA update to external flash completed!\r\n");
+        }
+        else
+        {
+            print_str("OTA update failed with error: ");
+            print_dec(result);
+            print_str("\r\n");
+        }
     }
     else
     {
@@ -835,10 +932,70 @@ static uint32_t calculate_firmware_size(w25q64_partition_id_t pid)
     return 8192;
 }
 
-/* WiFi和OTA命令处理函数声明 - 实现在 bootloader_cmd_esp.c */
+/* OTA进度回调 */
+static void ota_progress_callback(uint8_t progress)
+{
+    print_str("\rProgress: ");
+    print_dec(progress);
+    print_str("%");
+    
+    if(progress >= 100)
+    {
+        print_str("\r\n");
+    }
+}
 
+/* OTA状态回调 */
+static void ota_state_callback(ota_state_t state)
+{
+    switch(state)
+    {
+        case OTA_STATE_CONNECTING:
+            print_str("Connecting to WiFi...\r\n");
+            break;
+        case OTA_STATE_DOWNLOADING:
+            print_str("Downloading firmware...\r\n");
+            break;
+        case OTA_STATE_WRITING:
+            print_str("Writing to flash...\r\n");
+            break;
+        case OTA_STATE_VERIFYING:
+            print_str("Verifying firmware...\r\n");
+            break;
+        case OTA_STATE_SUCCESS:
+            print_str("OTA update successful!\r\n");
+            break;
+        case OTA_STATE_FAILED:
+            print_str("OTA update failed!\r\n");
+            break;
+        default:
+            break;
+    }
+}
 
-/* 以下旧的ESP8266处理函数已移除，使用新的实现 */
+/* 命令处理函数 */
+void cmd_wifi_handler(void)
+{
+    print_str("WiFi functions removed. Use 'u' command for OTA updates.\r\n");
+}
+
+void cmd_wifi_info_handler(void)
+{
+    print_str("WiFi functions removed. Use 'u' command for OTA updates.\r\n");
+}
+
+void cmd_ota_handler(void)
+{
+    print_str("OTA functions integrated into 'u' command.\r\n");
+    print_str("Use 'u' and select option 3 or 4 for OTA updates.\r\n");
+}
+
+void cmd_ota_debug_handler(void)
+{
+    print_str("OTA debug mode removed.\r\n");
+}
+
+/* 以下旧的ESP8266处理函数已移除 */
 #if 0
 void cmd_esp_wifi_handler(void)
 {

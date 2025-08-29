@@ -104,8 +104,8 @@ void w25q64_wait_busy(void)
     uint32_t timeout = 0;
     while(w25q64_is_busy())
     {
-        HAL_Delay(1);
-        if(++timeout > 10000) // 10秒超时
+        HAL_Delay(10);
+        if(++timeout > 500) // 5秒超时 (500 * 10ms)
         {
             break;
         }

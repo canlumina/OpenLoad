@@ -6,9 +6,7 @@
 
 /* Flash分区定义 */
 #define FLASH_BASE_ADDR         0x08000000
-#ifndef FLASH_PAGE_SIZE
-#define FLASH_PAGE_SIZE         0x800        // 2KB per page
-#endif
+// FLASH_PAGE_SIZE已经在HAL库中定义
 #define FLASH_TOTAL_SIZE        0x80000      // 512KB total
 #define BOOTLOADER_SIZE         0x10000      // 64KB bootloader
 #define APP_START_ADDR          0x08010000   // App start
