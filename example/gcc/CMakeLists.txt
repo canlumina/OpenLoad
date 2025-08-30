@@ -50,8 +50,10 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/bootloader_cmd.c
     Core/Src/w25q64.c
     Core/Src/xmodem.c
-    Core/Src/wifi.c
-    Core/Src/ota.c
+    Core/Src/at_client.c
+    Core/Src/esp8266_wifi.c
+    Core/Src/http_client.c
+    Core/Src/http_ota.c
 )
 
 # Add include paths

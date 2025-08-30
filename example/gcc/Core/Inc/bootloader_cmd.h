@@ -31,10 +31,9 @@ typedef enum {
     CMD_EXTBACKUP,
     CMD_EXTRESTORE,
     CMD_EXTLIST,
-    CMD_WIFI,
-    CMD_WIFI_INFO,
-    CMD_OTA,
-    CMD_OTA_DEBUG
+    CMD_WIFI_CONNECT,
+    CMD_WIFI_STATUS,
+    CMD_WIFI_DEBUG
 } cmd_id_t;
 
 /* 命令结构 */
@@ -64,10 +63,9 @@ void cmd_extinfo_handler(void);
 void cmd_extbackup_handler(void);
 void cmd_extrestore_handler(void);
 void cmd_extlist_handler(void);
-void cmd_wifi_handler(void);
-void cmd_wifi_info_handler(void);
-void cmd_ota_handler(void);
-void cmd_ota_debug_handler(void);
+void cmd_wifi_connect_handler(void);
+void cmd_wifi_status_handler(void);
+void cmd_wifi_debug_handler(void);
 
 /* Flash操作函数 */
 bool bootloader_flash_erase(uint32_t addr, uint32_t size);
