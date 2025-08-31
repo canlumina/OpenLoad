@@ -59,6 +59,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/firmware_crypto.c
     Core/Src/firmware_aes.c
     Core/Src/streaming_aes.c
+    Core/Src/encrypted_firmware.c
 )
 
 # Add include paths
