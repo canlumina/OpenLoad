@@ -33,7 +33,12 @@ typedef enum {
     CMD_EXTLIST,
     CMD_WIFI_CONNECT,
     CMD_WIFI_STATUS,
-    CMD_WIFI_DEBUG
+    CMD_WIFI_DEBUG,
+    CMD_CONFIG_SHOW,
+    CMD_CONFIG_WIFI,
+    CMD_CONFIG_OTA,
+    CMD_CONFIG_SAVE,
+    CMD_CONFIG_RESET
 } cmd_id_t;
 
 /* 命令结构 */

@@ -27,6 +27,7 @@
 /* USER CODE BEGIN Includes */
 #include "dev_usart.h"
 #include "bootloader_cmd.h"
+#include "config.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,8 +103,10 @@ int main(void)
   /* 初始化Bootloader */
   bootloader_init();
   
-  /* 检查是否进入Bootloader模式 (3秒超时) */
-  if(bootloader_check_entry(3000))
+  /* 检查是否进入Bootloader模式 */
+  const bootloader_config_t* cfg = config_get();
+  uint32_t delay_ms = cfg ? cfg->system.bootloader_delay_ms : 3000;
+  if(bootloader_check_entry(delay_ms))
   {
     /* 进入Bootloader命令模式 */
     bootloader_cmd_mode();

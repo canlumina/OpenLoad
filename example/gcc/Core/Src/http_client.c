@@ -265,13 +265,6 @@ static http_status_t http_receive_data(http_client_t *client)
             int received = esp8266_tcp_receive(client->esp8266, buffer, to_receive, 1000);
             
             if (received > 0) {
-                /* 数据接收中 - 打印前几次接收的调试信息 */
-                static int recv_count = 0;
-                recv_count++;
-                if (recv_count <= 3) {
-                    /* 通过系统调用打印调试信息 */
-                }
-                
                 if (client->data_handler) {
                     if (client->data_handler(buffer, received) < 0) {
                         return HTTP_STATUS_ERROR;

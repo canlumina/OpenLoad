@@ -47,6 +47,8 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     Core/Src/dev_usart.c
     Core/Src/ringbuff.c
+    Core/Src/config.c
+    Core/Src/network_mgr.c
     Core/Src/bootloader_cmd.c
     Core/Src/w25q64.c
     Core/Src/xmodem.c

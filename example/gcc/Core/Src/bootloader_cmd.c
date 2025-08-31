@@ -6,6 +6,7 @@
 #include "xmodem.h"
 #include "http_ota.h"
 #include "esp8266_wifi.h"
+#include "config.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,6 +19,13 @@ static uint8_t cmd_index = 0;
 /* WiFi相关变量 */
 static esp8266_device_t g_wifi_device;
 static bool g_wifi_initialized = false;
+
+/* 配置命令处理函数前向声明 */
+static void cmd_config_show_handler(void);
+static void cmd_config_wifi_handler(void);
+static void cmd_config_ota_handler(void);
+static void cmd_config_save_handler(void);
+static void cmd_config_reset_handler(void);
 
 /* 命令表 */
 static const bootloader_cmd_t cmd_table[] = {
@@ -34,6 +42,11 @@ static const bootloader_cmd_t cmd_table[] = {
     {"wifi",    "w",  "Connect to WiFi network",    CMD_WIFI_CONNECT, cmd_wifi_connect_handler},
     {"wstatus", "ws", "Show WiFi connection status", CMD_WIFI_STATUS,  cmd_wifi_status_handler},
     {"wdebug",  "wd", "WiFi debug information",     CMD_WIFI_DEBUG,   cmd_wifi_debug_handler},
+    {"cfgshow", "cs", "Show current configuration",  CMD_CONFIG_SHOW,  cmd_config_show_handler},
+    {"cfgwifi", "cw", "Configure WiFi settings",     CMD_CONFIG_WIFI,  cmd_config_wifi_handler},
+    {"cfgota",  "co", "Configure OTA settings",      CMD_CONFIG_OTA,   cmd_config_ota_handler},
+    {"cfgsave", "cS", "Save configuration",          CMD_CONFIG_SAVE,  cmd_config_save_handler},
+    {"cfgreset","cR", "Reset to default config",     CMD_CONFIG_RESET, cmd_config_reset_handler},
 };
 
 #define CMD_TABLE_SIZE (sizeof(cmd_table)/sizeof(cmd_table[0]))
@@ -44,14 +57,21 @@ static void print_hex(uint32_t val);
 static void print_dec(uint32_t val);
 static void process_cmd(char* cmd);
 static uint8_t read_char(void);
+static void read_line(char* buffer, uint16_t size);
 static void show_progress(uint32_t current, uint32_t total, const char* prefix);
 static uint32_t calculate_firmware_size(w25q64_partition_id_t pid);
+
 
 /* 初始化Bootloader */
 void bootloader_init(void)
 {
     bootloader_state = BOOT_STATE_IDLE;
     cmd_index = 0;
+    
+    /* 初始化配置系统 */
+    if (!config_init()) {
+        print_str("WARNING: Config system init failed!\r\n");
+    }
 }
 
 /* 检查是否进入Bootloader命令模式 */
@@ -381,8 +401,18 @@ void cmd_update_handler(void)
         /* 设置进度回调 */
         ota_set_progress_callback(&ota_ctx, ota_progress_callback);
         
-        /* 默认固件下载URL */
-        const char *firmware_url = "http://120.27.208.180/RTC3.bin";
+        /* 使用配置的OTA服务器 */
+        const bootloader_config_t* cfg = config_get();
+        if (!cfg) {
+            print_str("Configuration not loaded!\r\n");
+            ota_deinit(&ota_ctx);
+            return;
+        }
+        
+        /* 构建完整的URL */
+        char firmware_url[256];
+        snprintf(firmware_url, sizeof(firmware_url), "http://%s:%d%s", 
+                 cfg->ota.host, cfg->ota.port, cfg->ota.path);
         
         print_str("Starting OTA download...\r\n");
         print_str("URL: ");
@@ -440,8 +470,18 @@ void cmd_update_handler(void)
         /* 设置进度回调 */
         ota_set_progress_callback(&ota_ctx, ota_progress_callback);
         
-        /* 默认固件下载URL */
-        const char *firmware_url = "http://120.27.208.180/RTC3.bin";
+        /* 使用配置的OTA服务器 */
+        const bootloader_config_t* cfg = config_get();
+        if (!cfg) {
+            print_str("Configuration not loaded!\r\n");
+            ota_deinit(&ota_ctx);
+            return;
+        }
+        
+        /* 构建完整的URL */
+        char firmware_url[256];
+        snprintf(firmware_url, sizeof(firmware_url), "http://%s:%d%s", 
+                 cfg->ota.host, cfg->ota.port, cfg->ota.path);
         
         print_str("Starting OTA download to slot ");
         print_dec(ch);
@@ -957,6 +997,30 @@ static uint8_t read_char(void)
     return ch;
 }
 
+static void read_line(char* buffer, uint16_t size)
+{
+    uint16_t index = 0;
+    uint8_t ch;
+    
+    while(index < size - 1) {
+        ch = read_char();
+        
+        if (ch == '\r' || ch == '\n') {
+            break;
+        } else if (ch == '\b' || ch == 0x7F) {  /* 退格键 */
+            if (index > 0) {
+                index--;
+                print_str("\b \b");  /* 退格并清除字符 */
+            }
+        } else {
+            buffer[index++] = ch;
+        }
+    }
+    
+    buffer[index] = '\0';
+    print_str("\r\n");
+}
+
 static void show_progress(uint32_t current, uint32_t total, const char* prefix)
 {
     uint32_t percent = (current * 100) / total;
@@ -1060,8 +1124,8 @@ void cmd_wifi_connect_handler(void)
     print_str("\r\n");
     
     if (choice == '1') {
-        /* 连接到默认WiFi */
-        print_str("Connecting to default WiFi (YANG)...\r\n");
+        /* 连接到固定的调试WiFi */
+        print_str("Connecting to debug WiFi (YANG)...\r\n");
         if (esp8266_connect_wifi(&g_wifi_device, "YANG", "yang123456789")) {
             print_str("WiFi connected successfully!\r\n");
             print_str("IP Address: ");
@@ -1249,5 +1313,137 @@ void cmd_wifi_debug_handler(void)
         print_str("WiFi status response:\r\n");
         print_str(resp);
         print_str("\r\n");
+    }
+}
+
+/* 配置命令处理函数 */
+static void cmd_config_show_handler(void)
+{
+    const bootloader_config_t* cfg = config_get();
+    if (!cfg) {
+        print_str("Configuration not loaded!\r\n");
+        return;
+    }
+    
+    print_str("\r\n===== Current Configuration =====\r\n");
+    print_str("WiFi Settings:\r\n");
+    print_str("  SSID: ");
+    print_str(cfg->wifi.ssid);
+    print_str("\r\n  Password: ");
+    /* 隐藏密码显示 */
+    for (int i = 0; i < strlen(cfg->wifi.password); i++) {
+        print_str("*");
+    }
+    print_str("\r\n  Timeout: ");
+    print_dec(cfg->wifi.timeout_ms);
+    print_str(" ms\r\n");
+    
+    print_str("\r\nOTA Settings:\r\n");
+    print_str("  Server: ");
+    print_str(cfg->ota.host);
+    print_str(":");
+    print_dec(cfg->ota.port);
+    print_str("\r\n  Path: ");
+    print_str(cfg->ota.path);
+    print_str("\r\n  Timeout: ");
+    print_dec(cfg->ota.timeout_ms);
+    print_str(" ms\r\n");
+    
+    print_str("\r\nSystem Settings:\r\n");
+    print_str("  Bootloader delay: ");
+    print_dec(cfg->system.bootloader_delay_ms);
+    print_str(" ms\r\n");
+    print_str("  UART baudrate: ");
+    print_dec(cfg->system.uart_baudrate);
+    print_str("\r\n  Auto OTA: ");
+    print_str(cfg->system.auto_ota_enable ? "Enabled" : "Disabled");
+    print_str("\r\n  Max retries: ");
+    print_dec(cfg->system.max_retry_count);
+    print_str("\r\n");
+}
+
+static void cmd_config_wifi_handler(void)
+{
+    char ssid[64], password[64];
+    
+    print_str("Configure WiFi settings:\r\n");
+    print_str("SSID: ");
+    read_line(ssid, sizeof(ssid));
+    
+    print_str("Password: ");
+    read_line(password, sizeof(password));
+    
+    if (strlen(ssid) == 0) {
+        print_str("Invalid SSID!\r\n");
+        return;
+    }
+    
+    if (strlen(password) < 8) {
+        print_str("Password must be at least 8 characters!\r\n");
+        return;
+    }
+    
+    if (config_set_wifi(ssid, password)) {
+        print_str("WiFi configuration updated successfully!\r\n");
+        print_str("Use 'cfgsave' to save changes.\r\n");
+    } else {
+        print_str("Failed to update WiFi configuration!\r\n");
+    }
+}
+
+static void cmd_config_ota_handler(void)
+{
+    char host[64], path[128], port_str[8];
+    uint16_t port;
+    
+    print_str("Configure OTA settings:\r\n");
+    print_str("Server host/IP: ");
+    read_line(host, sizeof(host));
+    
+    print_str("Port: ");
+    read_line(port_str, sizeof(port_str));
+    port = atoi(port_str);
+    
+    print_str("Firmware path: ");
+    read_line(path, sizeof(path));
+    
+    if (strlen(host) == 0 || port == 0 || strlen(path) == 0) {
+        print_str("Invalid parameters!\r\n");
+        return;
+    }
+    
+    if (config_set_ota_server(host, port, path)) {
+        print_str("OTA configuration updated successfully!\r\n");
+        print_str("Use 'cfgsave' to save changes.\r\n");
+    } else {
+        print_str("Failed to update OTA configuration!\r\n");
+    }
+}
+
+static void cmd_config_save_handler(void)
+{
+    print_str("Saving configuration...\r\n");
+    if (config_save()) {
+        print_str("Configuration saved successfully!\r\n");
+    } else {
+        print_str("Failed to save configuration!\r\n");
+    }
+}
+
+static void cmd_config_reset_handler(void)
+{
+    print_str("Reset configuration to defaults? (y/N): ");
+    char ch = read_char();
+    print_str("\r\n");
+    
+    if (ch == 'y' || ch == 'Y') {
+        config_load_default();
+        if (config_save()) {
+            print_str("Configuration reset to defaults and saved!\r\n");
+        } else {
+            print_str("Configuration reset but save failed!\r\n");
+        }
+    } else {
+        print_str("Operation cancelled.\r\n");
     }
 }
