@@ -56,6 +56,9 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/esp8266_wifi.c
     Core/Src/http_client.c
     Core/Src/http_ota.c
+    Core/Src/firmware_crypto.c
+    Core/Src/firmware_aes.c
+    Core/Src/streaming_aes.c
 )
 
 # Add include paths

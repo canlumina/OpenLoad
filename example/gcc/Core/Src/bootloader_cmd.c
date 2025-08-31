@@ -7,6 +7,9 @@
 #include "http_ota.h"
 #include "esp8266_wifi.h"
 #include "config.h"
+#include "firmware_crypto.h"
+#include "firmware_aes.h"
+#include "streaming_aes.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -177,6 +180,23 @@ void bootloader_jump_to_app(void)
         return;
     }
     
+    /* 检查是否为加密固件，需要先解密 */
+    if (firmware_crypto_is_encrypted(APP_START_ADDR)) {
+        print_str("Encrypted firmware detected, full decryption required...\r\n");
+        
+        /* 初始化加密模块 */
+        const char* crypto_key = "yangcan";
+        if (!firmware_crypto_init((uint8_t*)crypto_key, strlen(crypto_key))) {
+            print_str("Crypto init failed!\r\n");
+            return;
+        }
+        
+        /* 将整个加密固件解密到外部Flash，然后再复制回内部Flash */
+        print_str("This feature requires implementation of full decryption.\r\n");
+        print_str("Please use XMODEM encrypted option 5 to pre-decrypt firmware.\r\n");
+        return;
+    }
+    
     /* 验证恢复的应用程序向量表 */
     uint32_t app_stack = *(__IO uint32_t*)APP_START_ADDR;
     uint32_t app_reset = *(__IO uint32_t*)(APP_START_ADDR + 4);
@@ -243,11 +263,51 @@ void bootloader_jump_to_app(void)
 /* 验证应用程序 */
 bool bootloader_validate_app(void)
 {
-    uint32_t app_stack = *(__IO uint32_t*)APP_START_ADDR;
-    uint32_t app_reset = *(__IO uint32_t*)(APP_START_ADDR + 4);
-    
-    return ((app_stack >= 0x20000000) && (app_stack <= 0x20010000) &&
-            (app_reset >= APP_START_ADDR) && (app_reset <= (APP_START_ADDR + APP_MAX_SIZE)));
+    /* 首先检查是否为加密固件 */
+    if (firmware_crypto_is_encrypted(APP_START_ADDR)) {
+        print_str("Encrypted firmware detected, decrypting for validation...\r\n");
+        
+        /* 初始化加密模块 */
+        const char* crypto_key = "yangcan";
+        if (!firmware_crypto_init((uint8_t*)crypto_key, strlen(crypto_key))) {
+            print_str("Crypto init failed!\r\n");
+            return false;
+        }
+        
+        /* 验证加密固件头部 */
+        firmware_crypto_header_t* header = (firmware_crypto_header_t*)APP_START_ADDR;
+        if (!firmware_crypto_validate_header(header)) {
+            print_str("Invalid encrypted firmware header!\r\n");
+            return false;
+        }
+        
+        /* 解密前几个字节检查栈指针和复位向量 */
+        uint8_t decrypted_start[256];
+        uint8_t* encrypted_data = (uint8_t*)(APP_START_ADDR + sizeof(firmware_crypto_header_t));
+        memcpy(decrypted_start, encrypted_data, 256);
+        firmware_crypto_xor(decrypted_start, 256, 0);
+        
+        uint32_t app_stack = *((uint32_t*)decrypted_start);
+        uint32_t app_reset = *((uint32_t*)(decrypted_start + 4));
+        
+        bool valid = ((app_stack >= 0x20000000) && (app_stack <= 0x20010000) &&
+                      (app_reset >= APP_START_ADDR) && (app_reset <= (APP_START_ADDR + APP_MAX_SIZE)));
+        
+        if (valid) {
+            print_str("Encrypted firmware validation passed.\r\n");
+        } else {
+            print_str("Encrypted firmware validation failed.\r\n");
+        }
+        
+        return valid;
+    } else {
+        /* 普通未加密固件验证 */
+        uint32_t app_stack = *(__IO uint32_t*)APP_START_ADDR;
+        uint32_t app_reset = *(__IO uint32_t*)(APP_START_ADDR + 4);
+        
+        return ((app_stack >= 0x20000000) && (app_stack <= 0x20010000) &&
+                (app_reset >= APP_START_ADDR) && (app_reset <= (APP_START_ADDR + APP_MAX_SIZE)));
+    }
 }
 
 /* 命令处理函数 */
@@ -304,7 +364,11 @@ void cmd_update_handler(void)
     print_str("2 = XMODEM to External Flash\r\n");
     print_str("3 = HTTP OTA to Internal Flash\r\n");
     print_str("4 = HTTP OTA to External Flash\r\n");
-    print_str("Select (1-4): ");
+    print_str("5 = XMODEM Encrypted to Internal Flash (XOR/AES)\r\n");
+    print_str("6 = XMODEM Encrypted to External Flash (XOR/AES)\r\n");
+    print_str("7 = HTTP OTA Encrypted to Internal Flash (XOR/AES)\r\n");
+    print_str("8 = HTTP OTA Encrypted to External Flash (XOR/AES)\r\n");
+    print_str("Select (1-8): ");
     
     ch = read_char();
     print_str("\r\n");
@@ -531,6 +595,407 @@ void cmd_update_handler(void)
             print_str(")\r\n");
         }
     }
+    else if(ch == '5')
+    {
+        /* XMODEM加密固件到内部Flash */
+        print_str("WARNING! Update internal flash with encrypted firmware? (y/n): ");
+        if(read_char() != 'y')
+        {
+            print_str("\r\nCancelled\r\n");
+            return;
+        }
+        print_str("\r\n");
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        bool use_aes = (encrypt_choice == '2');
+        
+        /* 初始化加密模块 */
+        const char* crypto_key = "yangcan";
+        if (!firmware_crypto_init((uint8_t*)crypto_key, strlen(crypto_key))) {
+            print_str("Crypto init failed!\r\n");
+            return;
+        }
+        
+        /* 如果选择AES，还需要初始化AES */
+        if (use_aes) {
+            uint32_t* unique_id = (uint32_t*)0x1FFFF7E8;
+            uint8_t aes_key[16];
+            firmware_aes_derive_key(crypto_key, unique_id, aes_key);
+            if (!firmware_aes_init(aes_key)) {
+                print_str("AES init failed!\r\n");
+                return;
+            }
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        print_str("Erasing app area...\r\n");
+        if(!bootloader_flash_erase(APP_START_ADDR, APP_MAX_SIZE))
+        {
+            print_str("Erase failed!\r\n");
+            return;
+        }
+        
+        print_str("Start XMODEM transfer (encrypted firmware)\r\n");
+        int result = xmodem_receive(APP_START_ADDR, false, 0, true);
+        if(result > 0)
+        {
+            print_str("Transfer complete: ");
+            print_dec(result);
+            print_str(" bytes\r\n");
+            
+            /* 检查是否为加密固件 */
+            bool is_xor_encrypted = firmware_crypto_is_encrypted(APP_START_ADDR);
+            bool is_aes_encrypted = firmware_aes_is_encrypted(APP_START_ADDR);
+            
+            if (is_xor_encrypted || is_aes_encrypted) {
+                if (is_aes_encrypted) {
+                    print_str("AES encrypted firmware detected, decrypting...\r\n");
+                } else {
+                    print_str("XOR encrypted firmware detected, decrypting...\r\n");
+                }
+                
+                /* 将加密固件移动到临时区域（使用外部Flash） */
+                w25q64_init();
+                if (!w25q64_erase_partition(W25Q64_PARTITION_DOWNLOAD)) {
+                    print_str("Failed to prepare temp area!\r\n");
+                    return;
+                }
+                
+                /* 备份加密固件到外部Flash */
+                uint8_t buf[1024];
+                for (uint32_t offset = 0; offset < result; offset += 1024) {
+                    uint32_t size = (result - offset > 1024) ? 1024 : (result - offset);
+                    memcpy(buf, (uint8_t*)(APP_START_ADDR + offset), size);
+                    if (!w25q64_write_partition(W25Q64_PARTITION_DOWNLOAD, offset, buf, size)) {
+                        print_str("Backup to external flash failed!\r\n");
+                        return;
+                    }
+                }
+                
+                /* 擦除内部Flash准备存储解密固件 */
+                print_str("Erasing for decrypted firmware...\r\n");
+                if(!bootloader_flash_erase(APP_START_ADDR, APP_MAX_SIZE))
+                {
+                    print_str("Erase failed!\r\n");
+                    return;
+                }
+                
+                /* 从外部Flash解密到内部Flash */
+                uint32_t decrypted_size = 0;
+                uint32_t expected_crc32 = 0;
+                uint32_t header_size = 0;
+                uint8_t aes_iv[AES_IV_SIZE];
+                
+                if (is_aes_encrypted) {
+                    firmware_aes_header_t aes_header;
+                    if (w25q64_read_partition(W25Q64_PARTITION_DOWNLOAD, 0, (uint8_t*)&aes_header, sizeof(aes_header))) {
+                        decrypted_size = aes_header.firmware_size;
+                        expected_crc32 = aes_header.crc32;
+                        header_size = sizeof(firmware_aes_header_t);
+                        memcpy(aes_iv, aes_header.iv, AES_IV_SIZE);
+                    }
+                } else {
+                    firmware_crypto_header_t xor_header;
+                    if (w25q64_read_partition(W25Q64_PARTITION_DOWNLOAD, 0, (uint8_t*)&xor_header, sizeof(xor_header))) {
+                        decrypted_size = xor_header.firmware_size;
+                        expected_crc32 = xor_header.crc32;
+                        header_size = sizeof(firmware_crypto_header_t);
+                    }
+                }
+                
+                if (decrypted_size > 0) {
+                    print_str("Decrypting firmware (");
+                    print_dec(decrypted_size);
+                    print_str(" bytes)...\r\n");
+                    
+                    if (is_aes_encrypted) {
+                        /* 内存优化的AES解密方案 - 分块处理避免RAM不足 */
+                        print_str("Using memory-optimized AES decryption...\r\n");
+                        
+                        /* 读取AES头部信息 */
+                        firmware_aes_header_t aes_header;
+                        if (!w25q64_read_partition(W25Q64_PARTITION_DOWNLOAD, 0, (uint8_t*)&aes_header, sizeof(aes_header))) {
+                            print_str("Failed to read AES header!\r\n");
+                            return;
+                        }
+                        
+                        print_str("Header - Magic: ");
+                        print_hex(aes_header.magic);
+                        print_str(", FW Size: ");
+                        print_dec(aes_header.firmware_size);
+                        print_str(", Enc Size: ");
+                        print_dec(aes_header.encrypted_size);
+                        print_str("\r\n");
+                        
+                        /* 初始化流式AES解密器 */
+                        print_str("Initializing streaming AES decryption...\r\n");
+                        
+                        streaming_aes_ctx_t aes_ctx;
+                        uint32_t* unique_id = (uint32_t*)0x1FFFF7E8;
+                        uint8_t aes_key[16];
+                        firmware_aes_derive_key("yangcan", unique_id, aes_key);
+                        
+                        if (!streaming_aes_init(&aes_ctx, aes_key, aes_header.iv)) {
+                            print_str("Failed to initialize streaming AES!\r\n");
+                            return;
+                        }
+                        
+                        print_str("Starting streaming AES-CBC decryption...\r\n");
+                        uint8_t* work_buffer = (uint8_t*)(0x20000000 + 0x8000);  /* 4KB工作缓冲区 */
+                        uint8_t* decrypt_buffer = work_buffer + 2048;  /* 2KB解密输出缓冲区 */
+                        uint32_t buffer_size = 2048;  /* 减少到2KB确保16字节对齐 */
+                        uint32_t decrypted_total = 0;
+                        
+                        HAL_FLASH_Unlock();
+                        
+                        /* 分块读取、解密、写入 */
+                        for (uint32_t offset = 0; offset < aes_header.encrypted_size; offset += buffer_size) {
+                            uint32_t chunk_size = (aes_header.encrypted_size - offset > buffer_size) ? 
+                                                 buffer_size : (aes_header.encrypted_size - offset);
+                            
+                            /* 确保chunk_size是16字节的倍数 */
+                            chunk_size = (chunk_size / 16) * 16;
+                            if (chunk_size == 0) chunk_size = 16;
+                            
+                            /* 从外部Flash读取加密数据块 */
+                            if (!w25q64_read_partition(W25Q64_PARTITION_DOWNLOAD, 
+                                                     sizeof(firmware_aes_header_t) + offset, 
+                                                     work_buffer, chunk_size)) {
+                                print_str("\r\nRead encrypted chunk failed!\r\n");
+                                HAL_FLASH_Lock();
+                                return;
+                            }
+                            
+                            /* 使用流式AES-CBC解密 */
+                            uint32_t decrypted_chunk_size = streaming_aes_decrypt(&aes_ctx, work_buffer, decrypt_buffer, chunk_size);
+                            if (decrypted_chunk_size == 0) {
+                                print_str("\r\nAES decryption failed!\r\n");
+                                HAL_FLASH_Lock();
+                                return;
+                            }
+                            
+                            /* 计算实际写入大小（处理最后一块的情况） */
+                            uint32_t write_size = decrypted_chunk_size;
+                            if (decrypted_total + decrypted_chunk_size > aes_header.firmware_size) {
+                                write_size = aes_header.firmware_size - decrypted_total;
+                            }
+                            
+                            /* 如果是最后一块，需要移除PKCS7填充 */
+                            if (offset + chunk_size >= aes_header.encrypted_size) {
+                                uint32_t unpadded_size = firmware_aes_pkcs7_unpad(decrypt_buffer, decrypted_chunk_size);
+                                if (unpadded_size > 0 && decrypted_total + unpadded_size <= aes_header.firmware_size) {
+                                    write_size = unpadded_size;
+                                }
+                            }
+                            
+                            /* 写入解密数据到Flash */
+                            if (write_size > 0) {
+                                if (!bootloader_flash_write(APP_START_ADDR + decrypted_total, decrypt_buffer, write_size)) {
+                                    print_str("\r\nFlash write failed!\r\n");
+                                    HAL_FLASH_Lock();
+                                    return;
+                                }
+                                decrypted_total += write_size;
+                            }
+                            
+                            /* 显示进度 */
+                            if ((offset % 8192) == 0 || offset + chunk_size >= aes_header.encrypted_size) {
+                                show_progress(offset + chunk_size, aes_header.encrypted_size, "AES-CBC");
+                            }
+                            
+                            /* 如果已经解密完所有原始数据，提前退出 */
+                            if (decrypted_total >= aes_header.firmware_size) {
+                                break;
+                            }
+                        }
+                        
+                        HAL_FLASH_Lock();
+                        
+                        print_str("\r\nMemory-optimized decryption completed: ");
+                        print_dec(decrypted_total);
+                        print_str(" bytes\r\n");
+                        
+                        /* 验证解密后的固件 */
+                        if (firmware_aes_verify_firmware(APP_START_ADDR, decrypted_total, expected_crc32)) {
+                            print_str("AES firmware verification successful!\r\n");
+                        } else {
+                            print_str("AES firmware verification failed!\r\n");
+                        }
+                    } else {
+                        /* XOR解密：保持原来的分块处理方式 */
+                        uint8_t* buffer = (uint8_t*)(0x20000000 + 0x5000); /* 临时RAM区域 */
+                        uint32_t buffer_size = 2048;
+                        
+                        HAL_FLASH_Unlock();
+                        for (uint32_t offset = 0; offset < decrypted_size; offset += buffer_size) {
+                            uint32_t chunk_size = (decrypted_size - offset > buffer_size) ? buffer_size : (decrypted_size - offset);
+                            
+                            /* 从外部Flash读取加密数据 */
+                            if (!w25q64_read_partition(W25Q64_PARTITION_DOWNLOAD, header_size + offset, buffer, chunk_size)) {
+                                print_str("\r\nRead encrypted data failed!\r\n");
+                                HAL_FLASH_Lock();
+                                return;
+                            }
+                            
+                            /* XOR解密 */
+                            firmware_crypto_xor(buffer, chunk_size, offset);
+                            
+                            /* 写入内部Flash */
+                            if (!bootloader_flash_write(APP_START_ADDR + offset, buffer, chunk_size)) {
+                                print_str("\r\nWrite decrypted firmware failed!\r\n");
+                                HAL_FLASH_Lock();
+                                return;
+                            }
+                            
+                            if ((offset % 0x2000) == 0 || offset + chunk_size >= decrypted_size) {
+                                show_progress(offset + chunk_size, decrypted_size, "Decrypt");
+                            }
+                        }
+                        HAL_FLASH_Lock();
+                        
+                        /* 验证解密后的固件 */
+                        if (firmware_crypto_verify_firmware(APP_START_ADDR, decrypted_size, expected_crc32)) {
+                            print_str("\r\nXOR decryption and verification successful!\r\n");
+                        } else {
+                            print_str("\r\nXOR firmware verification failed!\r\n");
+                        }
+                    }
+                } else {
+                    print_str("Read header failed!\r\n");
+                }
+            } else {
+                print_str("Warning: Firmware is not encrypted!\r\n");
+            }
+        }
+        else
+        {
+            print_str("Transfer failed!\r\n");
+        }
+    }
+    else if(ch == '6')
+    {
+        /* XMODEM加密固件到外部Flash */
+        print_str("Slot (1-3): ");
+        ch = read_char() - '0';
+        print_str("\r\n");
+        
+        if(ch < 1 || ch > 3)
+        {
+            print_str("Invalid slot!\r\n");
+            return;
+        }
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        if (encrypt_choice == '2') {
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        print_str("Start XMODEM transfer (encrypted firmware to external flash slot ");
+        print_dec(ch);
+        print_str(")\r\n");
+        int result = xmodem_receive(0, true, W25Q64_PARTITION_BACKUP1 + ch - 1, true);
+        if(result > 0)
+        {
+            print_str("Success: ");
+            print_dec(result);
+            print_str(" bytes\r\n");
+        }
+        else
+        {
+            print_str("Transfer failed!\r\n");
+        }
+    }
+    else if(ch >= '7' && ch <= '8')
+    {
+        /* HTTP OTA加密固件 */
+        bool to_internal = (ch == '7');
+        uint8_t slot = 0;
+        
+        if (to_internal) {
+            print_str("WARNING! Update internal flash via OTA (encrypted)? (y/n): ");
+            if(read_char() != 'y')
+            {
+                print_str("\r\nCancelled\r\n");
+                return;
+            }
+            print_str("\r\n");
+        } else {
+            print_str("Slot (1-3): ");
+            slot = read_char() - '0';
+            print_str("\r\n");
+            
+            if(slot < 1 || slot > 3)
+            {
+                print_str("Invalid slot!\r\n");
+                return;
+            }
+        }
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        if (encrypt_choice == '2') {
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        /* 检查ESP8266是否已初始化 */
+        if (!g_wifi_initialized) {
+            print_str("ESP8266 not initialized! Please use 'w' command first.\r\n");
+            return;
+        }
+        
+        /* 检查WiFi连接状态 */
+        if (esp8266_get_wifi_status(&g_wifi_device) != ESP8266_WIFI_GOT_IP) {
+            print_str("WiFi not connected! Please connect WiFi first.\r\n");
+            return;
+        }
+        
+        print_str("OTA encrypted firmware download not yet implemented.\r\n");
+        print_str("Please use PC tool to encrypt firmware first, then use options 5-6.\r\n");
+        
+        /* TODO: 未来在这里实现HTTP OTA加密固件下载 */
+        /* 需要修改OTA模块支持下载后的解密处理 */
+    }
     else
     {
         print_str("Invalid selection!\r\n");
@@ -544,6 +1009,15 @@ void cmd_info_handler(void)
     print_str("Flash: 512KB\r\n");
     print_str("Boot: 0x08000000 (64KB)\r\n");
     print_str("App: 0x08010000 (448KB)\r\n");
+    
+    /* 显示STM32唯一ID */
+    uint32_t* unique_id = (uint32_t*)0x1FFFF7E8;
+    print_str("Unique ID: ");
+    for(int i = 0; i < 3; i++) {
+        print_hex(unique_id[i]);
+        if(i < 2) print_str(",");
+    }
+    print_str("\r\n");
     
     if(bootloader_validate_app())
     {
