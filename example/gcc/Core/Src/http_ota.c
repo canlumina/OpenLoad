@@ -11,6 +11,7 @@
 /* 静态变量 */
 static ota_context_t *g_ota_ctx = NULL;
 static uint32_t g_actual_write_offset = 0;  /* 实际写入位置 */
+static uint32_t g_expected_chunk_remaining = 0;  /* 当前分块剩余字节数 */
 
 /* 数据写入处理函数 */
 static int ota_data_handler(uint8_t *data, uint16_t len)
@@ -19,6 +20,70 @@ static int ota_data_handler(uint8_t *data, uint16_t len)
     
     ota_context_t *ctx = g_ota_ctx;
     bool write_success = false;
+    
+    /* 调试：打印接收到的数据量和当前偏移 */
+    static int call_count = 0;
+    call_count++;
+    if (call_count <= 10 || call_count > 25) {  /* 打印更多来看数据模式 */
+        bootloader_print("\r\n[Handler] Call ");
+        bootloader_print_dec(call_count);
+        bootloader_print(": offset=");
+        bootloader_print_dec(g_actual_write_offset);
+        bootloader_print(", len=");
+        bootloader_print_dec(len);
+        bootloader_print(", remaining=");
+        bootloader_print_dec(g_expected_chunk_remaining);
+        
+        /* 打印前几个字节的十六进制 */
+        if (len > 0) {
+            bootloader_print(" [");
+            for (int i = 0; i < 4 && i < len; i++) {
+                char hex[4];
+                sprintf(hex, "%02X", data[i]);
+                bootloader_print(hex);
+                if (i < 3 && i < len-1) bootloader_print(" ");
+            }
+            bootloader_print("]");
+        }
+        
+        bootloader_print("\r\n");
+    }
+    
+    /* 简化数据过滤 - 只在ota_data_handler中处理，避免重复过滤 */
+    /* 临时禁用所有过滤，让HTTP客户端负责处理+IPD和HTTP头 */
+    
+    if (call_count <= 5) {
+        bootloader_print("\r\n[Handler] Raw data received, first 8 bytes: ");
+        for (int i = 0; i < 8 && i < len; i++) {
+            char hex[4];
+            sprintf(hex, "%02X", data[i]);
+            bootloader_print(hex);
+            if (i < 7) bootloader_print(" ");
+        }
+        bootloader_print("\r\n");
+    }
+    
+    /* 简化的分块处理逻辑 - 取消截断，允许跨分块数据处理 */
+    if (g_expected_chunk_remaining == 0) {
+        /* 这是一个新的分块开始 */
+        uint32_t remaining_total = ctx->total_size - g_actual_write_offset;
+        g_expected_chunk_remaining = (remaining_total > 1024) ? 1024 : remaining_total;
+        
+        bootloader_print("\r\n[Handler] New chunk, expecting ");
+        bootloader_print_dec(g_expected_chunk_remaining);
+        bootloader_print(" bytes\r\n");
+    }
+    
+    /* 不再截断数据，允许接收超过分块边界的数据 */
+    /* 这样可以避免36字节的数据丢失问题 */
+    
+    /* 检查是否会超出预期大小 */
+    if (g_actual_write_offset + len > ctx->total_size) {
+        len = ctx->total_size - g_actual_write_offset;
+        if (len <= 0) {
+            return 0; /* 已经写完了 */
+        }
+    }
     
     /* 直接写入数据，不使用缓冲区（因为每个块本身就是1KB） */
     if (ctx->target == OTA_TARGET_INTERNAL_FLASH) {
@@ -37,11 +102,35 @@ static int ota_data_handler(uint8_t *data, uint16_t len)
     }
     
     if (!write_success) {
+        bootloader_print("\r\n[Handler] Write failed at offset ");
+        bootloader_print_dec(g_actual_write_offset);
+        bootloader_print("\r\n");
         return -1;
     }
     
-    /* 更新实际写入位置 */
+    /* 更新实际写入位置和分块剩余 */
     g_actual_write_offset += len;
+    
+    /* 更新分块剩余量，处理跨分块情况 */
+    if (len >= g_expected_chunk_remaining) {
+        /* 当前数据跨越或完成了分块边界 */
+        uint32_t processed_in_chunk = g_expected_chunk_remaining;
+        g_expected_chunk_remaining = 0;
+        
+        bootloader_print("\r\n[Handler] Chunk completed, processed ");
+        bootloader_print_dec(processed_in_chunk);
+        bootloader_print(" bytes\r\n");
+        
+        /* 如果还有剩余数据，开始下一个分块 */
+        uint32_t remaining_data = len - processed_in_chunk;
+        if (remaining_data > 0) {
+            uint32_t remaining_total = ctx->total_size - g_actual_write_offset + remaining_data;
+            g_expected_chunk_remaining = (remaining_total > 1024) ? (1024 - remaining_data) : 0;
+        }
+    } else {
+        /* 数据在当前分块内 */
+        g_expected_chunk_remaining -= len;
+    }
     
     /* 不在这里调用进度回调，避免多次更新 */
     
@@ -169,6 +258,10 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
     /* 设置全局上下文 */
     g_ota_ctx = ctx;
     g_actual_write_offset = 0;  /* 重置写入位置 */
+    g_expected_chunk_remaining = 0;  /* 重置分块计数 */
+    
+    /* 重置调试计数器（在ota_data_handler中使用） */
+    /* 注意：这里通过一个dummy调用来重置static变量 */
     
     /* 分块下载 */
     int chunk_count = (ctx->total_size + CHUNK_SIZE - 1) / CHUNK_SIZE;
@@ -262,6 +355,92 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
     
     /* 最终更新实际下载大小 */
     ctx->downloaded_size = g_actual_write_offset;
+    
+    bootloader_print("\r\n=== OTA Download Summary ===\r\n");
+    bootloader_print("Total written: ");
+    bootloader_print_dec(g_actual_write_offset);
+    bootloader_print(" bytes\r\n");
+    bootloader_print("Expected size: ");
+    bootloader_print_dec(ctx->total_size);
+    bootloader_print(" bytes\r\n");
+    
+    if (g_actual_write_offset != ctx->total_size) {
+        int32_t diff = (int32_t)g_actual_write_offset - (int32_t)ctx->total_size;
+        bootloader_print("Size difference: ");
+        if (diff > 0) {
+            bootloader_print("+");
+        }
+        bootloader_print_dec(diff);
+        bootloader_print(" bytes\r\n");
+    } else {
+        bootloader_print("Size match: OK\r\n");
+    }
+    
+    /* 验证写入的数据 */
+    if (ctx->target == OTA_TARGET_EXTERNAL_FLASH) {
+        uint8_t verify_buf[64];
+        w25q64_partition_id_t pid = (w25q64_partition_id_t)ctx->target_addr;
+        if (w25q64_read_partition(pid, 0, verify_buf, 64)) {
+            bootloader_print("\r\n=== Firmware Verification ===\r\n");
+            
+            /* 显示前16字节的十六进制 */
+            bootloader_print("Vector table (first 16 bytes):\r\n");
+            for (int i = 0; i < 16; i++) {
+                char hex[4];
+                sprintf(hex, "%02X", verify_buf[i]);
+                bootloader_print(hex);
+                if ((i + 1) % 8 == 0) {
+                    bootloader_print("\r\n");
+                } else {
+                    bootloader_print(" ");
+                }
+            }
+            
+            /* 检查栈指针和复位向量 */
+            uint32_t stack_ptr = *(uint32_t*)verify_buf;
+            uint32_t reset_vector = *(uint32_t*)(verify_buf + 4);
+            
+            bootloader_print("Stack pointer: 0x");
+            char hex_str[16];
+            sprintf(hex_str, "%08lX", stack_ptr);
+            bootloader_print(hex_str);
+            bootloader_print("\r\n");
+            
+            bootloader_print("Reset vector: 0x");
+            sprintf(hex_str, "%08lX", reset_vector);
+            bootloader_print(hex_str);
+            bootloader_print("\r\n");
+            
+            /* 验证向量表的合理性 */
+            if ((stack_ptr & 0xFFFF0000) == 0x20000000 && 
+                (reset_vector & 0xFFFF0000) == 0x08010000) {
+                bootloader_print("Vector table validation: PASS\r\n");
+            } else {
+                bootloader_print("Vector table validation: FAIL\r\n");
+            }
+            
+            /* 显示更多字节来查看是否有模式 */
+            bootloader_print("Bytes 16-31: ");
+            for (int i = 16; i < 32; i++) {
+                char hex[4];
+                sprintf(hex, "%02X", verify_buf[i]);
+                bootloader_print(hex);
+                bootloader_print(" ");
+            }
+            bootloader_print("\r\n");
+            
+            bootloader_print("Bytes 32-47: ");
+            for (int i = 32; i < 48; i++) {
+                char hex[4];
+                sprintf(hex, "%02X", verify_buf[i]);
+                bootloader_print(hex);
+                bootloader_print(" ");
+            }
+            bootloader_print("\r\n");
+        } else {
+            bootloader_print("Failed to verify written data\r\n");
+        }
+    }
     
     /* 最终进度回调 */
     if (ctx->progress_callback) {

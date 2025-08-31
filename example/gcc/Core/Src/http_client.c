@@ -134,52 +134,69 @@ static http_status_t http_parse_response_header(http_client_t *client)
         return HTTP_STATUS_TIMEOUT;
     }
     
-    /* 查找HTTP头结束位置 */
-    char *header_end = strstr(header_buffer, "\r\n\r\n");
-    if (header_end) {
-        header_end += 4; /* 跳过\r\n\r\n */
-        int body_data_len = header_len - (header_end - header_buffer);
-        
-        /* 如果头部缓冲区中包含body数据，处理它 */
-        if (body_data_len > 0 && client->data_handler) {
-            /* 处理+IPD前缀的情况 */
-            char *actual_body_start = header_end;
-            
-            /* 检查body数据是否也有+IPD前缀 */
-            if (strncmp(header_end, "+IPD,", 5) == 0) {
-                char *colon = strchr(header_end + 5, ':');
-                if (colon) {
-                    actual_body_start = colon + 1;
-                    body_data_len = header_len - (actual_body_start - header_buffer);
-                }
-            }
-            
-            if (body_data_len > 0) {
-                client->data_handler((uint8_t*)actual_body_start, body_data_len);
-                client->body_received = body_data_len;  /* 记录已处理的数据量 */
-            }
-        }
-    }
+    /* 暂不处理非+IPD格式的body数据，统一由+IPD处理逻辑处理 */
+    client->body_received = 0;
     
     /* HTTP头接收完成 */
     
-    /* 处理ESP8266的+IPD前缀 */
-    char *http_start = header_buffer;
+    /* 处理ESP8266的+IPD格式数据 */
     char *ipd_pos = strstr(header_buffer, "+IPD,");
     if (ipd_pos) {
-        /* 解析+IPD,xxxx:中的数据长度 */
-        char *len_start = ipd_pos + 5; /* 跳过"+IPD," */
+        /* 解析+IPD,xxxx:获取数据长度 */
+        char *len_start = ipd_pos + 5;
         char *colon = strchr(len_start, ':');
         if (colon) {
-            http_start = colon + 1; /* 跳过: */
-        } else {
-            http_start = header_buffer;
+            /* 获取+IPD声明的数据长度 */
+            char len_str[16];
+            int len_size = colon - len_start;
+            if (len_size < sizeof(len_str) && len_size > 0) {
+                memcpy(len_str, len_start, len_size);
+                len_str[len_size] = '\0';
+                int ipd_data_len = atoi(len_str);
+                
+                /* HTTP响应从冒号后开始 */
+                char *http_start = colon + 1;
+                int available_data = header_len - (http_start - header_buffer);
+                
+                /* 确保不超过+IPD声明的长度 */
+                if (available_data > ipd_data_len) {
+                    available_data = ipd_data_len;
+                }
+                
+                /* 在HTTP响应中查找头部结束 */
+                char *http_header_end = NULL;
+                for (int i = 0; i <= available_data - 4; i++) {
+                    if (http_start[i] == '\r' && http_start[i+1] == '\n' && 
+                        http_start[i+2] == '\r' && http_start[i+3] == '\n') {
+                        http_header_end = http_start + i + 4;
+                        break;
+                    }
+                }
+                
+                if (http_header_end) {
+                    /* 计算实际可用的HTTP body长度 */
+                    int http_body_len = (http_start + available_data) - http_header_end;
+                    
+                    if (http_body_len > 0 && client->data_handler) {
+                        client->data_handler((uint8_t*)http_header_end, http_body_len);
+                        client->body_received = http_body_len;
+                    }
+                } else {
+                    /* HTTP头不完整或者全部都是头部数据 */
+                    client->body_received = 0;
+                }
+            }
         }
-    } else {
     }
     
-    /* 解析状态行 */
-    char *line_start = http_start;
+    /* 解析状态行 - 使用处理后的HTTP数据 */
+    char *line_start = header_buffer;
+    if (ipd_pos) {
+        char *colon = strchr(ipd_pos + 5, ':');
+        if (colon) {
+            line_start = colon + 1;
+        }
+    }
     char *line_end = strstr(line_start, "\r\n");
     if (line_end) {
         int line_len = line_end - line_start;
@@ -196,7 +213,7 @@ static http_status_t http_parse_response_header(http_client_t *client)
     
     /* 解析Content-Length */
     client->response.content_length = -1;
-    const char *content_len = strstr(http_start, "Content-Length: ");
+    const char *content_len = strstr(line_start, "Content-Length: ");
     if (content_len) {
         client->response.content_length = atoi(content_len + 16);
     } else {
@@ -204,10 +221,10 @@ static http_status_t http_parse_response_header(http_client_t *client)
     }
     
     /* 检查是否为分块传输 */
-    client->response.is_chunked = (strstr(http_start, "Transfer-Encoding: chunked") != NULL);
+    client->response.is_chunked = (strstr(line_start, "Transfer-Encoding: chunked") != NULL);
     
     /* 解析Content-Type */
-    const char *content_type = strstr(http_start, "Content-Type: ");
+    const char *content_type = strstr(line_start, "Content-Type: ");
     if (content_type) {
         content_type += 14;
         const char *type_end = strstr(content_type, "\r\n");
@@ -248,7 +265,12 @@ static http_status_t http_receive_data(http_client_t *client)
             int received = esp8266_tcp_receive(client->esp8266, buffer, to_receive, 1000);
             
             if (received > 0) {
-                /* 数据接收中 */
+                /* 数据接收中 - 打印前几次接收的调试信息 */
+                static int recv_count = 0;
+                recv_count++;
+                if (recv_count <= 3) {
+                    /* 通过系统调用打印调试信息 */
+                }
                 
                 if (client->data_handler) {
                     if (client->data_handler(buffer, received) < 0) {

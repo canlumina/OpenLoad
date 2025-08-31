@@ -157,18 +157,65 @@ void bootloader_jump_to_app(void)
         return;
     }
     
-    print_str("Jumping to app...\r\n");
-    HAL_Delay(100);
-    
-    __disable_irq();
-    HAL_DeInit();
-    
+    /* 验证恢复的应用程序向量表 */
     uint32_t app_stack = *(__IO uint32_t*)APP_START_ADDR;
     uint32_t app_reset = *(__IO uint32_t*)(APP_START_ADDR + 4);
     
-    __set_MSP(app_stack);
-    SCB->VTOR = APP_START_ADDR;
+    print_str("App stack: 0x");
+    print_hex(app_stack);
+    print_str("\r\nApp reset: 0x");
+    print_hex(app_reset);
+    print_str("\r\n");
     
+    /* 检查复位向量是否在合理范围内 */
+    if (app_reset < APP_START_ADDR || app_reset > (APP_START_ADDR + APP_MAX_SIZE)) {
+        print_str("Invalid reset vector!\r\n");
+        return;
+    }
+    
+    print_str("Jumping to app...\r\n");
+    HAL_Delay(100);
+    
+    /* 完全禁用所有中断 */
+    __disable_irq();
+    
+    /* 复位所有外设到默认状态 */
+    HAL_DeInit();
+    
+    /* 禁用SysTick */
+    SysTick->CTRL = 0;
+    SysTick->LOAD = 0;
+    SysTick->VAL = 0;
+    
+    /* 清除所有挂起的中断 */
+    for (int i = 0; i < 8; i++) {
+        NVIC->ICPR[i] = 0xFFFFFFFF;
+    }
+    
+    /* 禁用所有中断 */
+    for (int i = 0; i < 8; i++) {
+        NVIC->ICER[i] = 0xFFFFFFFF;
+    }
+    
+    /* 重置时钟到默认状态（HSI） */
+    RCC->CR |= RCC_CR_HSION;
+    while (!(RCC->CR & RCC_CR_HSIRDY));
+    
+    RCC->CFGR = 0x00000000; /* HSI作为系统时钟 */
+    RCC->CR &= 0xFEF6FFFF;  /* 关闭HSE, CSS, PLL */
+    RCC->CR &= 0xFFFBFFFF;  /* 关闭HSE旁路 */
+    RCC->CFGR &= 0xFF80FFFF; /* 重置PLL配置 */
+    RCC->CIR = 0x00000000;   /* 禁用所有RCC中断 */
+    
+    /* 设置向量表和栈指针 */
+    SCB->VTOR = APP_START_ADDR;
+    __set_MSP(app_stack);
+    
+    /* 确保所有缓存操作完成 */
+    __DSB();
+    __ISB();
+    
+    /* 跳转到应用程序 */
     void (*app_entry)(void) = (void (*)(void))app_reset;
     app_entry();
 }
