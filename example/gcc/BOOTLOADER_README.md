@@ -2,7 +2,30 @@
 
 ## 功能概述
 
-本 Bootloader 提供了完整的固件管理功能，支持通过串口进行固件更新、下载等操作。
+本 Bootloader 提供了完整的固件管理功能，支持：
+
+### 📦 固件更新方式
+- **XMODEM协议**: 通过串口上传固件（普通/加密）
+- **HTTP OTA**: 通过WiFi网络下载固件（普通/加密）
+- **外部Flash**: 支持固件备份和恢复
+
+### 🔐 加密固件支持  
+- **XOR加密**: 轻量级快速加密，适用于基础保护
+- **AES-128-CBC**: 工业级安全加密，适用于商业产品
+- **设备绑定**: 基于STM32唯一ID的设备专用加密
+- **内存优化**: 流式解密，仅使用4KB工作RAM
+- **完整性验证**: CRC32校验确保固件完整性
+
+### 🌐 网络功能
+- **ESP8266 WiFi**: 支持WiFi网络连接
+- **配置管理**: WiFi和OTA参数持久化存储
+- **实时进度**: OTA下载进度显示
+
+### 🔧 管理功能
+- **多分区支持**: 3个外部Flash备份分区
+- **智能检测**: 自动识别加密算法类型
+- **用户友好**: 交互式命令行界面
+- **故障诊断**: 详细的错误信息和调试功能
 
 ## 内存分区
 
@@ -40,13 +63,21 @@ STM32F103ZET6 拥有 512KB 内部 Flash，分区如下：
 | `xrestore` | `xr` | 从外部Flash恢复固件 |
 | `xlist` | `xl` | 列出外部Flash备份 |
 
-### ESP8266 WiFi模块命令
+### WiFi网络命令
 | 命令 | 缩写 | 功能描述 |
 |------|------|----------|
-| `espinit` | `ei` | 初始化ESP8266模块 |
-| `esptest` | `et` | 测试ESP8266通信 |
-| `espwifi` | `ew` | 连接WiFi网络（交互式配置） |
-| `espinfo` | `ef` | 显示ESP8266状态和连接信息 |
+| `wifi` | `w` | 连接WiFi网络 |
+| `wstatus` | `ws` | 显示WiFi连接状态 |
+| `wdebug` | `wd` | WiFi调试信息 |
+
+### 配置管理命令
+| 命令 | 缩写 | 功能描述 |
+|------|------|----------|
+| `cfgshow` | `cs` | 显示当前配置 |
+| `cfgwifi` | `cw` | 配置WiFi设置 |
+| `cfgota` | `co` | 配置OTA设置 |
+| `cfgsave` | `cS` | 保存配置 |
+| `cfgreset` | `cR` | 重置为默认配置 |
 
 ### 命令输入方式
 
@@ -142,21 +173,29 @@ BOOT> u
 Firmware update method:
 1 = XMODEM to Internal Flash
 2 = XMODEM to External Flash  
-3 = OTA to Internal Flash
-4 = OTA to External Flash
-Select (1-4): 
+3 = HTTP OTA to Internal Flash
+4 = HTTP OTA to External Flash
+5 = XMODEM Encrypted to Internal Flash (XOR/AES)
+6 = XMODEM Encrypted to External Flash (XOR/AES)  
+7 = HTTP OTA Encrypted to Internal Flash (XOR/AES)
+8 = HTTP OTA Encrypted to External Flash (XOR/AES)
+Select (1-8): 
 ```
 
-#### 4.2 XMODEM更新（选项1-2）
+#### 4.2 普通XMODEM更新（选项1-2）
 
 ```
 BOOT> u
 Firmware update method:
 1 = XMODEM to Internal Flash
 2 = XMODEM to External Flash
-3 = OTA to Internal Flash
-4 = OTA to External Flash
-Select (1-4): 2
+3 = HTTP OTA to Internal Flash
+4 = HTTP OTA to External Flash
+5 = XMODEM Encrypted to Internal Flash (XOR/AES)
+6 = XMODEM Encrypted to External Flash (XOR/AES)  
+7 = HTTP OTA Encrypted to Internal Flash (XOR/AES)
+8 = HTTP OTA Encrypted to External Flash (XOR/AES)
+Select (1-8): 2
 
 Slot (1-3): 1
 Start XMODEM transfer
@@ -171,7 +210,64 @@ XMODEM: Transfer complete, received 245760 bytes
 Successfully received 245760 bytes to external flash slot 1
 ```
 
-#### 4.3 OTA WiFi更新（选项3-4）
+#### 4.3 加密XMODEM更新（选项5-6）
+
+```
+BOOT> u
+Select (1-8): 5
+WARNING! Update internal flash with encrypted firmware? (y/n): y
+
+Select encryption algorithm:
+1. XOR encryption
+2. AES-128-CBC encryption
+Choice (1-2): 2
+Using AES-128-CBC encryption
+Erasing app area...
+Start XMODEM transfer (encrypted firmware)
+Ready to receive encrypted firmware via XMODEM-1K...
+
+[... 传输进度 ...]
+Transfer complete: 15360 bytes
+AES encrypted firmware detected, decrypting...
+Starting streaming AES-CBC decryption...
+Progress: 15360/15360 (100%)
+Memory-optimized decryption completed: 14240 bytes
+AES firmware verification successful!
+```
+
+**选项6 - 外部Flash加密固件**:
+```
+BOOT> u  
+Select (1-8): 6
+External flash encrypted firmware options:
+1. Upload encrypted firmware to external flash
+2. Decrypt external flash firmware to internal flash
+Choice (1-2): 1
+
+Slot (1-3): 1
+Select encryption algorithm:
+1. XOR encryption
+2. AES-128-CBC encryption  
+Choice (1-2): 2
+Using AES-128-CBC encryption
+Start XMODEM transfer (encrypted firmware to external flash slot 1)
+Success: 15360 bytes
+```
+
+解密外部Flash固件到内部Flash：
+```
+BOOT> u
+Select (1-8): 6
+Choice (1-2): 2
+WARNING! This will overwrite internal flash! (y/n): y
+Select source slot (1-3): 1
+AES encrypted firmware detected
+AES decryption completed: 14240 bytes
+External firmware decryption successful!
+You can now use 'j' to jump to the new firmware.
+```
+
+#### 4.4 普通OTA WiFi更新（选项3-4）
 
 ```
 BOOT> u
@@ -194,6 +290,52 @@ OTA update completed!
 Total downloaded: 245760 bytes to slot 1
 Firmware validation: PASSED
 Use 'xr 1' to restore this firmware.
+```
+
+#### 4.5 加密OTA WiFi更新（选项7-8）
+
+**选项7 - 加密OTA到内部Flash**:
+```
+BOOT> u
+Select (1-8): 7
+WARNING! Update internal flash via OTA (encrypted)? (y/n): y
+
+Select encryption algorithm:
+1. XOR encryption
+2. AES-128-CBC encryption
+Choice (1-2): 2
+Using AES-128-CBC encryption
+HTTP OTA encrypted firmware - Phase 1 Implementation:
+1. Download encrypted firmware to temporary partition
+2. Decrypt and install automatically
+
+URL: http://192.168.1.100:8080/firmware_aes.bin
+Starting encrypted OTA download...
+Download: [########...........] 100% (15KB/15KB)
+OTA download completed! Starting decryption...
+AES encrypted firmware detected
+Starting streaming AES-CBC decryption...
+Memory-optimized decryption completed: 14240 bytes
+AES firmware verification successful!
+Encrypted OTA update successful!
+```
+
+**选项8 - 加密OTA到外部Flash**:
+```
+BOOT> u
+Select (1-8): 8
+Slot (1-3): 2
+
+Select encryption algorithm:
+1. XOR encryption  
+2. AES-128-CBC encryption
+Choice (1-2): 2
+Using AES-128-CBC encryption
+URL: http://192.168.1.100:8080/firmware_aes.bin
+Starting encrypted OTA download...
+Download: [########...........] 100% (15KB/15KB)
+Encrypted OTA download to external flash completed!
+Use option 6-2 to decrypt and install later.
 ```
 
 #### XMODEM 传输方法
@@ -225,6 +367,63 @@ sx firmware.bin             # XMODEM-128
 
 **注意:** XMODEM-1K 比 XMODEM-128 快8倍，推荐使用XMODEM-1K
 
+### 固件加密工具使用
+
+#### 前置条件
+1. **获取设备唯一ID**: 在Bootloader中使用 `i` 命令查看
+   ```
+   BOOT> i
+   === System Info ===
+   MCU: STM32F103ZET6
+   ...
+   Unique ID: 05D8FF35,3132564E,51125725
+   ```
+   
+2. **安装Python依赖** (仅AES加密需要):
+   ```bash
+   pip install pycryptodome
+   ```
+
+#### 加密工具位置
+加密工具位于 `tools/` 目录下：
+- `firmware_encrypt.py` - XOR加密工具
+- `firmware_aes_encrypt.py` - AES-128-CBC加密工具
+- `firmware_pseudo_aes_cbc_encrypt.py` - 伪AES-CBC测试工具
+- `test_key_derivation.py` - 密钥派生测试工具
+
+#### XOR加密固件
+```bash
+# 基础用法
+python tools/firmware_encrypt.py app.bin app_xor.bin yangcan
+
+# 指定设备唯一ID（推荐）
+python tools/firmware_encrypt.py app.bin app_xor.bin yangcan 0x05D8FF35,0x3132564E,0x51125725
+```
+
+#### AES-128-CBC加密固件  
+```bash
+# 必须指定设备唯一ID
+python tools/firmware_aes_encrypt.py app.bin app_aes.bin yangcan 0x05D8FF35,0x3132564E,0x51125725
+```
+
+#### 加密算法对比
+| 算法 | 安全级别 | 加密速度 | 解密速度 | 内存占用 | 适用场景 |
+|------|----------|----------|----------|----------|----------|
+| XOR | 基础 | 很快 | 很快 | 极低 | 快速开发、基础保护 |
+| AES-128-CBC | 高 | 中等 | 中等 | 中等 | 生产环境、商业产品 |
+
+#### 密钥派生验证
+```bash
+# 验证PC端和STM32端密钥派生算法一致性
+python tools/test_key_derivation.py
+```
+
+#### 安全特性
+- **设备绑定**: 每个设备使用不同的加密密钥
+- **防复制**: 加密固件无法在其他设备上运行  
+- **完整性验证**: CRC32校验确保固件完整性
+- **内存优化**: 流式处理，仅使用4KB工作RAM
+
 ### OTA WiFi更新详细说明
 
 #### 前置条件
@@ -235,8 +434,13 @@ sx firmware.bin             # XMODEM-128
 #### 使用步骤
 1. **连接WiFi**:
    ```
-   BOOT> ew
-   === WiFi Connection ===
+   BOOT> w
+   WiFi connection options:
+   1. Use hardcoded WiFi (YANG/yang123456789)  
+   2. Enter WiFi credentials manually
+   3. Use saved configuration
+   Choice (1-3): 2
+   
    Enter WiFi SSID: MyWiFi
    Enter Password: ********
    Connecting to "MyWiFi"...
@@ -256,8 +460,11 @@ sx firmware.bin             # XMODEM-128
 3. **执行OTA更新**:
    ```
    BOOT> u
-   Select (1-4): 3  # 或 4 用于外部Flash
-   Enter firmware URL: http://192.168.1.100:8080/firmware.bin
+   Select (1-8): 3  # 普通固件到内部Flash
+   # 或选择其他选项：
+   # 4 = 普通固件到外部Flash  
+   # 7 = 加密固件到内部Flash
+   # 8 = 加密固件到外部Flash
    ```
 
 #### 支持的URL格式
@@ -355,29 +562,18 @@ ESP8266模块通过串口2（UART2）与STM32通信：
 | RST     | PE9          | 复位引脚（低电平复位） |
 | EN/CH_PD| 3.3V         | 使能引脚（高电平使能） |
 
-### ESP8266命令使用示例
+### WiFi配置和使用
 
-#### 1. 初始化ESP8266模块
-
-```
-BOOT> ei
-=== ESP8266 Initialization ===
-ESP8266 initialized successfully!
-```
-
-#### 2. 测试通信
+#### 1. 连接WiFi网络
 
 ```
-BOOT> et
-=== ESP8266 Communication Test ===
-ESP8266 communication test passed!
-```
+BOOT> w
+WiFi connection options:
+1. Use hardcoded WiFi (YANG/yang123456789)
+2. Enter WiFi credentials manually  
+3. Use saved configuration
+Choice (1-3): 2
 
-#### 3. 连接WiFi网络
-
-```
-BOOT> ew
-=== WiFi Connection ===
 Enter WiFi SSID: MyWiFi
 Enter Password: ********
 Connecting to "MyWiFi"...
@@ -385,38 +581,49 @@ WiFi connected successfully!
 IP Address: 192.168.1.100
 ```
 
-#### 4. 查看ESP8266信息
+#### 2. 查看WiFi状态
 
 ```
-BOOT> ef
-=== ESP8266 Information ===
-Getting version info...
-Version:
-AT version:1.7.4.0(May 11 2020 19:13:04)
-SDK version:3.0.4(9532ceb)
-compile time:May 27 2020 10:12:17
-Bin version(Wroom 02):1.7.4
+BOOT> ws
+WiFi Status: Connected with IP (192.168.1.100)
+```
 
-Connection Status: Connected
+#### 3. 查看WiFi调试信息
+
+```
+BOOT> wd
+=== WiFi Debug Information ===
+ESP8266 Status: Initialized
+AT Command Response: OK
+Current WiFi Mode: Station
+Connection Status: Connected  
 IP Address: 192.168.1.100
-Detailed Status: Connected with IP
 ```
 
-### WiFi配置注意事项
+### 配置管理
 
-1. **SSID输入**: 支持中文SSID，但建议使用英文
-2. **密码输入**: 输入时显示为 `*` 号，支持退格删除
-3. **连接超时**: WiFi连接超时时间为10秒
-4. **断开重连**: 如需连接其他WiFi，先使用 `espwifi` 命令重新配置
+#### 配置WiFi参数
+```
+BOOT> cw  
+Enter WiFi SSID: MyNetwork
+Enter WiFi Password: ********
+WiFi configuration saved.
+```
 
-### 故障排除
+#### 配置OTA服务器
+```
+BOOT> co
+Enter OTA server host: 192.168.1.100
+Enter OTA server port: 8080  
+Enter OTA firmware path: /firmware.bin
+OTA configuration saved.
+```
 
-| 问题 | 可能原因 | 解决方法 |
-|------|----------|----------|
-| 初始化失败 | 模块未上电或接线错误 | 检查3.3V电源和串口接线 |
-| 通信超时 | 波特率不匹配 | ESP8266默认115200，检查配置 |
-| WiFi连接失败 | SSID或密码错误 | 重新输入正确的WiFi信息 |
-| 无法获取IP | 路由器DHCP问题 | 检查路由器DHCP服务状态 |
+#### 保存配置到Flash
+```
+BOOT> cS
+Configuration saved to flash.
+```
 
 ## 串口配置
 
@@ -436,14 +643,37 @@ Detailed Status: Connected with IP
 - **流控**: 无
 - **用途**: ESP8266模块通信
 
+## 故障排除
+
+### 加密固件相关
+| 问题 | 可能原因 | 解决方法 |
+|------|----------|----------|
+| AES firmware verification failed | 密码错误或设备ID不匹配 | 确认使用"yangcan"密码和正确的设备唯一ID |
+| Failed to initialize streaming AES | 密钥派生失败 | 检查设备唯一ID读取，重启设备后重试 |
+| Read encrypted chunk failed | 外部Flash读取错误 | 检查外部Flash连接，确认XMODEM传输完整 |
+| Decryption failed | 加密算法不匹配 | 确认使用对应的加密工具生成固件 |
+
+### 常见问题
+| 问题 | 可能原因 | 解决方法 |
+|------|----------|----------|
+| 无法进入 Bootloader | 时间窗口太短 | 上电后立即按键或发送字符 |
+| 无法跳转到应用程序 | 应用程序无效 | 检查应用程序编译地址是否为 0x08010000 |
+| 更新失败 | Flash 写保护 | 检查 Flash 写保护状态 |
+| WiFi连接失败 | SSID或密码错误 | 重新输入正确的WiFi信息 |
+| OTA下载失败 | 网络连接问题 | 检查WiFi连接状态和固件服务器可达性 |
+
 ## 后续开发计划
 
 - [x] 实现 XMODEM 协议支持
 - [x] 支持外部 Flash 备份
 - [x] ESP8266 WiFi模块驱动
 - [x] 通过WiFi进行OTA更新
+- [x] 添加固件加密功能（XOR + AES-128-CBC）
+- [x] 设备绑定加密（基于STM32唯一ID）
+- [x] 内存优化流式解密
+- [x] 加密固件XMODEM更新
+- [x] 加密固件OTA更新
 - [ ] HTTPS支持（SSL/TLS）
-- [ ] 添加固件加密功能
 - [ ] 支持固件签名验证
 - [ ] 支持 USB DFU 模式
 - [ ] 添加固件版本管理
