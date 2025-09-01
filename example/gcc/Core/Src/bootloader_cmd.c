@@ -335,15 +335,26 @@ void cmd_help_handler(void)
         print_str("\r\n");
     }
     
+    print_str("\r\n===== Firmware Update Methods =====\r\n");
+    print_str("XMODEM Options (u -> 1):\r\n");
+    print_str("  1 = Internal Flash\r\n");
+    print_str("  2 = External Flash (to backup slots)\r\n");
+    print_str("  3 = Internal Flash (Encrypted XOR/AES)\r\n");
+    print_str("  4 = External Flash (Encrypted + Decrypt)\r\n");
+    print_str("\r\nOTA Options (u -> 2):\r\n");
+    print_str("  1 = Internal Flash\r\n");
+    print_str("  2 = External Flash (to backup slots)\r\n");
+    print_str("  3 = Internal Flash (Encrypted XOR/AES)\r\n");
+    print_str("  4 = External Flash (Encrypted XOR/AES)\r\n");
     print_str("\r\nExamples:\r\n");
     print_str("  h          - Show this help\r\n");
-    print_str("  u          - Update firmware (XMODEM/OTA)\r\n");
+    print_str("  u          - Update firmware (select method)\r\n");
     print_str("  i          - Show system info\r\n");
     print_str("  w          - Connect to WiFi network\r\n");
     print_str("  ws         - Show WiFi connection status\r\n");
     print_str("  wd         - WiFi debug information\r\n");
     print_str("  xb         - Backup current firmware to slot 1-3\r\n");
-    print_str("  xr         - Restore firmware from slot 1-3\r\n");
+    print_str("  xr         - Restore firmware from slot 0-3 (0=download)\r\n");
     print_str("  xl         - List all backup slots status\r\n");
     print_str("===============================================\r\n");
 }
@@ -356,20 +367,49 @@ static void ota_progress_callback(uint32_t current, uint32_t total)
     }
 }
 
+/* XMODEM子菜单处理函数前向声明 */
+static void cmd_update_xmodem_handler(void);
+static void cmd_update_ota_handler(void);
+
 void cmd_update_handler(void)
 {
     uint8_t ch;
     
-    print_str("Firmware update method:\r\n");
-    print_str("1 = XMODEM to Internal Flash\r\n");
-    print_str("2 = XMODEM to External Flash\r\n");
-    print_str("3 = HTTP OTA to Internal Flash\r\n");
-    print_str("4 = HTTP OTA to External Flash\r\n");
-    print_str("5 = XMODEM Encrypted to Internal Flash (XOR/AES)\r\n");
-    print_str("6 = XMODEM Encrypted to External Flash (XOR/AES)\r\n");
-    print_str("7 = HTTP OTA Encrypted to Internal Flash (XOR/AES)\r\n");
-    print_str("8 = HTTP OTA Encrypted to External Flash (XOR/AES)\r\n");
-    print_str("Select (1-8): ");
+    print_str("===== Firmware Update =====\r\n");
+    print_str("Select transfer method:\r\n");
+    print_str("1 = XMODEM\r\n");
+    print_str("2 = HTTP OTA\r\n");
+    print_str("Select (1-2): ");
+    
+    ch = read_char();
+    print_str("\r\n");
+    
+    if(ch == '1')
+    {
+        cmd_update_xmodem_handler();
+    }
+    else if(ch == '2')
+    {
+        cmd_update_ota_handler();
+    }
+    else
+    {
+        print_str("Invalid selection!\r\n");
+    }
+}
+
+/* XMODEM固件更新子菜单 */
+static void cmd_update_xmodem_handler(void)
+{
+    uint8_t ch;
+    
+    print_str("===== XMODEM Firmware Update =====\r\n");
+    print_str("Select destination and type:\r\n");
+    print_str("1 = Internal Flash\r\n");
+    print_str("2 = External Flash\r\n");
+    print_str("3 = Internal Flash (Encrypted XOR/AES)\r\n");
+    print_str("4 = External Flash (Encrypted XOR/AES)\r\n");
+    print_str("Select (1-4): ");
     
     ch = read_char();
     print_str("\r\n");
@@ -409,17 +449,19 @@ void cmd_update_handler(void)
     {
         /* XMODEM到外部Flash */
         print_str("Slot (1-3): ");
-        ch = read_char() - '0';
+        uint8_t slot = read_char() - '0';
         print_str("\r\n");
         
-        if(ch < 1 || ch > 3)
+        if(slot < 1 || slot > 3)
         {
             print_str("Invalid slot!\r\n");
             return;
         }
         
-        print_str("Start XMODEM transfer\r\n");
-        int result = xmodem_receive(0, true, W25Q64_PARTITION_BACKUP1 + ch - 1, true);
+        print_str("Start XMODEM transfer to slot ");
+        print_dec(slot);
+        print_str("\r\n");
+        int result = xmodem_receive(0, true, W25Q64_PARTITION_BACKUP1 + slot - 1, true);
         if(result > 0)
         {
             print_str("Success: ");
@@ -432,6 +474,322 @@ void cmd_update_handler(void)
         }
     }
     else if(ch == '3')
+    {
+        /* XMODEM加密固件到内部Flash */
+        print_str("WARNING! Update internal flash with encrypted firmware? (y/n): ");
+        if(read_char() != 'y')
+        {
+            print_str("\r\nCancelled\r\n");
+            return;
+        }
+        print_str("\r\n");
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        bool use_aes = (encrypt_choice == '2');
+        
+        /* 初始化加密模块 */
+        const char* crypto_key = "yangcan";
+        if (!firmware_crypto_init((uint8_t*)crypto_key, strlen(crypto_key))) {
+            print_str("Crypto init failed!\r\n");
+            return;
+        }
+        
+        /* 如果选择AES，还需要初始化AES */
+        if (use_aes) {
+            uint32_t* unique_id = (uint32_t*)0x1FFFF7E8;
+            uint8_t aes_key[16];
+            firmware_aes_derive_key(crypto_key, unique_id, aes_key);
+            if (!firmware_aes_init(aes_key)) {
+                print_str("AES init failed!\r\n");
+                return;
+            }
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        print_str("Erasing app area...\r\n");
+        if(!bootloader_flash_erase(APP_START_ADDR, APP_MAX_SIZE))
+        {
+            print_str("Erase failed!\r\n");
+            return;
+        }
+        
+        print_str("Start XMODEM transfer (encrypted firmware)\r\n");
+        int result = xmodem_receive(APP_START_ADDR, false, 0, true);
+        if(result > 0)
+        {
+            print_str("Transfer complete: ");
+            print_dec(result);
+            print_str(" bytes\r\n");
+            
+            /* 检查是否为加密固件 */
+            bool is_xor_encrypted = firmware_crypto_is_encrypted(APP_START_ADDR);
+            bool is_aes_encrypted = firmware_aes_is_encrypted(APP_START_ADDR);
+            
+            if (is_xor_encrypted || is_aes_encrypted) {
+                if (is_aes_encrypted) {
+                    print_str("AES encrypted firmware detected, decrypting...\r\n");
+                } else {
+                    print_str("XOR encrypted firmware detected, decrypting...\r\n");
+                }
+                
+                /* 将加密固件移动到临时区域（使用外部Flash） */
+                w25q64_init();
+                if (!w25q64_erase_partition(W25Q64_PARTITION_DOWNLOAD)) {
+                    print_str("Failed to prepare temp area!\r\n");
+                    return;
+                }
+                
+                /* 备份加密固件到外部Flash */
+                uint8_t buf[1024];
+                for (uint32_t offset = 0; offset < result; offset += 1024) {
+                    uint32_t size = (result - offset > 1024) ? 1024 : (result - offset);
+                    memcpy(buf, (uint8_t*)(APP_START_ADDR + offset), size);
+                    if (!w25q64_write_partition(W25Q64_PARTITION_DOWNLOAD, offset, buf, size)) {
+                        print_str("Backup to external flash failed!\r\n");
+                        return;
+                    }
+                }
+                
+                print_str("\r\nEncrypted firmware downloaded to temporary storage!\r\n");
+                print_str("Use 'xr 0' to decrypt and restore to internal flash.\r\n");
+                print_str("Use 'j' to jump to the firmware after restore.\r\n");
+            } else {
+                print_str("Warning: Firmware is not encrypted!\r\n");
+            }
+        }
+        else
+        {
+            print_str("Transfer failed!\r\n");
+        }
+    }
+    else if(ch == '4')
+    {
+        /* XMODEM加密固件到外部Flash */
+        print_str("Slot (1-3): ");
+        uint8_t slot = read_char() - '0';
+        print_str("\r\n");
+        
+        if(slot < 1 || slot > 3)
+        {
+            print_str("Invalid slot!\r\n");
+            return;
+        }
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        if (encrypt_choice == '2') {
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        print_str("Start XMODEM transfer (encrypted firmware to external flash slot ");
+        print_dec(slot);
+        print_str(")\r\n");
+        int result = xmodem_receive(0, true, W25Q64_PARTITION_BACKUP1 + slot - 1, true);
+        if(result > 0)
+        {
+            print_str("Success: ");
+            print_dec(result);
+            print_str(" bytes\r\n");
+            print_str("Use 'xr ");
+            print_dec(slot);
+            print_str("' to decrypt and restore to internal flash.\r\n");
+            print_str("Use 'j' to jump to the firmware after restore.\r\n");
+        }
+        else
+        {
+            print_str("Transfer failed!\r\n");
+        }
+    }
+    else if(ch == '3')
+    {
+        /* XMODEM加密固件到内部Flash */
+        print_str("Download encrypted firmware to temporary storage via XMODEM? (y/n): ");
+        if(read_char() != 'y')
+        {
+            print_str("\r\nCancelled\r\n");
+            return;
+        }
+        print_str("\r\n");
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        if (encrypt_choice == '2') {
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        print_str("Start XMODEM transfer to temporary storage\r\n");
+        int result = xmodem_receive(0, true, W25Q64_PARTITION_DOWNLOAD, true);
+        if(result > 0)
+        {
+            print_str("Success: ");
+            print_dec(result);
+            print_str(" bytes\r\n");
+            print_str("Use 'xr 0' to decrypt and restore to internal flash.\r\n");
+            print_str("Use 'j' to jump to the firmware after restore.\r\n");
+        }
+        else
+        {
+            print_str("Transfer failed!\r\n");
+        }
+    }
+    else if(ch == '4')
+    {
+        /* HTTP OTA加密固件到外部Flash */
+        print_str("Slot (1-3): ");
+        uint8_t slot = read_char() - '0';
+        print_str("\r\n");
+        
+        if(slot < 1 || slot > 3)
+        {
+            print_str("Invalid slot!\r\n");
+            return;
+        }
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        if (encrypt_choice == '2') {
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        /* 检查ESP8266是否已初始化 */
+        if (!g_wifi_initialized) {
+            print_str("ESP8266 not initialized! Please use 'w' command first.\r\n");
+            return;
+        }
+        
+        /* 检查WiFi连接状态 */
+        if (esp8266_get_wifi_status(&g_wifi_device) != ESP8266_WIFI_GOT_IP) {
+            print_str("WiFi not connected! Please connect WiFi first.\r\n");
+            return;
+        }
+        
+        /* 初始化OTA */
+        static ota_context_t ota_ctx;
+        print_str("Initializing OTA...\r\n");
+        if (!ota_init(&ota_ctx, &g_wifi_device)) {
+            print_str("OTA init failed!\r\n");
+            return;
+        }
+        
+        /* 设置进度回调 */
+        ota_set_progress_callback(&ota_ctx, ota_progress_callback);
+        
+        /* 使用配置的OTA服务器 */
+        const bootloader_config_t* cfg = config_get();
+        if (!cfg) {
+            print_str("Configuration not loaded!\r\n");
+            ota_deinit(&ota_ctx);
+            return;
+        }
+        
+        /* 构建完整的URL */
+        char firmware_url[256];
+        snprintf(firmware_url, sizeof(firmware_url), "http://%s:%d%s", 
+                 cfg->ota.host, cfg->ota.port, cfg->ota.path);
+        
+        print_str("Starting OTA download to external flash slot ");
+        print_dec(slot);
+        print_str("...\r\n");
+        print_str("URL: ");
+        print_str(firmware_url);
+        print_str("\r\n");
+        
+        w25q64_partition_id_t target_partition = W25Q64_PARTITION_BACKUP1 + slot - 1;
+        
+        ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
+                                                   OTA_TARGET_EXTERNAL_FLASH, 
+                                                   target_partition, 1024*1024);
+        
+        ota_deinit(&ota_ctx);
+        
+        if (result == OTA_STATUS_OK) {
+            print_str("\r\nEncrypted OTA download to external flash completed!\r\n");
+            print_str("Use 'xr ");
+            print_dec(slot);
+            print_str("' to decrypt and restore to internal flash.\r\n");
+            print_str("Use 'j' to jump to the firmware after restore.\r\n");
+        } else {
+            print_str("\r\nOTA download failed with error: ");
+            print_dec(result);
+            print_str("\r\n");
+        }
+    }
+    else
+    {
+        print_str("Invalid selection!\r\n");
+    }
+}
+
+/* HTTP OTA固件更新子菜单 */
+static void cmd_update_ota_handler(void)
+{
+    uint8_t ch;
+    
+    print_str("===== HTTP OTA Firmware Update =====\r\n");
+    print_str("Select destination and type:\r\n");
+    print_str("1 = Internal Flash\r\n");
+    print_str("2 = External Flash\r\n");
+    print_str("3 = Internal Flash (Encrypted XOR/AES)\r\n");
+    print_str("4 = External Flash (Encrypted XOR/AES)\r\n");
+    print_str("Select (1-4): ");
+    
+    ch = read_char();
+    print_str("\r\n");
+    
+    if(ch == '1')
     {
         /* HTTP OTA到内部Flash */
         print_str("WARNING! Update internal flash via OTA? (y/n): ");
@@ -498,14 +856,14 @@ void cmd_update_handler(void)
             print_str("\r\n");
         }
     }
-    else if(ch == '4')
+    else if(ch == '2')
     {
         /* HTTP OTA到外部Flash */
         print_str("Slot (1-3): ");
-        ch = read_char() - '0';
+        uint8_t slot = read_char() - '0';
         print_str("\r\n");
         
-        if(ch < 1 || ch > 3)
+        if(slot < 1 || slot > 3)
         {
             print_str("Invalid slot!\r\n");
             return;
@@ -567,7 +925,7 @@ void cmd_update_handler(void)
                 return;
         }
         
-        w25q64_partition_id_t partition = W25Q64_PARTITION_BACKUP1 + ch - 1;
+        w25q64_partition_id_t partition = W25Q64_PARTITION_BACKUP1 + slot - 1;
         
         ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
                                                    OTA_TARGET_EXTERNAL_FLASH, 
@@ -578,7 +936,7 @@ void cmd_update_handler(void)
         if (result == OTA_STATUS_OK) {
             print_str("\r\nOTA update to external flash completed!\r\n");
             print_str("Use 'xr ");
-            print_dec(ch);
+            print_dec(slot);
             print_str("' to restore this firmware.\r\n");
         } else {
             print_str("\r\nOTA update failed with error: ");
@@ -596,9 +954,9 @@ void cmd_update_handler(void)
             print_str(")\r\n");
         }
     }
-    else if(ch == '5')
+    else if(ch == '3')
     {
-        /* XMODEM加密固件到内部Flash */
+        /* HTTP OTA加密固件到内部Flash */
         print_str("WARNING! Update internal flash with encrypted firmware? (y/n): ");
         if(read_char() != 'y')
         {
@@ -831,7 +1189,7 @@ void cmd_update_handler(void)
                         print_str(" bytes\r\n");
                         
                         /* 验证解密后的固件 */
-                        if (firmware_aes_verify_firmware(APP_START_ADDR, decrypted_total, expected_crc32)) {
+                        if (firmware_crypto_verify_firmware(APP_START_ADDR, decrypted_total, expected_crc32)) {
                             print_str("AES firmware verification successful!\r\n");
                         } else {
                             print_str("AES firmware verification failed!\r\n");
@@ -1072,14 +1430,9 @@ void cmd_update_handler(void)
                                                        W25Q64_PARTITION_DOWNLOAD, 1024*1024);
             
             if (result == OTA_STATUS_OK) {
-                print_str("\r\nOTA download completed! Starting decryption...\r\n");
-                
-                /* 解密下载的固件到内部Flash */
-                if (decrypt_external_firmware_to_internal(W25Q64_PARTITION_DOWNLOAD, "yangcan")) {
-                    print_str("Encrypted OTA update successful!\r\n");
-                } else {
-                    print_str("Decryption failed!\r\n");
-                }
+                print_str("\r\nEncrypted OTA download completed!\r\n");
+                print_str("Use 'xr 0' to decrypt and restore to internal flash.\r\n");
+                print_str("Use 'j' to jump to the firmware after restore.\r\n");
             } else {
                 print_str("\r\nOTA download failed: ");
                 print_dec(result);
@@ -1095,7 +1448,10 @@ void cmd_update_handler(void)
             
             if (result == OTA_STATUS_OK) {
                 print_str("\r\nEncrypted OTA download to external flash completed!\r\n");
-                print_str("Use option 6-2 to decrypt and install later.\r\n");
+                print_str("Use 'xr ");
+                print_dec(slot);
+                print_str("' to decrypt and restore to internal flash.\r\n");
+                print_str("Use 'j' to jump to the firmware after restore.\r\n");
             } else {
                 print_str("\r\nOTA download failed: ");
                 print_dec(result);
@@ -1104,6 +1460,189 @@ void cmd_update_handler(void)
         }
         
         ota_deinit(&ota_ctx);
+    }
+    else if(ch == '3')
+    {
+        /* HTTP OTA加密固件到内部Flash */
+        print_str("Download encrypted firmware to temporary storage via OTA? (y/n): ");
+        if(read_char() != 'y')
+        {
+            print_str("\r\nCancelled\r\n");
+            return;
+        }
+        print_str("\r\n");
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        if (encrypt_choice == '2') {
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        /* 检查ESP8266是否已初始化 */
+        if (!g_wifi_initialized) {
+            print_str("ESP8266 not initialized! Please use 'w' command first.\r\n");
+            return;
+        }
+        
+        /* 检查WiFi连接状态 */
+        if (esp8266_get_wifi_status(&g_wifi_device) != ESP8266_WIFI_GOT_IP) {
+            print_str("WiFi not connected! Please connect WiFi first.\r\n");
+            return;
+        }
+        
+        /* 初始化OTA */
+        static ota_context_t ota_ctx;
+        print_str("Initializing OTA...\r\n");
+        if (!ota_init(&ota_ctx, &g_wifi_device)) {
+            print_str("OTA init failed!\r\n");
+            return;
+        }
+        
+        /* 设置进度回调 */
+        ota_set_progress_callback(&ota_ctx, ota_progress_callback);
+        
+        /* 使用配置的OTA服务器 */
+        const bootloader_config_t* cfg = config_get();
+        if (!cfg) {
+            print_str("Configuration not loaded!\r\n");
+            ota_deinit(&ota_ctx);
+            return;
+        }
+        
+        /* 构建完整的URL */
+        char firmware_url[256];
+        snprintf(firmware_url, sizeof(firmware_url), "http://%s:%d%s", 
+                 cfg->ota.host, cfg->ota.port, cfg->ota.path);
+        
+        print_str("Starting OTA download to temporary storage...\r\n");
+        print_str("URL: ");
+        print_str(firmware_url);
+        print_str("\r\n");
+        
+        /* 下载到下载分区 */
+        ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
+                                                   OTA_TARGET_EXTERNAL_FLASH, 
+                                                   W25Q64_PARTITION_DOWNLOAD, 1024*1024);
+        
+        ota_deinit(&ota_ctx);
+        
+        if (result == OTA_STATUS_OK) {
+            print_str("\r\nEncrypted OTA download completed!\r\n");
+            print_str("Use 'xr 0' to decrypt and restore to internal flash.\r\n");
+            print_str("Use 'j' to jump to the firmware after restore.\r\n");
+        } else {
+            print_str("\r\nOTA download failed with error: ");
+            print_dec(result);
+            print_str("\r\n");
+        }
+    }
+    else if(ch == '4')
+    {
+        /* HTTP OTA加密固件到外部Flash */
+        print_str("Slot (1-3): ");
+        uint8_t slot = read_char() - '0';
+        print_str("\r\n");
+        
+        if(slot < 1 || slot > 3)
+        {
+            print_str("Invalid slot!\r\n");
+            return;
+        }
+        
+        /* 选择加密算法 */
+        print_str("Select encryption algorithm:\r\n");
+        print_str("1. XOR encryption\r\n");
+        print_str("2. AES-128-CBC encryption\r\n");
+        print_str("Choice (1-2): ");
+        uint8_t encrypt_choice = read_char();
+        print_str("\r\n");
+        
+        if (encrypt_choice != '1' && encrypt_choice != '2') {
+            print_str("Invalid choice!\r\n");
+            return;
+        }
+        
+        if (encrypt_choice == '2') {
+            print_str("Using AES-128-CBC encryption\r\n");
+        } else {
+            print_str("Using XOR encryption\r\n");
+        }
+        
+        /* 检查ESP8266是否已初始化 */
+        if (!g_wifi_initialized) {
+            print_str("ESP8266 not initialized! Please use 'w' command first.\r\n");
+            return;
+        }
+        
+        /* 检查WiFi连接状态 */
+        if (esp8266_get_wifi_status(&g_wifi_device) != ESP8266_WIFI_GOT_IP) {
+            print_str("WiFi not connected! Please connect WiFi first.\r\n");
+            return;
+        }
+        
+        /* 初始化OTA */
+        static ota_context_t ota_ctx;
+        print_str("Initializing OTA...\r\n");
+        if (!ota_init(&ota_ctx, &g_wifi_device)) {
+            print_str("OTA init failed!\r\n");
+            return;
+        }
+        
+        /* 设置进度回调 */
+        ota_set_progress_callback(&ota_ctx, ota_progress_callback);
+        
+        /* 使用配置的OTA服务器 */
+        const bootloader_config_t* cfg = config_get();
+        if (!cfg) {
+            print_str("Configuration not loaded!\r\n");
+            ota_deinit(&ota_ctx);
+            return;
+        }
+        
+        /* 构建完整的URL */
+        char firmware_url[256];
+        snprintf(firmware_url, sizeof(firmware_url), "http://%s:%d%s", 
+                 cfg->ota.host, cfg->ota.port, cfg->ota.path);
+        
+        print_str("Starting OTA download to external flash slot ");
+        print_dec(slot);
+        print_str("...\r\n");
+        print_str("URL: ");
+        print_str(firmware_url);
+        print_str("\r\n");
+        
+        w25q64_partition_id_t target_partition = W25Q64_PARTITION_BACKUP1 + slot - 1;
+        
+        ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
+                                                   OTA_TARGET_EXTERNAL_FLASH, 
+                                                   target_partition, 1024*1024);
+        
+        ota_deinit(&ota_ctx);
+        
+        if (result == OTA_STATUS_OK) {
+            print_str("\r\nEncrypted OTA download to external flash completed!\r\n");
+            print_str("Use 'xr ");
+            print_dec(slot);
+            print_str("' to decrypt and restore to internal flash.\r\n");
+            print_str("Use 'j' to jump to the firmware after restore.\r\n");
+        } else {
+            print_str("\r\nOTA download failed with error: ");
+            print_dec(result);
+            print_str("\r\n");
+        }
     }
     else
     {
@@ -1300,20 +1839,35 @@ void cmd_extbackup_handler(void)
 
 void cmd_extrestore_handler(void)
 {
-    print_str("Slot (1-3): ");
-    uint8_t slot = read_char() - '0';
+    print_str("Slot (0-3, 0=download partition): ");
+    char ch = read_char();
     print_str("\r\n");
     
-    if(slot < 1 || slot > 3)
+    /* 验证输入字符 */
+    if(ch < '0' || ch > '3')
     {
-        print_str("Invalid slot!\r\n");
+        print_str("Invalid slot! Please enter 0-3.\r\n");
         return;
     }
     
-    w25q64_init();
-    w25q64_partition_id_t pid = W25Q64_PARTITION_BACKUP1 + slot - 1;
+    uint8_t slot = ch - '0';
+    print_str("Debug: slot = ");
+    print_dec(slot);
+    print_str("\r\n");
     
-    /* 验证备份 */
+    w25q64_init();
+    w25q64_partition_id_t pid;
+    if (slot == 0) {
+        pid = W25Q64_PARTITION_DOWNLOAD;
+        print_str("Restoring from download partition...\r\n");
+    } else {
+        pid = W25Q64_PARTITION_BACKUP1 + slot - 1;
+        print_str("Restoring from backup slot ");
+        print_dec(slot);
+        print_str("...\r\n");
+    }
+    
+    /* 验证备份 - 检查是否为加密固件 */
     uint8_t buf[256];
     if(!w25q64_read_partition(pid, 0, buf, 256))
     {
@@ -1321,73 +1875,107 @@ void cmd_extrestore_handler(void)
         return;
     }
     
-    uint32_t stack = *((uint32_t*)buf);
-    if(stack < 0x20000000 || stack > 0x20010000)
-    {
-        print_str("Invalid backup!\r\n");
-        return;
-    }
+    /* 检查是否为加密固件 */
+    bool is_encrypted_firmware = false;
+    firmware_crypto_header_t* xor_header = (firmware_crypto_header_t*)buf;
+    firmware_aes_header_t* aes_header = (firmware_aes_header_t*)buf;
     
-    /* 计算固件实际大小 */
-    print_str("Calculating firmware size...\r\n");
-    uint32_t firmware_size = calculate_firmware_size(pid);
-    if(firmware_size == 0)
-    {
-        print_str("Cannot determine firmware size!\r\n");
-        return;
-    }
-    
-    print_str("Firmware size: ");
-    print_dec(firmware_size / 1024);
-    print_str("KB\r\n");
-    
-    /* 只擦除需要的页数 */
-    uint32_t pages_needed = (firmware_size + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE;
-    uint32_t erase_size = pages_needed * FLASH_PAGE_SIZE;
-    
-    print_str("Erasing ");
-    print_dec(pages_needed);
-    print_str(" pages (");
-    print_dec(erase_size / 1024);
-    print_str("KB)...\r\n");
-    
-    if(!bootloader_flash_erase(APP_START_ADDR, erase_size))
-    {
-        print_str("Erase failed!\r\n");
-        return;
-    }
-    
-    print_str("Restoring firmware...\r\n");
-    uint32_t offset = 0;
-    uint32_t total = firmware_size; /* 只恢复实际固件大小 */
-    uint8_t large_buf[1024]; /* 使用更大的缓冲区提高速度 */
-    
-    while(offset < total)
-    {
-        uint32_t size = (total - offset) > 1024 ? 1024 : (total - offset);
-        
-        if(!w25q64_read_partition(pid, offset, large_buf, size))
+    if (xor_header->magic == FIRMWARE_CRYPTO_MAGIC) {
+        print_str("XOR encrypted firmware detected in slot ");
+        print_dec(slot);
+        print_str("\r\n");
+        is_encrypted_firmware = true;
+    } else if (aes_header->magic == FIRMWARE_AES_MAGIC) {
+        print_str("AES encrypted firmware detected in slot ");
+        print_dec(slot);
+        print_str("\r\n");
+        is_encrypted_firmware = true;
+    } else {
+        /* 普通固件验证 */
+        uint32_t stack = *((uint32_t*)buf);
+        if(stack < 0x20000000 || stack > 0x20010000)
         {
-            print_str("\r\nRead failed!\r\n");
+            print_str("Invalid backup!\r\n");
+            return;
+        }
+        print_str("Standard firmware detected in slot ");
+        print_dec(slot);
+        print_str("\r\n");
+    }
+    
+    if (is_encrypted_firmware) {
+        /* 处理加密固件 - 直接调用解密函数 */
+        print_str("Starting decryption from external flash...\r\n");
+        
+        if (decrypt_external_firmware_to_internal(pid, "yangcan")) {
+            print_str("\r\nEncrypted firmware restore completed successfully!\r\n");
+            print_str("Use 'j' to jump to the new firmware.\r\n");
+        } else {
+            print_str("\r\nEncrypted firmware restore failed!\r\n");
+        }
+    } else {
+        /* 处理普通固件 */
+        /* 计算固件实际大小 */
+        print_str("Calculating firmware size...\r\n");
+        uint32_t firmware_size = calculate_firmware_size(pid);
+        if(firmware_size == 0)
+        {
+            print_str("Cannot determine firmware size!\r\n");
             return;
         }
         
-        if(!bootloader_flash_write(APP_START_ADDR + offset, large_buf, size))
+        print_str("Firmware size: ");
+        print_dec(firmware_size / 1024);
+        print_str("KB\r\n");
+        
+        /* 只擦除需要的页数 */
+        uint32_t pages_needed = (firmware_size + FLASH_PAGE_SIZE - 1) / FLASH_PAGE_SIZE;
+        uint32_t erase_size = pages_needed * FLASH_PAGE_SIZE;
+        
+        print_str("Erasing ");
+        print_dec(pages_needed);
+        print_str(" pages (");
+        print_dec(erase_size / 1024);
+        print_str("KB)...\r\n");
+        
+        if(!bootloader_flash_erase(APP_START_ADDR, erase_size))
         {
-            print_str("\r\nWrite failed!\r\n");
+            print_str("Erase failed!\r\n");
             return;
         }
         
-        offset += size;
+        print_str("Restoring firmware...\r\n");
+        uint32_t offset = 0;
+        uint32_t total = firmware_size; /* 只恢复实际固件大小 */
+        uint8_t large_buf[1024]; /* 使用更大的缓冲区提高速度 */
         
-        /* 每4KB更新一次进度 */
-        if((offset % 0x1000) == 0 || offset >= total)
+        while(offset < total)
         {
-            show_progress(offset, total, "Restore");
+            uint32_t size = (total - offset) > 1024 ? 1024 : (total - offset);
+            
+            if(!w25q64_read_partition(pid, offset, large_buf, size))
+            {
+                print_str("\r\nRead failed!\r\n");
+                return;
+            }
+            
+            if(!bootloader_flash_write(APP_START_ADDR + offset, large_buf, size))
+            {
+                print_str("\r\nWrite failed!\r\n");
+                return;
+            }
+            
+            offset += size;
+            
+            /* 每4KB更新一次进度 */
+            if((offset % 0x1000) == 0 || offset >= total)
+            {
+                show_progress(offset, total, "Restore");
+            }
         }
+        
+        print_str("\r\nRestore completed successfully!\r\n");
     }
-    
-    print_str("\r\nRestore completed successfully!\r\n");
 }
 
 void cmd_extlist_handler(void)
@@ -1455,6 +2043,7 @@ void cmd_extlist_handler(void)
     
     print_str("=================================================\r\n");
 }
+
 
 /* Flash操作函数 */
 bool bootloader_flash_erase(uint32_t addr, uint32_t size)

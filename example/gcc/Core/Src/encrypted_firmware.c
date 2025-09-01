@@ -181,7 +181,7 @@ static bool decrypt_aes_firmware_to_internal(w25q64_partition_id_t source_partit
     print_str(" bytes\r\n");
     
     /* 验证 */
-    if (firmware_aes_verify_firmware(APP_START_ADDR, decrypted_total, aes_header.crc32)) {
+    if (firmware_crypto_verify_firmware(APP_START_ADDR, decrypted_total, aes_header.crc32)) {
         print_str("AES firmware verification successful!\r\n");
         return true;
     } else {
@@ -271,32 +271,3 @@ static bool decrypt_xor_firmware_to_internal(w25q64_partition_id_t source_partit
     }
 }
 
-/**
- * @brief 解密外部Flash中的加密固件到另一个外部Flash分区
- */
-bool decrypt_external_firmware_to_external(w25q64_partition_id_t source_partition, w25q64_partition_id_t dest_partition, const char* password)
-{
-    print_str("Decryption from external to external not implemented yet.\r\n");
-    print_str("Use options 5 or 7 to decrypt to internal flash first.\r\n");
-    return false;
-}
-
-/**
- * @brief 从HTTP下载加密固件并解密到内部Flash
- */
-bool download_and_decrypt_to_internal(const char* url, const char* password)
-{
-    print_str("HTTP OTA encrypted firmware download not fully implemented.\r\n");
-    print_str("Framework ready - TODO: Integrate with OTA download.\r\n");
-    return false;
-}
-
-/**
- * @brief 从HTTP下载加密固件并解密到外部Flash
- */
-bool download_and_decrypt_to_external(const char* url, w25q64_partition_id_t dest_partition, const char* password)
-{
-    print_str("HTTP OTA to external flash not fully implemented.\r\n");
-    print_str("Framework ready - TODO: Integrate with OTA download.\r\n");
-    return false;
-}

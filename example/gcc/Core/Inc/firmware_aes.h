@@ -87,14 +87,6 @@ bool firmware_aes_is_encrypted(uint32_t firmware_addr);
  */
 uint32_t firmware_aes_decrypt_firmware(uint32_t encrypted_addr, uint32_t output_addr, uint32_t max_size, const char* password);
 
-/**
- * @brief 验证解密后的固件
- * @param firmware_addr 固件地址
- * @param expected_size 期望大小
- * @param expected_crc32 期望CRC32
- * @return true=验证通过，false=验证失败
- */
-bool firmware_aes_verify_firmware(uint32_t firmware_addr, uint32_t expected_size, uint32_t expected_crc32);
 
 /**
  * @brief PKCS7填充
