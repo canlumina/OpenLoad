@@ -65,7 +65,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/mbedtls/library/aes.c
     Core/mbedtls/library/cipher.c
     Core/mbedtls/library/platform.c
-    Core/Src/mbedtls_test.c
+    Core/Src/firmware_version.c
 )
 
 # Add include paths

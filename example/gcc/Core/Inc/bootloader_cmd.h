@@ -38,7 +38,9 @@ typedef enum {
     CMD_CONFIG_WIFI,
     CMD_CONFIG_OTA,
     CMD_CONFIG_SAVE,
-    CMD_CONFIG_RESET
+    CMD_CONFIG_RESET,
+    CMD_VERSION,
+    CMD_VERSION_COMPARE
 } cmd_id_t;
 
 /* 命令结构 */

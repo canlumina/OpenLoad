@@ -11,6 +11,7 @@
 #include "firmware_aes.h"
 #include "streaming_aes.h"
 #include "encrypted_firmware.h"
+#include "firmware_version.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +31,10 @@ static void cmd_config_wifi_handler(void);
 static void cmd_config_ota_handler(void);
 static void cmd_config_save_handler(void);
 static void cmd_config_reset_handler(void);
+
+/* 版本管理命令处理函数前向声明 */
+static void cmd_version_handler(void);
+static void cmd_version_compare_handler(void);
 
 /* 命令表 */
 static const bootloader_cmd_t cmd_table[] = {
@@ -51,6 +56,8 @@ static const bootloader_cmd_t cmd_table[] = {
     {"cfgota",  "co", "Configure OTA settings",      CMD_CONFIG_OTA,   cmd_config_ota_handler},
     {"cfgsave", "cS", "Save configuration",          CMD_CONFIG_SAVE,  cmd_config_save_handler},
     {"cfgreset","cR", "Reset to default config",     CMD_CONFIG_RESET, cmd_config_reset_handler},
+    {"version", "v",  "Show firmware version info",  CMD_VERSION,      cmd_version_handler},
+    {"vcompare","vc", "Compare firmware versions",   CMD_VERSION_COMPARE, cmd_version_compare_handler},
 };
 
 #define CMD_TABLE_SIZE (sizeof(cmd_table)/sizeof(cmd_table[0]))
@@ -2618,4 +2625,127 @@ static void cmd_config_reset_handler(void)
     } else {
         print_str("Operation cancelled.\r\n");
     }
+}
+
+/* 版本管理命令实现 */
+static void cmd_version_handler(void)
+{
+    firmware_info_t current_info;
+    
+    print_str("=== Firmware Version Information ===\r\n\r\n");
+    
+    /* 显示当前运行的固件版本 */
+    print_str("Current Running Firmware:\r\n");
+    if (firmware_version_get_current(&current_info)) {
+        firmware_version_print_info(&current_info);
+    } else {
+        print_str("  No version information found in current firmware\r\n");
+        print_str("  (Legacy firmware without version header)\r\n");
+    }
+    
+    print_str("\r\n");
+    
+    /* 显示Bootloader版本信息 */
+    print_str("Bootloader Information:\r\n");
+    print_str("  Version: v2.0.0 (AES+Version)\r\n");
+    print_str("  Build Date: " __DATE__ " " __TIME__ "\r\n");
+    print_str("  Features: XMODEM, OTA, AES-128-CBC, Version Management\r\n");
+    print_str("  Flash Layout: 64KB Bootloader + 448KB App\r\n");
+    
+    print_str("\r\n");
+    
+    /* 显示系统信息 */
+    print_str("System Information:\r\n");
+    print_str("  STM32 Unique ID: ");
+    uint32_t* unique_id = (uint32_t*)0x1FFFF7E8;
+    print_hex(unique_id[0]);
+    print_str("-");
+    print_hex(unique_id[1]);
+    print_str("-");
+    print_hex(unique_id[2]);
+    print_str("\r\n");
+    
+    print_str("  Flash Size: 512KB\r\n");
+    print_str("  RAM Size: 64KB\r\n");
+    print_str("  App Start Address: 0x");
+    print_hex(APP_START_ADDR);
+    print_str("\r\n");
+    print_str("  App Max Size: ");
+    print_dec(APP_MAX_SIZE / 1024);
+    print_str("KB\r\n");
+}
+
+static void cmd_version_compare_handler(void)
+{
+    firmware_info_t current_info;
+    bool current_valid = false;
+    
+    print_str("=== Firmware Version Comparison ===\r\n\r\n");
+    
+    /* 获取当前固件版本信息 */
+    current_valid = firmware_version_get_current(&current_info);
+    if (current_valid) {
+        print_str("Current Firmware: ");
+        print_str(current_info.version_string);
+        print_str(" (");
+        print_str(current_info.build_date);
+        print_str(")\r\n");
+    } else {
+        print_str("Current Firmware: No version info (Legacy)\r\n");
+    }
+    
+    /* 检查外部Flash中的备份固件版本 */
+    print_str("\r\nExternal Flash Backup Versions:\r\n");
+    
+    for (int slot = 1; slot <= 3; slot++) {
+        w25q64_partition_id_t pid = W25Q64_PARTITION_BACKUP1 + slot - 1;
+        
+        print_str("  Slot ");
+        print_dec(slot);
+        print_str(": ");
+        
+        /* 检查是否有加密固件 */
+        firmware_aes_header_t aes_header;
+        if (w25q64_read_partition(pid, 0, (uint8_t*)&aes_header, sizeof(aes_header))) {
+            if (firmware_aes_validate_header(&aes_header)) {
+                /* AES加密固件，显示版本信息 */
+                print_str("v");
+                print_dec(aes_header.fw_version.major);
+                print_str(".");
+                print_dec(aes_header.fw_version.minor);
+                print_str(".");
+                print_dec(aes_header.fw_version.patch);
+                print_str(".");
+                print_dec(aes_header.fw_version.build);
+                print_str(" (AES Encrypted, ");
+                print_dec(aes_header.firmware_size);
+                print_str(" bytes)\r\n");
+                
+                /* 如果当前固件有版本信息，进行比较 */
+                if (current_valid) {
+                    int cmp = firmware_version_compare(&current_info.version, &aes_header.fw_version);
+                    if (cmp > 0) {
+                        print_str("    Status: Older than current\r\n");
+                    } else if (cmp < 0) {
+                        print_str("    Status: Newer than current\r\n");
+                    } else {
+                        print_str("    Status: Same as current\r\n");
+                    }
+                }
+                continue;
+            }
+        }
+        
+        /* 检查是否有普通固件 */
+        uint32_t size = calculate_firmware_size(pid);
+        if (size > 0) {
+            print_str("Unknown version (Legacy, ");
+            print_dec(size);
+            print_str(" bytes)\r\n");
+        } else {
+            print_str("Empty\r\n");
+        }
+    }
+    
+    print_str("\r\nUse 'u' command to update firmware.\r\n");
 }

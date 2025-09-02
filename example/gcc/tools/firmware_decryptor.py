@@ -114,16 +114,23 @@ def decrypt_firmware_file(encrypted_file, output_file, password="yangcan", stm32
             
             header = struct.unpack('<IIIIII16s16s8s', header_data)
             magic = header[0]
-            version = header[1]
+            header_version = header[1]
             firmware_size = header[2]
             encrypted_size = header[3]
             firmware_crc32 = header[4]
             encrypted_crc32 = header[5]
             iv = header[6]
+            key_hash = header[7]
+            fw_version_data = header[8]
+            
+            # 解析固件版本信息
+            fw_version = struct.unpack('<HHHH', fw_version_data)
+            fw_major, fw_minor, fw_patch, fw_build = fw_version
             
             print(f"AES加密固件信息:")
             print(f"  魔数: 0x{magic:08x}")
-            print(f"  版本: {version}")
+            print(f"  头部版本: {header_version}")
+            print(f"  固件版本: v{fw_major}.{fw_minor}.{fw_patch}.{fw_build}")
             print(f"  原始大小: {firmware_size} 字节")
             print(f"  加密大小: {encrypted_size} 字节")
             print(f"  IV: {binascii.hexlify(iv).decode()}")

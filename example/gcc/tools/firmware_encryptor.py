@@ -151,7 +151,7 @@ def encrypt_firmware_aes(firmware_data, password, salt):
         'key_hash': key_hash
     }
 
-def create_aes_firmware_header(encrypt_result):
+def create_aes_firmware_header(encrypt_result, fw_version=None):
     """
     创建AES加密固件头部
     对应STM32中的 firmware_aes_header_t 结构
@@ -160,37 +160,49 @@ def create_aes_firmware_header(encrypt_result):
     FIRMWARE_AES_MAGIC = 0x41455331  # "AES1"
     FIRMWARE_AES_VERSION = 1
     
-    # 按照STM32结构体定义：80字节
+    # 默认固件版本
+    if fw_version is None:
+        fw_version = {'major': 1, 'minor': 0, 'patch': 0, 'build': 1}
+    
+    # 按照STM32结构体定义：64字节
     # typedef struct {
-    #     uint32_t magic;              // 4字节
-    #     uint32_t version;            // 4字节  
-    #     uint32_t firmware_size;      // 4字节
-    #     uint32_t encrypted_size;     // 4字节
-    #     uint32_t crc32;              // 4字节
-    #     uint32_t encrypted_crc32;    // 4字节
-    #     uint8_t  iv[AES_IV_SIZE];    // 16字节
-    #     uint8_t  key_hash[16];       // 16字节
-    #     uint8_t  reserved[8];        // 8字节
+    #     uint32_t magic;                    // 4字节
+    #     uint32_t header_version;           // 4字节  
+    #     uint32_t firmware_size;            // 4字节
+    #     uint32_t encrypted_size;           // 4字节
+    #     uint32_t crc32;                    // 4字节
+    #     uint32_t encrypted_crc32;          // 4字节
+    #     uint8_t  iv[AES_IV_SIZE];          // 16字节
+    #     uint8_t  key_hash[16];             // 16字节
+    #     firmware_version_t fw_version;     // 8字节 (4*uint16_t)
     # } __attribute__((packed)) firmware_aes_header_t;
     # 总共：6*4 + 16 + 16 + 8 = 24 + 16 + 16 + 8 = 64字节
+    
+    # 打包固件版本结构 (4个uint16_t)
+    fw_version_packed = struct.pack('<HHHH',
+        fw_version['major'] & 0xFFFF,
+        fw_version['minor'] & 0xFFFF,
+        fw_version['patch'] & 0xFFFF,
+        fw_version['build'] & 0xFFFF
+    )
     
     # 打包头部结构 - 总共64字节
     header = struct.pack('<IIIIII16s16s8s',
         FIRMWARE_AES_MAGIC,                    # magic (4)
-        FIRMWARE_AES_VERSION,                  # version (4) 
+        FIRMWARE_AES_VERSION,                  # header_version (4) 
         encrypt_result['firmware_size'],       # firmware_size (4)
         encrypt_result['encrypted_size'],      # encrypted_size (4)
         encrypt_result['firmware_crc32'],      # crc32 (4)
         encrypt_result['encrypted_crc32'],     # encrypted_crc32 (4)
         encrypt_result['iv'],                  # iv[16] (16)
         encrypt_result['key_hash'],            # key_hash[16] (16)
-        b'\x00' * 8                           # reserved[8] (8)
+        fw_version_packed                      # fw_version (8)
     )
     
     print(f"头部结构大小: {len(header)} 字节")
     return header
 
-def encrypt_firmware_file(input_file, output_file, password="yangcan", stm32_unique_id=None):
+def encrypt_firmware_file(input_file, output_file, password="yangcan", stm32_unique_id=None, fw_version=None):
     """
     加密固件文件
     """
@@ -201,6 +213,10 @@ def encrypt_firmware_file(input_file, output_file, password="yangcan", stm32_uni
     # 默认的STM32 unique ID (可以替换为实际的设备ID)
     if stm32_unique_id is None:
         stm32_unique_id = [0x12345678, 0x9ABCDEF0, 0x11223344]
+    
+    # 默认固件版本
+    if fw_version is None:
+        fw_version = {'major': 1, 'minor': 0, 'patch': 0, 'build': 1}
     
     try:
         # 读取原始固件
@@ -216,10 +232,11 @@ def encrypt_firmware_file(input_file, output_file, password="yangcan", stm32_uni
         
         # 加密固件
         print(f"使用密码 '{password}' 加密固件...")
+        print(f"固件版本: v{fw_version['major']}.{fw_version['minor']}.{fw_version['patch']}.{fw_version['build']}")
         encrypt_result = encrypt_firmware_aes(firmware_data, password, stm32_unique_id)
         
         # 创建头部
-        header = create_aes_firmware_header(encrypt_result)
+        header = create_aes_firmware_header(encrypt_result, fw_version)
         
         # 写入加密固件文件
         print(f"写入加密固件: {output_file}")
@@ -301,20 +318,36 @@ def verify_encrypted_firmware(encrypted_file, password="yangcan", stm32_unique_i
 
 def main():
     if len(sys.argv) < 3:
-        print("用法: python firmware_encryptor.py <input.bin> <output_encrypted.bin> [password]")
-        print("示例: python firmware_encryptor.py app.bin app_encrypted.bin yangcan")
+        print("用法: python firmware_encryptor.py <input.bin> <output_encrypted.bin> [password] [version]")
+        print("示例: python firmware_encryptor.py app.bin app_encrypted.bin yangcan 1.2.3.1234")
+        print("版本格式: major.minor.patch.build (默认: 1.0.0.1)")
         return 1
     
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     password = sys.argv[3] if len(sys.argv) > 3 else "yangcan"
     
+    # 解析版本参数
+    fw_version = {'major': 1, 'minor': 0, 'patch': 0, 'build': 1}
+    if len(sys.argv) > 4:
+        try:
+            version_parts = sys.argv[4].split('.')
+            if len(version_parts) >= 4:
+                fw_version['major'] = int(version_parts[0])
+                fw_version['minor'] = int(version_parts[1])
+                fw_version['patch'] = int(version_parts[2])
+                fw_version['build'] = int(version_parts[3])
+            else:
+                print("警告: 版本格式不正确，使用默认版本 1.0.0.1")
+        except ValueError:
+            print("警告: 版本参数无效，使用默认版本 1.0.0.1")
+    
     print("=" * 60)
     print("STM32 固件AES加密工具")
     print("=" * 60)
     
     # 加密固件
-    success = encrypt_firmware_file(input_file, output_file, password)
+    success = encrypt_firmware_file(input_file, output_file, password, fw_version=fw_version)
     
     if success:
         print("\n" + "=" * 60)

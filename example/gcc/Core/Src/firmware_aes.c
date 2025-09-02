@@ -206,7 +206,7 @@ bool firmware_aes_validate_header(const firmware_aes_header_t* header)
     if (!header) return false;
     
     return (header->magic == FIRMWARE_AES_MAGIC && 
-            header->version == FIRMWARE_AES_VERSION &&
+            header->header_version == FIRMWARE_AES_VERSION &&
             header->firmware_size > 0 && 
             header->firmware_size < 512*1024);
 }

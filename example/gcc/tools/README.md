@@ -6,11 +6,12 @@
 
 | 文件名 | 描述 | 用途 |
 |--------|------|------|
-| `firmware_encryptor.py` | Python AES固件加密工具 | 将普通固件加密为AES加密固件 |
-| `firmware_decryptor.py` | Python AES固件解密工具 | 解密和验证AES加密固件 |
+| `firmware_encryptor.py` | Python AES固件加密工具 | 将普通固件加密为AES加密固件，支持版本信息 |
+| `firmware_decryptor.py` | Python AES固件解密工具 | 解密和验证AES加密固件，显示版本信息 |
 | `encrypt_with_real_uid.py` | 使用真实UID的加密工具 | 使用设备真实UID进行加密 |
 | `encrypt_firmware.bat` | Windows批处理脚本 | Windows下简化的加密操作入口 |
 | `encrypt_firmware.sh` | Linux/macOS Shell脚本 | Linux/macOS下简化的加密操作入口 |
+| `VERSION_GUIDE.md` | 版本管理详细指南 | 固件版本管理功能使用文档 |
 
 ## 快速开始
 
@@ -35,6 +36,9 @@ python encrypt_with_real_uid.py OpenLoad.bin OpenLoad_encrypted.bin yangcan
 
 # 或使用默认UID
 python firmware_encryptor.py OpenLoad.bin OpenLoad_encrypted.bin yangcan
+
+# 指定版本信息
+python firmware_encryptor.py OpenLoad.bin OpenLoad_encrypted.bin yangcan 2.1.5.2024
 ```
 
 ### 2. 验证加密固件
@@ -73,11 +77,18 @@ python firmware_decryptor.py OpenLoad_encrypted.bin OpenLoad_decrypted.bin yangc
 - 真实设备UID: 从实际硬件读取（`encrypt_with_real_uid.py`）
 - 默认UID: 用于测试的固定值
 
+### 版本管理
+固件支持4段式版本号（major.minor.patch.build）：
+- 版本格式: `v2.1.5.2024`
+- 版本比较: 自动识别新旧版本
+- 版本查询: bootloader命令 `version` 和 `vcompare`
+- 详细文档: 参见 `VERSION_GUIDE.md`
+
 ## 详细说明
 
 请参阅项目根目录的 `AES_FIRMWARE_GUIDE.md` 获取完整使用指南。
 
 ---
 
-**版本**: v2.0 (mbedTLS集成版本)  
-**更新时间**: 2024年9月2日
+**版本**: v2.1 (mbedTLS + 版本管理)  
+**更新时间**: 2024年12月2日

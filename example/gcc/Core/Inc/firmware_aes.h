@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "firmware_version.h"
 
 /* AES加密相关常量 */
 #define AES_BLOCK_SIZE          16
@@ -15,15 +16,15 @@
 
 /* AES加密固件头部结构 */
 typedef struct {
-    uint32_t magic;              /* 魔数：FIRMWARE_AES_MAGIC */
-    uint32_t version;            /* 版本号 */
-    uint32_t firmware_size;      /* 原始固件大小 */
-    uint32_t encrypted_size;     /* 加密后固件大小 */
-    uint32_t crc32;              /* 原始固件CRC32校验 */
-    uint32_t encrypted_crc32;    /* 加密固件CRC32校验 */
-    uint8_t  iv[AES_IV_SIZE];    /* 初始化向量 */
-    uint8_t  key_hash[16];       /* 密钥哈希值 */
-    uint8_t  reserved[8];        /* 保留字段 */
+    uint32_t magic;                    /* 魔数：FIRMWARE_AES_MAGIC */
+    uint32_t header_version;           /* 头部版本号 */
+    uint32_t firmware_size;            /* 原始固件大小 */
+    uint32_t encrypted_size;           /* 加密后固件大小 */
+    uint32_t crc32;                    /* 原始固件CRC32校验 */
+    uint32_t encrypted_crc32;          /* 加密固件CRC32校验 */
+    uint8_t  iv[AES_IV_SIZE];          /* 初始化向量 */
+    uint8_t  key_hash[16];             /* 密钥哈希值 */
+    firmware_version_t fw_version;     /* 固件版本信息 (8字节) */
 } __attribute__((packed)) firmware_aes_header_t;
 
 /* 函数声明 */
