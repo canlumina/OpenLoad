@@ -1,0 +1,335 @@
+/* OpenLoad Web管理器样式 */
+
+:root {
+    --primary-color: #0d6efd;
+    --success-color: #198754;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #0dcaf0;
+    --secondary-color: #6c757d;
+    --dark-color: #212529;
+    --light-color: #f8f9fa;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--light-color);
+}
+
+/* 导航栏 */
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+/* 卡片样式 */
+.card {
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background-color: var(--light-color);
+    border-bottom: 1px solid #dee2e6;
+    font-weight: 600;
+}
+
+/* 串口终端样式 */
+.terminal {
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'Courier New', Courier, monospace;
+    padding: 15px;
+    border-radius: 0.375rem;
+    height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.terminal::-webkit-scrollbar {
+    width: 8px;
+}
+
+.terminal::-webkit-scrollbar-track {
+    background: #2d2d2d;
+    border-radius: 4px;
+}
+
+.terminal::-webkit-scrollbar-thumb {
+    background: #555;
+    border-radius: 4px;
+}
+
+.terminal::-webkit-scrollbar-thumb:hover {
+    background: #777;
+}
+
+/* 终端文本颜色 */
+.terminal-sent {
+    color: #4ec9b0;
+}
+
+.terminal-received {
+    color: #ce9178;
+}
+
+.terminal-error {
+    color: #f48771;
+}
+
+.terminal-info {
+    color: #9cdcfe;
+}
+
+.terminal-timestamp {
+    color: #6a9955;
+    font-size: 0.75rem;
+}
+
+/* 连接状态指示器 */
+.connection-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-connected {
+    color: var(--success-color);
+}
+
+.status-disconnected {
+    color: var(--danger-color);
+}
+
+.status-connecting {
+    color: var(--warning-color);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* 进度条动画 */
+.progress-bar-animated {
+    animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+    0% {
+        background-position: 1rem 0;
+    }
+    100% {
+        background-position: 0 0;
+    }
+}
+
+/* 按钮组样式 */
+.btn-group-vertical .btn {
+    border-radius: 0;
+}
+
+.btn-group-vertical .btn:first-child {
+    border-top-left-radius: 0.375rem;
+    border-top-right-radius: 0.375rem;
+}
+
+.btn-group-vertical .btn:last-child {
+    border-bottom-left-radius: 0.375rem;
+    border-bottom-right-radius: 0.375rem;
+}
+
+/* 表格样式 */
+.table-sm td {
+    padding: 0.5rem;
+    vertical-align: middle;
+}
+
+/* 文件上传区域 */
+.file-drop-zone {
+    border: 2px dashed #dee2e6;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    text-align: center;
+    background-color: #fff;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.file-drop-zone:hover {
+    border-color: var(--primary-color);
+    background-color: #f8f9ff;
+}
+
+.file-drop-zone.drag-over {
+    border-color: var(--success-color);
+    background-color: #f0fff4;
+}
+
+/* 标签页样式 */
+.nav-tabs .nav-link {
+    border: 1px solid transparent;
+    border-top-left-radius: 0.375rem;
+    border-top-right-radius: 0.375rem;
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--primary-color);
+    background-color: #fff;
+    border-color: #dee2e6 #dee2e6 #fff;
+}
+
+/* 设备信息表格 */
+.device-info-table {
+    font-size: 0.875rem;
+}
+
+.device-info-table td {
+    border: none;
+    padding: 0.25rem 0.5rem;
+}
+
+.device-info-table td:first-child {
+    width: 40%;
+    color: var(--secondary-color);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .terminal {
+        height: 200px;
+        font-size: 0.75rem;
+    }
+    
+    .btn-group-vertical .btn {
+        font-size: 0.875rem;
+        padding: 0.5rem;
+    }
+}
+
+/* Toast通知样式 */
+.toast {
+    min-width: 300px;
+}
+
+.toast-success .toast-header {
+    color: var(--success-color);
+    background-color: #d1eddb;
+}
+
+.toast-error .toast-header {
+    color: var(--danger-color);
+    background-color: #f8d7da;
+}
+
+.toast-warning .toast-header {
+    color: var(--warning-color);
+    background-color: #fff3cd;
+}
+
+.toast-info .toast-header {
+    color: var(--info-color);
+    background-color: #d1ecf1;
+}
+
+/* 加载动画 */
+.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid transparent;
+    border-top: 2px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 固件文件列表 */
+.firmware-file-item {
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem;
+    background-color: #fff;
+    transition: all 0.2s ease;
+}
+
+.firmware-file-item:hover {
+    background-color: #f8f9fa;
+    border-color: var(--primary-color);
+}
+
+.firmware-file-item.selected {
+    background-color: #e7f3ff;
+    border-color: var(--primary-color);
+}
+
+/* 命令按钮组 */
+.command-buttons .btn {
+    margin-bottom: 0.5rem;
+    text-align: left;
+    justify-content: flex-start;
+}
+
+.command-buttons .btn i {
+    width: 1.2em;
+    text-align: center;
+}
+
+/* 状态徽章 */
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25em 0.5em;
+}
+
+/* 自定义表单控件 */
+.form-check-input:checked {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.form-select:focus,
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* 工具提示 */
+[data-bs-toggle="tooltip"] {
+    cursor: help;
+}
