@@ -396,3 +396,159 @@ def batch_delete_firmwares():
             'success': False,
             'error': str(e)
         }), 500
+
+@api_v1.route("/firmwares/latest", methods=["GET"])
+def get_latest_firmware():
+    """获取最新版本固件"""
+    try:
+        target_device = request.args.get("target_device")
+        download = request.args.get("download", "false").lower() == "true"
+        
+        # 获取最新固件
+        latest_firmware = get_firmware_manager().get_latest_version_firmware(target_device)
+        
+        if not latest_firmware:
+            return jsonify({
+                "success": False,
+                "error": "没有找到固件",
+                "data": None
+            }), 404
+        
+        # 如果请求下载固件二进制文件
+        if download:
+            file_path = get_firmware_manager().get_firmware_path(latest_firmware.id)
+            if not file_path or not file_path.exists():
+                return jsonify({
+                    "success": False,
+                    "error": "固件文件不存在"
+                }), 404
+            
+            return send_file(
+                str(file_path),
+                as_attachment=True,
+                download_name=latest_firmware.original_filename,
+                mimetype='application/octet-stream'
+            )
+        
+        # 返回固件信息
+        firmware_dict = latest_firmware.to_dict()
+        firmware_dict["is_latest"] = True
+        firmware_dict["download_url"] = f"/api/v1/firmwares/latest?download=true"
+        if target_device:
+            firmware_dict["download_url"] += f"&target_device={target_device}"
+        
+        return jsonify({
+            "success": True,
+            "data": firmware_dict,
+            "message": f"获取最新固件成功: {latest_firmware.version}"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@api_v1.route("/firmwares/version/<version>", methods=["GET"])
+def get_firmware_by_version(version):
+    """根据版本号获取固件"""
+    try:
+        target_device = request.args.get("target_device")
+        download = request.args.get("download", "false").lower() == "true"
+        
+        # 获取所有固件
+        firmwares = get_firmware_manager().list_firmwares(target_device=target_device)
+        
+        # 标准化版本号（确保v前缀）
+        if not version.startswith("v"):
+            version = f"v{version}"
+        
+        # 查找匹配版本的固件
+        matching_firmware = None
+        for firmware in firmwares:
+            if firmware.version == version:
+                matching_firmware = firmware
+                break
+        
+        if not matching_firmware:
+            return jsonify({
+                "success": False,
+                "error": f"没有找到版本 {version} 的固件",
+                "data": None
+            }), 404
+        
+        # 如果请求下载固件二进制文件
+        if download:
+            file_path = get_firmware_manager().get_firmware_path(matching_firmware.id)
+            if not file_path or not file_path.exists():
+                return jsonify({
+                    "success": False,
+                    "error": "固件文件不存在"
+                }), 404
+            
+            return send_file(
+                str(file_path),
+                as_attachment=True,
+                download_name=matching_firmware.original_filename,
+                mimetype='application/octet-stream'
+            )
+        
+        # 返回固件信息
+        firmware_dict = matching_firmware.to_dict()
+        # 标记是否为最新版本
+        latest_firmware = get_firmware_manager().get_latest_version_firmware(target_device)
+        firmware_dict["is_latest"] = (latest_firmware and matching_firmware.id == latest_firmware.id)
+        firmware_dict["download_url"] = f"/api/v1/firmwares/version/{version}?download=true"
+        if target_device:
+            firmware_dict["download_url"] += f"&target_device={target_device}"
+        
+        return jsonify({
+            "success": True,
+            "data": firmware_dict,
+            "message": f"获取固件成功: {version}"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@api_v1.route("/firmwares/versions", methods=["GET"])
+def list_firmware_versions():
+    """获取所有固件版本列表"""
+    try:
+        target_device = request.args.get("target_device")
+        
+        firmwares = get_firmware_manager().list_firmwares(target_device=target_device)
+        latest_firmware = get_firmware_manager().get_latest_version_firmware(target_device)
+        
+        versions = []
+        for firmware in firmwares:
+            version_info = {
+                "version": firmware.version,
+                "id": firmware.id,
+                "filename": firmware.original_filename,
+                "size": firmware.size,
+                "upload_time": firmware.upload_time,
+                "is_encrypted": firmware.is_encrypted,
+                "is_latest": (latest_firmware and firmware.id == latest_firmware.id)
+            }
+            versions.append(version_info)
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "versions": versions,
+                "count": len(versions),
+                "latest_version": latest_firmware.version if latest_firmware else None
+            },
+            "message": f"获取版本列表成功，共 {len(versions)} 个版本"
+        })
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+

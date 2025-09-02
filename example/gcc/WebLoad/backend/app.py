@@ -41,6 +41,11 @@ def index():
     """主页 - 新的固件管理界面"""
     return render_template('index_new.html')
 
+@app.route('/admin')
+def admin():
+    """后台管理页面 - API管理和固件列表"""
+    return render_template('admin.html')
+
 @app.route('/legacy')
 def legacy():
     """旧版界面 - 包含串口功能"""
