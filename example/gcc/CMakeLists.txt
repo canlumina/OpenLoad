@@ -60,12 +60,21 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/firmware_aes.c
     Core/Src/streaming_aes.c
     Core/Src/encrypted_firmware.c
+    
+    # mbedTLS sources
+    Core/mbedtls/library/aes.c
+    Core/mbedtls/library/cipher.c
+    Core/mbedtls/library/platform.c
+    Core/Src/mbedtls_test.c
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
-    /Core/Inc
+    Core/Inc
+    
+    # mbedTLS include paths
+    Core/mbedtls/include
 )
 
 # Add project symbols (macros)

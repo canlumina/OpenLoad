@@ -1,5 +1,6 @@
 #include "firmware_crypto.h"
 #include <string.h>
+#include "stm32f1xx_hal.h"
 
 /* 全局变量 */
 static uint8_t g_crypto_key[CRYPTO_KEY_SIZE];
@@ -105,10 +106,11 @@ void firmware_crypto_xor(uint8_t* data, uint32_t size, uint32_t offset)
 }
 
 /**
- * @brief 计算CRC32校验值
+ * @brief 计算CRC32校验值 - 使用STM32兼容的软件CRC32
  */
 uint32_t firmware_crypto_crc32(const uint8_t* data, uint32_t size)
 {
+    // 使用STM32兼容的CRC32算法（IEEE 802.3，不取反）
     uint32_t crc = 0xFFFFFFFF;
     
     for (uint32_t i = 0; i < size; i++) {
@@ -116,7 +118,8 @@ uint32_t firmware_crypto_crc32(const uint8_t* data, uint32_t size)
         crc = crc32_table[(crc ^ byte) & 0xFF] ^ (crc >> 8);
     }
     
-    return ~crc;
+    // 不取反，匹配STM32硬件CRC行为
+    return crc;
 }
 
 /**
@@ -250,6 +253,14 @@ bool firmware_crypto_verify_firmware(uint32_t firmware_addr, uint32_t expected_s
     
     /* 计算固件的CRC32 */
     uint32_t calculated_crc32 = firmware_crypto_crc32((uint8_t*)firmware_addr, expected_size);
+    
+    /* 调试信息 */
+    print_str("Debug: Expected CRC32: 0x");
+    print_hex(expected_crc32);
+    print_str("\r\n");
+    print_str("Debug: Calculated CRC32: 0x");
+    print_hex(calculated_crc32);
+    print_str("\r\n");
     
     return (calculated_crc32 == expected_crc32);
 }

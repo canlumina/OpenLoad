@@ -56,8 +56,8 @@ static const bootloader_cmd_t cmd_table[] = {
 #define CMD_TABLE_SIZE (sizeof(cmd_table)/sizeof(cmd_table[0]))
 
 /* 私有函数声明 */
-static void print_str(const char* str);
-static void print_hex(uint32_t val);
+void print_str(const char* str);
+void print_hex(uint32_t val);
 static void print_dec(uint32_t val);
 static void process_cmd(char* cmd);
 static uint8_t read_char(void);
@@ -2089,13 +2089,13 @@ bool bootloader_flash_write(uint32_t addr, const uint8_t* data, uint32_t size)
 }
 
 /* 私有函数实现 */
-static void print_str(const char* str)
+void print_str(const char* str)
 {
     uart_write(DEV_UART1, (uint8_t*)str, strlen(str));
     uart_poll_dma_tx(DEV_UART1);
 }
 
-static void print_hex(uint32_t val)
+void print_hex(uint32_t val)
 {
     char buf[9];
     for(int i = 7; i >= 0; i--)

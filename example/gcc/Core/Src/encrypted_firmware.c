@@ -14,13 +14,7 @@ extern bool bootloader_flash_write(uint32_t addr, const uint8_t* data, uint32_t 
 extern bool bootloader_flash_erase(uint32_t addr, uint32_t size);
 extern uint16_t uart_write(uint8_t uart_id, const uint8_t* data, uint16_t len);
 
-/* 简化实现，避免链接问题 */
-static void print_str(const char* str) {
-    if (str) {
-        uint16_t len = (uint16_t)strlen(str);
-        uart_write(DEV_UART1, (const uint8_t*)str, len);
-    }
-}
+/* print_str函数现在在bootloader_cmd.c中实现为全局函数 */
 
 static void print_dec(uint32_t val) {
     char buffer[12];
@@ -97,7 +91,53 @@ static bool decrypt_aes_firmware_to_internal(w25q64_partition_id_t source_partit
     streaming_aes_ctx_t aes_ctx;
     uint32_t* unique_id = (uint32_t*)0x1FFFF7E8;
     uint8_t aes_key[16];
+    
+    /* 调试信息：显示Unique ID */
+    print_str("Debug: STM32 Unique ID: ");
+    print_hex(unique_id[0]);
+    print_str("-");
+    print_hex(unique_id[1]);
+    print_str("-");
+    print_hex(unique_id[2]);
+    print_str("\r\n");
+    
     firmware_aes_derive_key(password, unique_id, aes_key);
+    
+    /* 调试信息：显示生成的AES密钥 */
+    print_str("Debug: Generated AES Key: ");
+    for (int i = 0; i < 16; i++) {
+        uint8_t byte_val = aes_key[i];
+        // 显示高4位
+        uint8_t high = (byte_val >> 4) & 0xF;
+        char h_char = high < 10 ? ('0' + high) : ('A' + high - 10);
+        char h_str[2] = {h_char, '\0'};
+        print_str(h_str);
+        
+        // 显示低4位
+        uint8_t low = byte_val & 0xF;
+        char l_char = low < 10 ? ('0' + low) : ('A' + low - 10);
+        char l_str[2] = {l_char, '\0'};
+        print_str(l_str);
+    }
+    print_str("\r\n");
+    
+    /* 调试信息：显示IV */
+    print_str("Debug: IV: ");
+    for (int i = 0; i < 16; i++) {
+        uint8_t byte_val = aes_header.iv[i];
+        // 显示高4位
+        uint8_t high = (byte_val >> 4) & 0xF;
+        char h_char = high < 10 ? ('0' + high) : ('A' + high - 10);
+        char h_str[2] = {h_char, '\0'};
+        print_str(h_str);
+        
+        // 显示低4位
+        uint8_t low = byte_val & 0xF;
+        char l_char = low < 10 ? ('0' + low) : ('A' + low - 10);
+        char l_str[2] = {l_char, '\0'};
+        print_str(l_str);
+    }
+    print_str("\r\n");
     
     if (!streaming_aes_init(&aes_ctx, aes_key, aes_header.iv)) {
         print_str("Failed to initialize AES!\r\n");
@@ -179,6 +219,25 @@ static bool decrypt_aes_firmware_to_internal(w25q64_partition_id_t source_partit
     print_str("\r\nAES decryption completed: ");
     print_dec(decrypted_total);
     print_str(" bytes\r\n");
+    
+    /* 调试信息：显示解密后前16字节数据 */
+    print_str("Debug: First 16 bytes of decrypted data: ");
+    uint8_t* flash_data = (uint8_t*)APP_START_ADDR;
+    for (int i = 0; i < 16; i++) {
+        uint8_t byte_val = flash_data[i];
+        uint8_t high = (byte_val >> 4) & 0xF;
+        char h_char = high < 10 ? ('0' + high) : ('A' + high - 10);
+        char h_str[2] = {h_char, '\0'};
+        print_str(h_str);
+        
+        uint8_t low = byte_val & 0xF;
+        char l_char = low < 10 ? ('0' + low) : ('A' + low - 10);
+        char l_str[2] = {l_char, '\0'};
+        print_str(l_str);
+        
+        if (i < 15) print_str(" ");
+    }
+    print_str("\r\n");
     
     /* 验证 */
     if (firmware_crypto_verify_firmware(APP_START_ADDR, decrypted_total, aes_header.crc32)) {

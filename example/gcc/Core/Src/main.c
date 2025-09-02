@@ -100,6 +100,9 @@ int main(void)
   uart_device_init(DEV_UART1);
   uart_device_init(DEV_UART2);
   
+  /* 等待一下，让串口稳定 */
+  HAL_Delay(500);
+  
   /* 初始化Bootloader */
   bootloader_init();
   

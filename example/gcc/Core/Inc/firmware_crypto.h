@@ -82,6 +82,12 @@ uint32_t firmware_crypto_decrypt_firmware(uint32_t encrypted_addr, uint32_t outp
 bool firmware_crypto_verify_firmware(uint32_t firmware_addr, uint32_t expected_size, uint32_t expected_crc32);
 
 /**
+ * @brief 调试打印函数声明
+ */
+void print_str(const char* str);
+void print_hex(uint32_t value);
+
+/**
  * @brief 生成简单的密钥哈希
  * @param key 密钥
  * @param key_len 密钥长度
