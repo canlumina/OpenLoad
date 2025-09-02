@@ -1,0 +1,24 @@
+{
+  "fw_1756823751_20250902_223551_RTC2": {
+    "id": "fw_1756823751_20250902_223551_RTC2",
+    "filename": "20250902_223551_RTC2.bin",
+    "original_filename": "RTC2.bin",
+    "version": "v1.0.0.2025",
+    "size": 16224,
+    "checksum": "0fd3133385b63af8a9027704a1dd3fba",
+    "upload_time": "2025-09-02T22:35:51.277366",
+    "target_device": "STM32F103ZET6",
+    "is_encrypted": true,
+    "encryption_algorithm": "aes-128-cbc",
+    "encryption_metadata": {
+      "algorithm": "aes-128-cbc",
+      "key_length": 16,
+      "iv": "2c1c3bda3e0363e7b6bdebc03fc346b3",
+      "block_size": 16
+    },
+    "metadata": {
+      "upload_source": "web_api",
+      "upload_timestamp": "2025-09-02T22:35:51.277110"
+    }
+  }
+}

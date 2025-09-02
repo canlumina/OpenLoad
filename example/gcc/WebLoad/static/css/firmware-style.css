@@ -1,0 +1,204 @@
+/* 固件管理器专用样式 */
+
+/* 版本号样式增强 */
+.version-badge {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+}
+
+.latest-firmware {
+    animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+    0% { box-shadow: 0 0 5px rgba(25, 135, 84, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(25, 135, 84, 0.8); }
+    100% { box-shadow: 0 0 5px rgba(25, 135, 84, 0.5); }
+}
+
+/* 固件列表表格增强 */
+.firmware-table {
+    border-radius: 0.5rem;
+    overflow: hidden;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.firmware-table .table-success {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+/* 星标图标动画 */
+.star-icon {
+    animation: twinkle 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes twinkle {
+    from { opacity: 0.7; transform: scale(1); }
+    to { opacity: 1; transform: scale(1.1); }
+}
+
+/* 卡片增强样式 */
+.card {
+    border: none;
+    border-radius: 0.75rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.15s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    transform: translateY(-0.125rem);
+}
+
+/* 上传区域拖放样式 */
+.upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: #198754;
+    background-color: rgba(25, 135, 84, 0.05);
+}
+
+/* 进度条增强 */
+.progress {
+    height: 0.75rem;
+    border-radius: 0.375rem;
+}
+
+/* 按钮组增强 */
+.btn-group-vertical .btn {
+    border-radius: 0.25rem !important;
+    margin-bottom: 0.125rem;
+}
+
+.btn-group-vertical .btn:last-child {
+    margin-bottom: 0;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .btn-group-vertical {
+        flex-direction: row;
+    }
+    
+    .btn-group-vertical .btn {
+        flex: 1;
+        margin-bottom: 0;
+        margin-right: 0.125rem;
+    }
+    
+    .btn-group-vertical .btn:last-child {
+        margin-right: 0;
+    }
+}
+
+/* 版本号颜色编码 */
+.version-major { color: #dc3545; }
+.version-minor { color: #0d6efd; }
+.version-patch { color: #ffc107; }
+.version-build { color: #6f42c1; }
+
+/* Toast 通知增强 */
+.toast {
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+/* 代码块样式 */
+code {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+}
+
+.user-select-all {
+    user-select: all;
+    cursor: pointer;
+}
+
+.user-select-all:hover {
+    background-color: #e9ecef;
+}
+
+/* 加载动画 */
+.loading-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 状态指示器 */
+.status-indicator {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 0.25rem;
+}
+
+.status-online { background-color: #198754; }
+.status-offline { background-color: #dc3545; }
+.status-warning { background-color: #ffc107; }
+
+/* 删除确认对话框样式 */
+#deleteConfirmDialog {
+    transform: translate(-50%, -50%) scale(0.9);
+    opacity: 0;
+    transition: all 0.2s ease-out;
+}
+
+#deleteBackdrop {
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+}
+
+#deleteConfirmDialog .card {
+    border-radius: 1rem;
+    overflow: hidden;
+}
+
+#deleteConfirmDialog .btn {
+    transition: all 0.2s ease;
+    border-radius: 0.5rem;
+    font-weight: 500;
+}
+
+#deleteConfirmDialog .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+#deleteConfirmDialog .btn-danger:hover {
+    background-color: #c82333;
+    border-color: #bd2130;
+}
+
+#deleteConfirmDialog .btn-outline-secondary:hover {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
