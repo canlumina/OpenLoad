@@ -1,30 +1,4 @@
 {
-  "fw_1756893082_RTC2_crc32_test": {
-    "id": "fw_1756893082_RTC2_crc32_test",
-    "filename": "RTC2_crc32_test.bin",
-    "original_filename": "RTC2_crc32_test.bin",
-    "version": "v2.21.1.2025",
-    "size": 16288,
-    "checksum": "7101dc90577292a6cddb5e78c247a429",
-    "upload_time": "2025-09-03T17:51:22.435547",
-    "target_device": "STM32F103ZET6",
-    "is_encrypted": true,
-    "encryption_algorithm": "aes-128-cbc",
-    "encryption_metadata": {
-      "algorithm": "aes-128-cbc",
-      "key_length": 16,
-      "iv": "78a74c5bc65d24ae2f02306067b7679c",
-      "block_size": 16,
-      "firmware_size": 16220,
-      "encrypted_size": 16224,
-      "header_size": 64,
-      "password": "test_password_for_crc32_fix_123456"
-    },
-    "metadata": {
-      "source": "crc32_test",
-      "test_time": "2025-09-03T17:49:00"
-    }
-  },
   "fw_1756894663_20250903_181743_RTC4": {
     "id": "fw_1756894663_20250903_181743_RTC4",
     "filename": "20250903_181743_RTC4.bin",
