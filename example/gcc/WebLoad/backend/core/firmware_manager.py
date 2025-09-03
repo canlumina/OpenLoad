@@ -387,7 +387,17 @@ class FirmwareManager:
             # 更新固件信息
             firmware.is_encrypted = True
             firmware.encryption_algorithm = algorithm.value
-            firmware.encryption_metadata = encryption_metadata
+            
+            # 合并加密元数据，确保不覆盖密码
+            if firmware.encryption_metadata is None:
+                firmware.encryption_metadata = {}
+            firmware.encryption_metadata.update(encryption_metadata)
+            
+            # 将密码保存到加密元数据中（便于OTA下载时获取）
+            if password:
+                firmware.encryption_metadata['password'] = password
+                logger.info(f"Password saved to metadata: {password}")
+            
             firmware.size = len(encrypted_content)
             firmware.checksum = crypto_manager.calculate_checksum(encrypted_content)
             

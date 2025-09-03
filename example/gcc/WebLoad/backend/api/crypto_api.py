@@ -138,9 +138,17 @@ def encrypt_data():
                 }), 400
         
         # 执行加密
-        encrypted_data, metadata = crypto_manager.encrypt_firmware(
-            data_bytes, algorithm, key_bytes, password
-        )
+        try:
+            encrypted_data, metadata = crypto_manager.encrypt_firmware(
+                data_bytes, algorithm, key_bytes, password
+            )
+        except Exception as encrypt_error:
+            import traceback
+            return jsonify({
+                'success': False,
+                'error': f'加密失败: {str(encrypt_error)}',
+                'traceback': traceback.format_exc()
+            }), 500
         
         return jsonify({
             'success': True,
@@ -155,9 +163,11 @@ def encrypt_data():
         })
         
     except Exception as e:
+        import traceback
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'traceback': traceback.format_exc()
         }), 500
 
 @api_v1.route('/crypto/decrypt', methods=['POST'])

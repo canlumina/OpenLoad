@@ -25,12 +25,21 @@ static uint8_t cmd_index = 0;
 static esp8266_device_t g_wifi_device;
 static bool g_wifi_initialized = false;
 
+/* OTA和加密相关变量 */
+static ota_context_t g_ota_context;
+static char g_dynamic_password[32] = "yangcan";  /* 默认密码，可动态更新 */
+
 /* 配置命令处理函数前向声明 */
 static void cmd_config_show_handler(void);
 static void cmd_config_wifi_handler(void);
 static void cmd_config_ota_handler(void);
 static void cmd_config_save_handler(void);
 static void cmd_config_reset_handler(void);
+
+/* 动态密码管理函数 */
+static void set_dynamic_password(const char* password);
+static const char* get_dynamic_password(void);
+static void update_password_from_ota(ota_context_t* ctx);
 
 /* 版本管理命令处理函数前向声明 */
 static void cmd_version_handler(void);
@@ -1330,7 +1339,7 @@ static void cmd_update_ota_handler(void)
             w25q64_partition_id_t source_partition = W25Q64_PARTITION_BACKUP1 + ch - 1;
             
             /* 解密外部Flash固件到内部Flash */
-            if (decrypt_external_firmware_to_internal(source_partition, "yangcan")) {
+            if (decrypt_external_firmware_to_internal(source_partition, get_dynamic_password())) {
                 print_str("External firmware decryption successful!\r\n");
                 print_str("You can now use 'j' to jump to the new firmware.\r\n");
             } else {
@@ -1914,7 +1923,7 @@ void cmd_extrestore_handler(void)
         /* 处理加密固件 - 直接调用解密函数 */
         print_str("Starting decryption from external flash...\r\n");
         
-        if (decrypt_external_firmware_to_internal(pid, "yangcan")) {
+        if (decrypt_external_firmware_to_internal(pid, get_dynamic_password())) {
             print_str("\r\nEncrypted firmware restore completed successfully!\r\n");
             print_str("Use 'j' to jump to the new firmware.\r\n");
         } else {
@@ -2748,4 +2757,39 @@ static void cmd_version_compare_handler(void)
     }
     
     print_str("\r\nUse 'u' command to update firmware.\r\n");
+}
+
+/* 动态密码管理函数实现 */
+static void set_dynamic_password(const char* password)
+{
+    if (password && strlen(password) > 0) {
+        strncpy(g_dynamic_password, password, sizeof(g_dynamic_password) - 1);
+        g_dynamic_password[sizeof(g_dynamic_password) - 1] = '\0';
+    }
+}
+
+static const char* get_dynamic_password(void)
+{
+    return g_dynamic_password;
+}
+
+static void update_password_from_ota(ota_context_t* ctx)
+{
+    if (ctx && strlen(ctx->encryption_password) > 0) {
+        set_dynamic_password(ctx->encryption_password);
+        print_str("Dynamic password updated from OTA response: ");
+        print_str(ctx->encryption_password);
+        print_str("\r\n");
+    }
+}
+
+/* 公共动态密码管理函数 - 供其他模块调用 */
+void bootloader_set_dynamic_password(const char* password)
+{
+    set_dynamic_password(password);
+}
+
+const char* bootloader_get_dynamic_password(void)
+{
+    return get_dynamic_password();
 }

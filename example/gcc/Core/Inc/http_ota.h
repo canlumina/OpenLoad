@@ -37,6 +37,7 @@ typedef struct {
     uint32_t target_addr;       /* 目标地址（内部Flash地址或外部Flash分区） */
     uint32_t max_size;          /* 最大允许大小 */
     bool is_encrypted;          /* 是否为加密固件 */
+    char encryption_password[32]; /* 加密密码（从HTTP响应头获取） */
     
     /* 进度信息 */
     uint32_t total_size;        /* 固件总大小 */

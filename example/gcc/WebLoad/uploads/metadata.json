@@ -1,19 +1,54 @@
 {
-  "fw_1756876613_20250903_131653_RTC2": {
-    "id": "fw_1756876613_20250903_131653_RTC2",
-    "filename": "20250903_131653_RTC2.bin",
-    "original_filename": "RTC2.bin",
-    "version": "v1.0.1.2025",
-    "size": 16288,
-    "checksum": "4cbce1d197422efb41a00670817bbecc",
-    "upload_time": "2025-09-03T13:16:53.468484",
+  "fw_1756887283_20250903_161443_RTC4": {
+    "id": "fw_1756887283_20250903_161443_RTC4",
+    "filename": "20250903_161443_RTC4.bin",
+    "original_filename": "RTC4.bin",
+    "version": "v1.11.1.2025",
+    "size": 14320,
+    "checksum": "b0e2c598af783db77b5c86d18314f834",
+    "upload_time": "2025-09-03T16:14:43.551316",
     "target_device": "STM32F103ZET6",
-    "is_encrypted": false,
-    "encryption_algorithm": "none",
-    "encryption_metadata": {},
+    "is_encrypted": true,
+    "encryption_algorithm": "aes-128-cbc",
+    "encryption_metadata": {
+      "algorithm": "aes-128-cbc",
+      "key_length": 16,
+      "iv": "9d01fef87aeab041403ef48e32a6b8ff",
+      "block_size": 16,
+      "firmware_size": 14240,
+      "encrypted_size": 14256,
+      "header_size": 64,
+      "password": "cancan"
+    },
     "metadata": {
       "upload_source": "web_api",
-      "upload_timestamp": "2025-09-03T13:16:53.466931"
+      "upload_timestamp": "2025-09-03T16:14:43.550698"
+    }
+  },
+  "fw_1756887446_20250903_161726_RTC3": {
+    "id": "fw_1756887446_20250903_161726_RTC3",
+    "filename": "20250903_161726_RTC3.bin",
+    "original_filename": "RTC3.bin",
+    "version": "v1.12.2.2025",
+    "size": 16288,
+    "checksum": "45e3d5346de1b39c3db03d77950e3a64",
+    "upload_time": "2025-09-03T16:17:26.378190",
+    "target_device": "STM32F103ZET6",
+    "is_encrypted": true,
+    "encryption_algorithm": "aes-128-cbc",
+    "encryption_metadata": {
+      "algorithm": "aes-128-cbc",
+      "key_length": 16,
+      "iv": "5b00e8fa8227b32539d93f85d70cd0ec",
+      "block_size": 16,
+      "firmware_size": 16220,
+      "encrypted_size": 16224,
+      "header_size": 64,
+      "password": "yangcancancacn"
+    },
+    "metadata": {
+      "upload_source": "web_api",
+      "upload_timestamp": "2025-09-03T16:17:26.377514"
     }
   }
 }

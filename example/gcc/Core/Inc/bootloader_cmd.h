@@ -83,4 +83,8 @@ void bootloader_print(const char* str);
 void bootloader_print_hex(uint32_t val);
 void bootloader_print_dec(uint32_t val);
 
+/* 动态密码管理函数 - 供其他模块使用 */
+void bootloader_set_dynamic_password(const char* password);
+const char* bootloader_get_dynamic_password(void);
+
 #endif

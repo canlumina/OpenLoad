@@ -20,6 +20,16 @@ typedef struct {
     int content_length;         /* 内容长度 */
     bool is_chunked;           /* 是否为分块传输 */
     char content_type[64];      /* 内容类型 */
+    
+    /* 固件加密信息 */
+    bool firmware_encrypted;    /* 固件是否加密 */
+    char encryption_algorithm[16]; /* 加密算法 */
+    char encryption_password[32];  /* 加密密码 */
+    
+    /* 固件元信息 */
+    char firmware_version[32];  /* 固件版本 */
+    char firmware_filename[64]; /* 固件文件名 */
+    uint32_t firmware_size;     /* 固件大小 */
 } http_response_info_t;
 
 /* HTTP客户端会话 */

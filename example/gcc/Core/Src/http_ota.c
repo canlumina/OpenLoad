@@ -155,6 +155,9 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
     ctx->downloaded_size = 0;
     ctx->buffer_used = 0;
     
+    /* 初始化加密密码为空 */
+    memset(ctx->encryption_password, 0, sizeof(ctx->encryption_password));
+    
     /* 连接HTTP服务器 */
     http_status_t http_status = http_client_connect(&ctx->http_client, host, port);
     if (http_status != HTTP_STATUS_OK) {
@@ -181,33 +184,82 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
     /* 分块下载实现 */
     #define CHUNK_SIZE 1024  /* 每次下载1KB */
     
-    /* 先发送HEAD请求获取文件大小（不下载数据） */
+    /* 先调用API获取固件信息（包括密码） */
     if (http_client_connect(&ctx->http_client, host, port) == HTTP_STATUS_OK) {
-        /* 发送HEAD请求 */
-        char head_request[512];
-        snprintf(head_request, sizeof(head_request),
-                 "HEAD %s HTTP/1.1\r\n"
+        /* 构建不带download参数的API路径 */
+        char info_path[256];
+        const char *download_param = strstr(path, "?download=true");
+        if (download_param) {
+            /* 移除download参数 */
+            int base_len = download_param - path;
+            memcpy(info_path, path, base_len);
+            info_path[base_len] = '\0';
+        } else {
+            /* 没有download参数，直接使用原路径 */
+            strncpy(info_path, path, sizeof(info_path) - 1);
+            info_path[sizeof(info_path) - 1] = '\0';
+        }
+        
+        /* 发送GET请求到固件信息API（不带download参数） */
+        bootloader_print("API Info: Requesting ");
+        bootloader_print(info_path);
+        bootloader_print("\r\n");
+        
+        char info_request[512];
+        snprintf(info_request, sizeof(info_request),
+                 "GET %s HTTP/1.1\r\n"
                  "Host: %s\r\n"
                  "Connection: close\r\n"
                  "\r\n",
-                 path, host);
+                 info_path, host);
         
         /* 发送请求并接收响应头 */
-        if (http_client_send_raw_request(&ctx->http_client, head_request) == HTTP_STATUS_OK) {
-            /* 从响应中获取Content-Length */
-            if (ctx->http_client.response.content_length > 0) {
-                ctx->total_size = ctx->http_client.response.content_length;
-                bootloader_print("HEAD request: Content-Length = ");
+        if (http_client_send_raw_request(&ctx->http_client, info_request) == HTTP_STATUS_OK) {
+            /* 从API响应中获取固件元信息 */
+            if (ctx->http_client.response.firmware_size > 0) {
+                ctx->total_size = ctx->http_client.response.firmware_size;
+                bootloader_print("API Info: Firmware Size = ");
                 bootloader_print_dec(ctx->total_size);
                 bootloader_print(" bytes\r\n");
+            }
+            
+            if (strlen(ctx->http_client.response.firmware_version) > 0) {
+                bootloader_print("API Info: Version = ");
+                bootloader_print(ctx->http_client.response.firmware_version);
+                bootloader_print("\r\n");
+            }
+            
+            if (strlen(ctx->http_client.response.firmware_filename) > 0) {
+                bootloader_print("API Info: Filename = ");
+                bootloader_print(ctx->http_client.response.firmware_filename);
+                bootloader_print("\r\n");
+            }
+            
+            /* 检查是否为加密固件并获取密码 */
+            if (ctx->http_client.response.firmware_encrypted) {
+                ctx->is_encrypted = true;
+                strncpy(ctx->encryption_password, ctx->http_client.response.encryption_password, 
+                       sizeof(ctx->encryption_password) - 1);
+                
+                /* 立即更新全局动态密码 */
+                bootloader_set_dynamic_password(ctx->encryption_password);
+                
+                bootloader_print("API Info: Encrypted firmware detected\r\n");
+                bootloader_print("Algorithm: ");
+                bootloader_print(ctx->http_client.response.encryption_algorithm);
+                bootloader_print("\r\n");
+                bootloader_print("Password: ");
+                bootloader_print(ctx->encryption_password);
+                bootloader_print("\r\n");
+                bootloader_print("Global password updated!\r\n");
             } else {
-                bootloader_print("HEAD request: No Content-Length found\r\n");
+                bootloader_print("API Info: Firmware is not encrypted\r\n");
             }
         } else {
-            bootloader_print("HEAD request failed\r\n");
+            bootloader_print("API Info request failed\r\n");
         }
         
-        /* 断开HEAD请求连接 */
+        /* 断开API请求连接 */
         http_client_disconnect(&ctx->http_client);
     }
     

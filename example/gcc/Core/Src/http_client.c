@@ -195,6 +195,83 @@ static http_status_t http_parse_response_header(http_client_t *client)
         }
     }
     
+    /* 解析固件加密信息 */
+    client->response.firmware_encrypted = false;
+    client->response.firmware_size = 0;
+    memset(client->response.encryption_algorithm, 0, sizeof(client->response.encryption_algorithm));
+    memset(client->response.encryption_password, 0, sizeof(client->response.encryption_password));
+    memset(client->response.firmware_version, 0, sizeof(client->response.firmware_version));
+    memset(client->response.firmware_filename, 0, sizeof(client->response.firmware_filename));
+    
+    /* 检查是否为加密固件 */
+    const char *encrypted_header = strstr(line_start, "X-Firmware-Encrypted: true");
+    if (encrypted_header) {
+        client->response.firmware_encrypted = true;
+        
+        /* 解析加密算法 */
+        const char *algorithm_header = strstr(line_start, "X-Encryption-Algorithm: ");
+        if (algorithm_header) {
+            algorithm_header += 24;
+            const char *alg_end = strstr(algorithm_header, "\r\n");
+            if (alg_end) {
+                int alg_len = alg_end - algorithm_header;
+                if (alg_len < sizeof(client->response.encryption_algorithm)) {
+                    memcpy(client->response.encryption_algorithm, algorithm_header, alg_len);
+                    client->response.encryption_algorithm[alg_len] = '\0';
+                }
+            }
+        }
+        
+        /* 解析加密密码 */
+        const char *password_header = strstr(line_start, "X-Encryption-Password: ");
+        if (password_header) {
+            password_header += 23;
+            const char *pwd_end = strstr(password_header, "\r\n");
+            if (pwd_end) {
+                int pwd_len = pwd_end - password_header;
+                if (pwd_len < sizeof(client->response.encryption_password)) {
+                    memcpy(client->response.encryption_password, password_header, pwd_len);
+                    client->response.encryption_password[pwd_len] = '\0';
+                }
+            }
+        }
+    }
+    
+    /* 解析固件元信息 */
+    /* 解析固件大小 */
+    const char *size_header = strstr(line_start, "X-Firmware-Size: ");
+    if (size_header) {
+        client->response.firmware_size = atoi(size_header + 17);
+    }
+    
+    /* 解析固件版本 */
+    const char *version_header = strstr(line_start, "X-Firmware-Version: ");
+    if (version_header) {
+        version_header += 20;
+        const char *ver_end = strstr(version_header, "\r\n");
+        if (ver_end) {
+            int ver_len = ver_end - version_header;
+            if (ver_len < sizeof(client->response.firmware_version)) {
+                memcpy(client->response.firmware_version, version_header, ver_len);
+                client->response.firmware_version[ver_len] = '\0';
+            }
+        }
+    }
+    
+    /* 解析固件文件名 */
+    const char *filename_header = strstr(line_start, "X-Firmware-Filename: ");
+    if (filename_header) {
+        filename_header += 21;
+        const char *file_end = strstr(filename_header, "\r\n");
+        if (file_end) {
+            int file_len = file_end - filename_header;
+            if (file_len < sizeof(client->response.firmware_filename)) {
+                memcpy(client->response.firmware_filename, filename_header, file_len);
+                client->response.firmware_filename[file_len] = '\0';
+            }
+        }
+    }
+    
     return HTTP_STATUS_OK;
 }
 

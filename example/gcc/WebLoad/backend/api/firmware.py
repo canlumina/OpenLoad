@@ -474,11 +474,23 @@ def get_latest_firmware():
                     "error": "固件文件不存在"
                 }), 404
             
-            return send_file_with_range(
+            # 创建响应并添加加密信息到HTTP头
+            response = send_file_with_range(
                 str(file_path),
                 latest_firmware.original_filename,
                 'application/octet-stream'
             )
+            
+            # 如果是加密固件，添加加密信息到响应头
+            if latest_firmware.is_encrypted:
+                response.headers['X-Firmware-Encrypted'] = 'true'
+                response.headers['X-Encryption-Algorithm'] = latest_firmware.encryption_algorithm
+                
+                # 从加密元数据中获取密码（如果存储了）
+                if latest_firmware.encryption_metadata and 'password' in latest_firmware.encryption_metadata:
+                    response.headers['X-Encryption-Password'] = latest_firmware.encryption_metadata['password']
+            
+            return response
         
         # 返回固件信息
         firmware_dict = latest_firmware.to_dict()
@@ -487,11 +499,30 @@ def get_latest_firmware():
         if target_device:
             firmware_dict["download_url"] += f"&target_device={target_device}"
         
-        return jsonify({
+        # 创建JSON响应并添加固件信息到响应头（便于嵌入式设备解析）
+        response = jsonify({
             "success": True,
             "data": firmware_dict,
             "message": f"获取最新固件成功: {latest_firmware.version}"
         })
+        
+        # 添加固件元信息到HTTP响应头
+        response.headers['X-Firmware-Size'] = str(latest_firmware.size)
+        response.headers['X-Firmware-Version'] = latest_firmware.version
+        response.headers['X-Firmware-Filename'] = latest_firmware.original_filename
+        
+        # 如果是加密固件，添加加密信息
+        if latest_firmware.is_encrypted:
+            response.headers['X-Firmware-Encrypted'] = 'true'
+            response.headers['X-Encryption-Algorithm'] = latest_firmware.encryption_algorithm
+            
+            # 从加密元数据中获取密码（如果存储了）
+            if latest_firmware.encryption_metadata and 'password' in latest_firmware.encryption_metadata:
+                response.headers['X-Encryption-Password'] = latest_firmware.encryption_metadata['password']
+        else:
+            response.headers['X-Firmware-Encrypted'] = 'false'
+        
+        return response
         
     except Exception as e:
         return jsonify({
