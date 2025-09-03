@@ -36,6 +36,7 @@ typedef struct {
     ota_target_t target;
     uint32_t target_addr;       /* 目标地址（内部Flash地址或外部Flash分区） */
     uint32_t max_size;          /* 最大允许大小 */
+    bool is_encrypted;          /* 是否为加密固件 */
     
     /* 进度信息 */
     uint32_t total_size;        /* 固件总大小 */
@@ -51,7 +52,8 @@ typedef struct {
 /* HTTP OTA API */
 bool ota_init(ota_context_t *ctx, esp8266_device_t *esp8266);
 ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url, 
-                                  ota_target_t target, uint32_t target_addr, uint32_t max_size);
+                                  ota_target_t target, uint32_t target_addr, uint32_t max_size,
+                                  bool is_encrypted);
 void ota_set_progress_callback(ota_context_t *ctx, ota_progress_callback_t callback);
 bool ota_deinit(ota_context_t *ctx);
 

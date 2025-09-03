@@ -57,9 +57,9 @@ bool config_load_default(void)
     g_config.wifi.timeout_ms = 15000;
     
     /* 默认OTA服务器配置 */
-    strcpy(g_config.ota.host, "120.27.208.180");
-    g_config.ota.port = 80;
-    strcpy(g_config.ota.path, "/app.bin");
+    strcpy(g_config.ota.host, "192.168.0.100");
+    g_config.ota.port = 5000;
+    strcpy(g_config.ota.path, "/api/v1/firmwares/latest?download=true");
     g_config.ota.timeout_ms = 30000;
     
     /* 默认系统配置 */

@@ -1,6 +1,7 @@
 #include "http_client.h"
 #include "main.h"
 #include "bootloader_cmd.h"
+#include "dev_usart.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -115,7 +116,7 @@ static http_status_t http_parse_response_header(http_client_t *client)
     
     /* 接收HTTP响应头 */
     while (!header_complete && (HAL_GetTick() - start_time) < 10000) {
-        int received = esp8266_tcp_receive(client->esp8266, 
+        int received = esp8266_tcp_receive_for_header(client->esp8266, 
                                           (uint8_t*)header_buffer + header_len,
                                           sizeof(header_buffer) - header_len - 1,
                                           100);
@@ -134,81 +135,40 @@ static http_status_t http_parse_response_header(http_client_t *client)
         return HTTP_STATUS_TIMEOUT;
     }
     
-    /* 暂不处理非+IPD格式的body数据，统一由+IPD处理逻辑处理 */
+    /* 透传模式下的响应头处理 - 直接处理HTTP响应 */
     client->body_received = 0;
     
-    /* HTTP头接收完成 */
-    
-    /* 处理ESP8266的+IPD格式数据 */
-    char *ipd_pos = strstr(header_buffer, "+IPD,");
-    if (ipd_pos) {
-        /* 解析+IPD,xxxx:获取数据长度 */
-        char *len_start = ipd_pos + 5;
-        char *colon = strchr(len_start, ':');
-        if (colon) {
-            /* 获取+IPD声明的数据长度 */
-            char len_str[16];
-            int len_size = colon - len_start;
-            if (len_size < sizeof(len_str) && len_size > 0) {
-                memcpy(len_str, len_start, len_size);
-                len_str[len_size] = '\0';
-                int ipd_data_len = atoi(len_str);
-                
-                /* HTTP响应从冒号后开始 */
-                char *http_start = colon + 1;
-                int available_data = header_len - (http_start - header_buffer);
-                
-                /* 确保不超过+IPD声明的长度 */
-                if (available_data > ipd_data_len) {
-                    available_data = ipd_data_len;
-                }
-                
-                /* 在HTTP响应中查找头部结束 */
-                char *http_header_end = NULL;
-                for (int i = 0; i <= available_data - 4; i++) {
-                    if (http_start[i] == '\r' && http_start[i+1] == '\n' && 
-                        http_start[i+2] == '\r' && http_start[i+3] == '\n') {
-                        http_header_end = http_start + i + 4;
-                        break;
-                    }
-                }
-                
-                if (http_header_end) {
-                    /* 计算实际可用的HTTP body长度 */
-                    int http_body_len = (http_start + available_data) - http_header_end;
-                    
-                    if (http_body_len > 0 && client->data_handler) {
-                        client->data_handler((uint8_t*)http_header_end, http_body_len);
-                        client->body_received = http_body_len;
-                    }
-                } else {
-                    /* HTTP头不完整或者全部都是头部数据 */
-                    client->body_received = 0;
-                }
-            }
+    /* 查找响应头结束位置 */
+    char *header_end = strstr(header_buffer, "\r\n\r\n");
+    if (header_end) {
+        header_end += 4; /* 跳过\r\n\r\n */
+        int body_in_header = header_len - (header_end - header_buffer);
+        
+        /* 如果响应头缓冲区中包含响应体数据，先处理它 */
+        if (body_in_header > 0 && client->data_handler) {
+            client->data_handler((uint8_t*)header_end, body_in_header);
+            client->body_received = body_in_header;
         }
     }
     
-    /* 解析状态行 - 使用处理后的HTTP数据 */
+    /* 解析状态行 */
     char *line_start = header_buffer;
-    if (ipd_pos) {
-        char *colon = strchr(ipd_pos + 5, ':');
-        if (colon) {
-            line_start = colon + 1;
-        }
-    }
     char *line_end = strstr(line_start, "\r\n");
+    
     if (line_end) {
         int line_len = line_end - line_start;
         if (line_len < sizeof(line)) {
             memcpy(line, line_start, line_len);
             line[line_len] = '\0';
             
-            /* 解析状态码 HTTP/1.1 200 OK */
-            if (sscanf(line, "HTTP/1.%*d %d", &client->response.status_code) != 1) {
+            /* 解析状态码 HTTP/1.1 200 OK 或 HTTP/1.0 200 OK */
+            if (sscanf(line, "HTTP/%*[0-9.] %d", &client->response.status_code) != 1) {
                 client->response.status_code = 0;
             }
         }
+    } else {
+        /* 没有找到状态行 */
+        client->response.status_code = 0;
     }
     
     /* 解析Content-Length */
@@ -216,8 +176,6 @@ static http_status_t http_parse_response_header(http_client_t *client)
     const char *content_len = strstr(line_start, "Content-Length: ");
     if (content_len) {
         client->response.content_length = atoi(content_len + 16);
-    } else {
-        /* Content-Length not found */
     }
     
     /* 检查是否为分块传输 */
@@ -262,7 +220,7 @@ static http_status_t http_receive_data(http_client_t *client)
         
         while (remaining > 0 && (HAL_GetTick() - start_time) < 30000) {
             int to_receive = (remaining < sizeof(buffer)) ? remaining : sizeof(buffer);
-            int received = esp8266_tcp_receive(client->esp8266, buffer, to_receive, 1000);
+            int received = esp8266_tcp_receive(client->esp8266, buffer, to_receive, 5000);
             
             if (received > 0) {
                 if (client->data_handler) {
@@ -274,11 +232,11 @@ static http_status_t http_receive_data(http_client_t *client)
                 total_received += received;
                 start_time = HAL_GetTick(); /* 重置超时，只要有数据就继续 */
             } else if (received == 0) {
-                /* 如果连接关闭且我们已经收到一些数据，可能是正常结束 */
+                /* 透传模式下连接关闭检测 */
                 if (total_received > 0) {
                     break;
                 }
-                HAL_Delay(10);
+                HAL_Delay(50);
             } else {
                 return HTTP_STATUS_ERROR;
             }
@@ -286,7 +244,7 @@ static http_status_t http_receive_data(http_client_t *client)
     } else {
         /* 没有Content-Length，接收到连接关闭 */
         while ((HAL_GetTick() - start_time) < 30000) {
-            int received = esp8266_tcp_receive(client->esp8266, buffer, sizeof(buffer), 1000);
+            int received = esp8266_tcp_receive(client->esp8266, buffer, sizeof(buffer), 5000);
             
             if (received > 0) {
                 if (client->data_handler) {
@@ -297,7 +255,7 @@ static http_status_t http_receive_data(http_client_t *client)
                 total_received += received;
                 start_time = HAL_GetTick();  /* 重置超时 */
             } else if (received == 0) {
-                /* 没有数据，可能连接已关闭 */
+                /* 透传模式下连接已关闭 */
                 break;
             } else {
                 return HTTP_STATUS_ERROR;
@@ -366,14 +324,30 @@ http_status_t http_client_get_with_range(http_client_t *client, const char *path
     
     /* 发送请求 */
     http_status_t status = http_send_request(client, request);
-    if (status != HTTP_STATUS_OK) return status;
+    if (status != HTTP_STATUS_OK) {
+        char debug[64];
+        snprintf(debug, sizeof(debug), "\r\nRange request send failed: %d\r\n", status);
+        uart_write(DEV_UART1, (uint8_t*)debug, strlen(debug));
+        uart_poll_dma_tx(DEV_UART1);
+        return status;
+    }
     
     /* 解析响应头 */
     status = http_parse_response_header(client);
-    if (status != HTTP_STATUS_OK) return status;
+    if (status != HTTP_STATUS_OK) {
+        char debug[64];
+        snprintf(debug, sizeof(debug), "\r\nRange header parse failed: %d\r\n", status);
+        uart_write(DEV_UART1, (uint8_t*)debug, strlen(debug));
+        uart_poll_dma_tx(DEV_UART1);
+        return status;
+    }
     
     /* 检查HTTP状态码 */
     if (client->response.status_code != 206 && client->response.status_code != 200) {
+        char debug[64];
+        snprintf(debug, sizeof(debug), "\r\nRange status code: %d (expected 206/200)\r\n", client->response.status_code);
+        uart_write(DEV_UART1, (uint8_t*)debug, strlen(debug));
+        uart_poll_dma_tx(DEV_UART1);
         return HTTP_STATUS_ERROR;
     }
     
@@ -391,7 +365,9 @@ http_status_t http_client_send_raw_request(http_client_t *client, const char *re
     
     /* 解析响应头 */
     status = http_parse_response_header(client);
-    if (status != HTTP_STATUS_OK) return status;
+    if (status != HTTP_STATUS_OK) {
+        return status;
+    }
     
     /* HEAD请求没有body，直接返回 */
     return HTTP_STATUS_OK;

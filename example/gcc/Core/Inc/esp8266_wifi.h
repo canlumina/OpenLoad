@@ -38,4 +38,7 @@ bool esp8266_tcp_disconnect(esp8266_device_t *device);
 int esp8266_tcp_send(esp8266_device_t *device, const uint8_t *data, uint16_t len);
 int esp8266_tcp_receive(esp8266_device_t *device, uint8_t *buffer, uint16_t buffer_size, uint32_t timeout);
 
+/* 内部API - 用于HTTP响应头解析 */
+int esp8266_tcp_receive_for_header(esp8266_device_t *device, uint8_t *buffer, uint16_t buffer_size, uint32_t timeout);
+
 #endif /* __ESP8266_WIFI_H__ */

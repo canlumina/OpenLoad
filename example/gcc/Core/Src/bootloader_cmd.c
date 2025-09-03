@@ -758,7 +758,7 @@ static void cmd_update_xmodem_handler(void)
         
         ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
                                                    OTA_TARGET_EXTERNAL_FLASH, 
-                                                   target_partition, 1024*1024);
+                                                   target_partition, 1024*1024, true);
         
         ota_deinit(&ota_ctx);
         
@@ -851,7 +851,7 @@ static void cmd_update_ota_handler(void)
         
         ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
                                                    OTA_TARGET_INTERNAL_FLASH, 
-                                                   APP_START_ADDR, APP_MAX_SIZE);
+                                                   APP_START_ADDR, APP_MAX_SIZE, false);
         
         ota_deinit(&ota_ctx);
         
@@ -936,7 +936,7 @@ static void cmd_update_ota_handler(void)
         
         ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
                                                    OTA_TARGET_EXTERNAL_FLASH, 
-                                                   partition, 1024*1024);  /* 1MB最大 */
+                                                   partition, 1024*1024, false);  /* 1MB最大 */
         
         ota_deinit(&ota_ctx);
         
@@ -1434,7 +1434,7 @@ static void cmd_update_ota_handler(void)
             /* 下载到临时分区，然后解密到内部Flash */
             ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
                                                        OTA_TARGET_EXTERNAL_FLASH, 
-                                                       W25Q64_PARTITION_DOWNLOAD, 1024*1024);
+                                                       W25Q64_PARTITION_DOWNLOAD, 1024*1024, true);
             
             if (result == OTA_STATUS_OK) {
                 print_str("\r\nEncrypted OTA download completed!\r\n");
@@ -1451,7 +1451,7 @@ static void cmd_update_ota_handler(void)
             
             ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
                                                        OTA_TARGET_EXTERNAL_FLASH, 
-                                                       target_partition, 1024*1024);
+                                                       target_partition, 1024*1024, true);
             
             if (result == OTA_STATUS_OK) {
                 print_str("\r\nEncrypted OTA download to external flash completed!\r\n");
@@ -1542,7 +1542,7 @@ static void cmd_update_ota_handler(void)
         /* 下载到下载分区 */
         ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
                                                    OTA_TARGET_EXTERNAL_FLASH, 
-                                                   W25Q64_PARTITION_DOWNLOAD, 1024*1024);
+                                                   W25Q64_PARTITION_DOWNLOAD, 1024*1024, true);
         
         ota_deinit(&ota_ctx);
         
@@ -1635,7 +1635,7 @@ static void cmd_update_ota_handler(void)
         
         ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url,
                                                    OTA_TARGET_EXTERNAL_FLASH, 
-                                                   target_partition, 1024*1024);
+                                                   target_partition, 1024*1024, true);
         
         ota_deinit(&ota_ctx);
         

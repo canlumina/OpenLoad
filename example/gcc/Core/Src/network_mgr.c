@@ -105,7 +105,7 @@ bool network_mgr_download_firmware(network_mgr_t* mgr, ota_target_t target,
     bootloader_print(firmware_url);
     bootloader_print("\r\n");
     
-    ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url, target, target_addr, max_size);
+    ota_status_t result = ota_download_firmware(&ota_ctx, firmware_url, target, target_addr, max_size, false);
     
     ota_deinit(&ota_ctx);
     

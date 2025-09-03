@@ -201,8 +201,8 @@ bool esp8266_tcp_connect(esp8266_device_t *device, const char *host, uint16_t po
     /* 设置单连接模式 */
     at_send_cmd(&device->at_client, "AT+CIPMUX=0", "OK", 3000);
     
-    /* 尝试设置更大的接收缓冲区（某些固件支持） */
-    at_send_cmd(&device->at_client, "AT+CIPRECVLEN=2048", "OK", 1000);
+    /* 设置透传模式 */
+    at_send_cmd(&device->at_client, "AT+CIPMODE=1", "OK", 1000);
     
     /* 建立TCP连接 */
     snprintf(cmd, sizeof(cmd), "AT+CIPSTART=\"TCP\",\"%s\",%d", host, port);
@@ -211,6 +211,14 @@ bool esp8266_tcp_connect(esp8266_device_t *device, const char *host, uint16_t po
         return false;
     }
     
+    /* 进入透传模式 */
+    if (at_send_cmd(&device->at_client, "AT+CIPSEND", ">", 3000) != AT_STATUS_OK) {
+        return false;
+    }
+    
+    /* 现在ESP8266处于透传模式，所有数据将直接转发 */
+    HAL_Delay(100);
+    
     return true;
 }
 
@@ -218,34 +226,36 @@ bool esp8266_tcp_disconnect(esp8266_device_t *device)
 {
     if (!device || !device->is_initialized) return false;
     
-    return (at_send_cmd(&device->at_client, "AT+CIPCLOSE", "CLOSED", 5000) == AT_STATUS_OK);
+    /* 退出透传模式 */
+    uart_write(device->at_client.uart_dev, (uint8_t*)"+++", 3);
+    uart_poll_dma_tx(device->at_client.uart_dev);
+    HAL_Delay(1000);
+    
+    /* 关闭连接 */
+    at_send_cmd(&device->at_client, "AT+CIPCLOSE", "CLOSED", 5000);
+    
+    /* 恢复非透传模式 */
+    at_send_cmd(&device->at_client, "AT+CIPMODE=0", "OK", 1000);
+    
+    return true;
 }
 
 int esp8266_tcp_send(esp8266_device_t *device, const uint8_t *data, uint16_t len)
 {
     if (!device || !device->is_initialized || !data || len == 0) return -1;
     
-    char cmd[32];
-    
-    /* 发送数据长度命令 */
-    snprintf(cmd, sizeof(cmd), "AT+CIPSEND=%d", len);
-    
-    if (at_send_cmd(&device->at_client, cmd, ">", 3000) != AT_STATUS_OK) {
-        return -1;
-    }
-    
-    /* 发送实际数据 */
+    /* 透传模式下直接发送数据 */
     uart_write(device->at_client.uart_dev, data, len);
     uart_poll_dma_tx(device->at_client.uart_dev);
     
-    /* 等待发送完成 */
-    if (at_send_cmd(&device->at_client, "", "SEND OK", 10000) != AT_STATUS_OK) {
-        return -1;
-    }
+    /* 短暂延时确保数据发送完成 */
+    HAL_Delay(10);
     
     return len;
 }
 
+
+/* 透传模式下的TCP接收 - 无需处理+IPD */
 int esp8266_tcp_receive(esp8266_device_t *device, uint8_t *buffer, uint16_t buffer_size, uint32_t timeout)
 {
     if (!device || !device->is_initialized || !buffer) return -1;
@@ -254,25 +264,38 @@ int esp8266_tcp_receive(esp8266_device_t *device, uint8_t *buffer, uint16_t buff
     uint16_t received = 0;
     uint32_t no_data_time = HAL_GetTick();
     
-    /* 尝试批量读取以提高效率 */
+    /* 透传模式下直接接收数据，不会有+IPD前缀 */
     while ((HAL_GetTick() - start_time) < timeout && received < buffer_size) {
-        /* 尝试一次读取更多数据 */
         uint16_t to_read = buffer_size - received;
-        if (to_read > 256) to_read = 256; /* 限制单次读取量 */
+        if (to_read > 512) to_read = 512;
         
         int read_count = uart_read(device->at_client.uart_dev, buffer + received, to_read);
         
         if (read_count > 0) {
             received += read_count;
-            no_data_time = HAL_GetTick(); /* 重置无数据时间 */
+            no_data_time = HAL_GetTick();
         } else {
-            /* 如果超过500ms没有数据且已收到一些数据，可能连接关闭 */
-            if (received > 0 && (HAL_GetTick() - no_data_time) > 500) {
-                break; /* 提前退出，避免不必要等待 */
+            uint32_t silence_time = HAL_GetTick() - no_data_time;
+            
+            /* 根据接收情况调整超时策略 */
+            if (received == 0) {
+                if (silence_time > 5000) break;
+            } else if (received < 100) {
+                if (silence_time > 3000) break;
+            } else {
+                if (silence_time > 4000) break;
             }
-            HAL_Delay(1);
+            
+            HAL_Delay(2);
         }
     }
     
     return received;
+}
+
+/* 用于响应头解析的接收函数 - 透传模式下与普通接收相同 */
+int esp8266_tcp_receive_for_header(esp8266_device_t *device, uint8_t *buffer, uint16_t buffer_size, uint32_t timeout)
+{
+    /* 透传模式下，响应头和响应体的接收逻辑相同 */
+    return esp8266_tcp_receive(device, buffer, buffer_size, timeout);
 }

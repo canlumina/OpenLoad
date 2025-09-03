@@ -95,6 +95,7 @@ bool ota_init(ota_context_t *ctx, esp8266_device_t *esp8266)
     memset(ctx, 0, sizeof(ota_context_t));
     
     ctx->esp8266 = esp8266;
+    ctx->is_encrypted = false;
     
     /* 不再需要分配缓冲区，直接写入 */
     ctx->buffer = NULL;
@@ -128,7 +129,8 @@ void ota_set_progress_callback(ota_context_t *ctx, ota_progress_callback_t callb
 }
 
 ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url, 
-                                  ota_target_t target, uint32_t target_addr, uint32_t max_size)
+                                  ota_target_t target, uint32_t target_addr, uint32_t max_size,
+                                  bool is_encrypted)
 {
     if (!ctx || !ctx->esp8266 || !url) return OTA_STATUS_ERROR;
     
@@ -149,6 +151,7 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
     ctx->target = target;
     ctx->target_addr = target_addr;
     ctx->max_size = max_size;
+    ctx->is_encrypted = is_encrypted;
     ctx->downloaded_size = 0;
     ctx->buffer_used = 0;
     
@@ -194,7 +197,14 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
             /* 从响应中获取Content-Length */
             if (ctx->http_client.response.content_length > 0) {
                 ctx->total_size = ctx->http_client.response.content_length;
+                bootloader_print("HEAD request: Content-Length = ");
+                bootloader_print_dec(ctx->total_size);
+                bootloader_print(" bytes\r\n");
+            } else {
+                bootloader_print("HEAD request: No Content-Length found\r\n");
             }
+        } else {
+            bootloader_print("HEAD request failed\r\n");
         }
         
         /* 断开HEAD请求连接 */
@@ -229,14 +239,32 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
             chunk_end = ctx->total_size - 1;
         }
         
+        /* 调试：显示分块信息 */
+        bootloader_print("Chunk ");
+        bootloader_print_dec(chunk + 1);
+        bootloader_print("/");
+        bootloader_print_dec(chunk_count);
+        bootloader_print(" (");
+        bootloader_print_dec(chunk_start);
+        bootloader_print("-");
+        bootloader_print_dec(chunk_end);
+        bootloader_print(") ");
+        
         /* 每个分块最多重试3次 */
         int retry_count = 0;
         const int max_retries = 3;
         bool chunk_success = false;
         
         while (retry_count < max_retries && !chunk_success) {
+            /* 记录分块开始前的写入位置 */
+            uint32_t chunk_start_offset = g_actual_write_offset;
+            
             /* 重新连接 */
-            if (http_client_connect(&ctx->http_client, host, port) != HTTP_STATUS_OK) {
+            http_status_t connect_status = http_client_connect(&ctx->http_client, host, port);
+            if (connect_status != HTTP_STATUS_OK) {
+                bootloader_print("Connect failed: ");
+                bootloader_print_dec(connect_status);
+                bootloader_print("\r\n");
                 retry_count++;
                 if (retry_count >= max_retries) {
                     bootloader_print("\r\nFailed to connect at chunk ");
@@ -276,6 +304,16 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
             /* 断开连接 */
             http_client_disconnect(&ctx->http_client);
             chunk_success = true;
+            
+            /* 显示实际收到的字节数 */
+            uint32_t chunk_bytes_received = g_actual_write_offset - chunk_start_offset;
+            bootloader_print("OK (");
+            bootloader_print_dec(chunk_bytes_received);
+            bootloader_print("B)\r\n");
+        }
+        
+        if (!chunk_success) {
+            bootloader_print("FAILED\r\n");
         }
         
         /* 更新已下载的字节数（基于实际写入的位置） */
@@ -320,8 +358,11 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
         bootloader_print("Size difference: ");
         if (diff > 0) {
             bootloader_print("+");
+            bootloader_print_dec((uint32_t)diff);
+        } else {
+            bootloader_print("-");
+            bootloader_print_dec((uint32_t)(-diff));
         }
-        bootloader_print_dec(diff);
         bootloader_print(" bytes\r\n");
     } else {
         bootloader_print("Size match: OK\r\n");
@@ -347,27 +388,33 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
                 }
             }
             
-            /* 检查栈指针和复位向量 */
-            uint32_t stack_ptr = *(uint32_t*)verify_buf;
-            uint32_t reset_vector = *(uint32_t*)(verify_buf + 4);
-            
-            bootloader_print("Stack pointer: 0x");
-            char hex_str[16];
-            sprintf(hex_str, "%08lX", stack_ptr);
-            bootloader_print(hex_str);
-            bootloader_print("\r\n");
-            
-            bootloader_print("Reset vector: 0x");
-            sprintf(hex_str, "%08lX", reset_vector);
-            bootloader_print(hex_str);
-            bootloader_print("\r\n");
-            
-            /* 验证向量表的合理性 */
-            if ((stack_ptr & 0xFFFF0000) == 0x20000000 && 
-                (reset_vector & 0xFFFF0000) == 0x08010000) {
-                bootloader_print("Vector table validation: PASS\r\n");
+            /* 对于加密固件，跳过向量表验证 */
+            if (ctx->is_encrypted) {
+                bootloader_print("Encrypted firmware: Vector table validation SKIPPED\r\n");
+                bootloader_print("Use 'xr' command to decrypt and restore to internal flash\r\n");
             } else {
-                bootloader_print("Vector table validation: FAIL\r\n");
+                /* 检查栈指针和复位向量 */
+                uint32_t stack_ptr = *(uint32_t*)verify_buf;
+                uint32_t reset_vector = *(uint32_t*)(verify_buf + 4);
+                
+                bootloader_print("Stack pointer: 0x");
+                char hex_str[16];
+                sprintf(hex_str, "%08lX", stack_ptr);
+                bootloader_print(hex_str);
+                bootloader_print("\r\n");
+                
+                bootloader_print("Reset vector: 0x");
+                sprintf(hex_str, "%08lX", reset_vector);
+                bootloader_print(hex_str);
+                bootloader_print("\r\n");
+                
+                /* 验证向量表的合理性 */
+                if ((stack_ptr & 0xFFFF0000) == 0x20000000 && 
+                    (reset_vector & 0xFFFF0000) == 0x08010000) {
+                    bootloader_print("Vector table validation: PASS\r\n");
+                } else {
+                    bootloader_print("Vector table validation: FAIL\r\n");
+                }
             }
             
         } else {

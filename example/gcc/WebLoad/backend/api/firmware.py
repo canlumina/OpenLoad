@@ -3,9 +3,10 @@
 
 import os
 import json
-from flask import request, jsonify, send_file
+from flask import request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 from datetime import datetime
+import re
 
 from . import api_v1
 from ..core.firmware_manager import FirmwareManager
@@ -17,6 +18,56 @@ def get_firmware_manager():
         current_app.firmware_manager = FirmwareManager(current_app.config['UPLOAD_FOLDER'])
     return current_app.firmware_manager
 from ..core.crypto import EncryptionType
+
+def send_file_with_range(file_path, original_filename, mimetype='application/octet-stream'):
+    """支持Range请求的文件发送函数"""
+    # 获取文件大小
+    file_size = os.path.getsize(file_path)
+    
+    # 检查Range请求头
+    range_header = request.headers.get('Range', None)
+    if not range_header:
+        # 没有Range请求，发送整个文件
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=original_filename,
+            mimetype=mimetype
+        )
+    
+    # 解析Range请求
+    m = re.search(r'bytes=(\d+)-(\d*)', range_header)
+    if not m:
+        # Range格式错误，返回整个文件
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=original_filename,
+            mimetype=mimetype
+        )
+    
+    start = int(m.group(1))
+    end = int(m.group(2)) if m.group(2) else file_size - 1
+    
+    # 确保范围有效
+    start = max(0, min(start, file_size - 1))
+    end = max(start, min(end, file_size - 1))
+    
+    content_length = end - start + 1
+    
+    # 读取指定范围的数据
+    with open(file_path, 'rb') as f:
+        f.seek(start)
+        data = f.read(content_length)
+    
+    # 创建206 Partial Content响应
+    response = Response(data, 206, mimetype=mimetype)
+    response.headers.add('Content-Range', f'bytes {start}-{end}/{file_size}')
+    response.headers.add('Content-Length', str(content_length))
+    response.headers.add('Accept-Ranges', 'bytes')
+    response.headers.add('Content-Disposition', f'attachment; filename="{original_filename}"')
+    
+    return response
 
 @api_v1.route('/firmwares', methods=['GET'])
 def get_firmwares():
@@ -196,10 +247,10 @@ def download_firmware(firmware_id):
                 'error': '固件文件不存在'
             }), 404
         
-        return send_file(
+        return send_file_with_range(
             str(file_path),
-            as_attachment=True,
-            download_name=firmware.original_filename
+            firmware.original_filename,
+            'application/octet-stream'
         )
         
     except Exception as e:
@@ -423,11 +474,10 @@ def get_latest_firmware():
                     "error": "固件文件不存在"
                 }), 404
             
-            return send_file(
+            return send_file_with_range(
                 str(file_path),
-                as_attachment=True,
-                download_name=latest_firmware.original_filename,
-                mimetype='application/octet-stream'
+                latest_firmware.original_filename,
+                'application/octet-stream'
             )
         
         # 返回固件信息
@@ -486,11 +536,10 @@ def get_firmware_by_version(version):
                     "error": "固件文件不存在"
                 }), 404
             
-            return send_file(
+            return send_file_with_range(
                 str(file_path),
-                as_attachment=True,
-                download_name=matching_firmware.original_filename,
-                mimetype='application/octet-stream'
+                matching_firmware.original_filename,
+                'application/octet-stream'
             )
         
         # 返回固件信息
