@@ -3,6 +3,7 @@
 #include "main.h"
 #include "mbedtls/aes.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* mbedTLS AES上下文和状态 */
 static mbedtls_aes_context g_aes_enc_ctx;
@@ -118,12 +119,34 @@ bool firmware_aes_decrypt_cbc(const uint8_t* input, uint8_t* output, uint32_t si
  */
 void firmware_aes_derive_key(const char* password, const uint32_t* salt, uint8_t* key)
 {
-    /* 简单的密钥派生：使用mbedTLS AES进行强化 */
+    /* 特殊处理：如果密码是32个字符的十六进制字符串，直接作为密钥使用 */
+    uint32_t pwd_len = strlen(password);
+    if (pwd_len == 32) {
+        /* 尝试解析为十六进制密钥 */
+        bool is_hex = true;
+        for (uint32_t i = 0; i < pwd_len; i++) {
+            char c = password[i];
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                is_hex = false;
+                break;
+            }
+        }
+        
+        if (is_hex) {
+            /* 将十六进制字符串转换为字节 */
+            for (uint32_t i = 0; i < 16; i++) {
+                char hex_byte[3] = {password[i*2], password[i*2+1], '\0'};
+                key[i] = (uint8_t)strtoul(hex_byte, NULL, 16);
+            }
+            return;
+        }
+    }
+    
+    /* 正常的密钥派生：使用mbedTLS AES进行强化 */
     uint8_t temp_key[32];
     memset(temp_key, 0, sizeof(temp_key));
     
     /* 复制密码 */
-    uint32_t pwd_len = strlen(password);
     if (pwd_len > 24) pwd_len = 24;
     memcpy(temp_key, password, pwd_len);
     

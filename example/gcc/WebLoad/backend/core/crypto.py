@@ -63,7 +63,8 @@ class CryptoManager:
                         data: bytes, 
                         algorithm: EncryptionType,
                         key: bytes = None,
-                        password: str = None) -> Tuple[bytes, Dict[str, Any]]:
+                        password: str = None,
+                        firmware_version: str = None) -> Tuple[bytes, Dict[str, Any]]:
         """
         加密固件数据
         
@@ -93,7 +94,7 @@ class CryptoManager:
             elif algorithm in [EncryptionType.AES_128_CBC, EncryptionType.AES_256_CBC]:
                 if algorithm == EncryptionType.AES_128_CBC:
                     # 生成STM32兼容的AES固件格式
-                    encrypted_data_with_header, metadata = self._aes_encrypt_stm32_format(data, key, password)
+                    encrypted_data_with_header, metadata = self._aes_encrypt_stm32_format(data, key, password, firmware_version)
                     return encrypted_data_with_header, metadata
                 else:
                     # AES-256保持原有格式
@@ -198,7 +199,7 @@ class CryptoManager:
         
         return data
     
-    def _aes_encrypt_stm32_format(self, data: bytes, key: bytes, password: str) -> Tuple[bytes, Dict[str, Any]]:
+    def _aes_encrypt_stm32_format(self, data: bytes, key: bytes, password: str, firmware_version: str = None) -> Tuple[bytes, Dict[str, Any]]:
         """
         STM32格式的AES加密 - 生成包含固件头的完整格式
         与单片机端firmware_aes_header_t结构兼容
@@ -223,6 +224,10 @@ class CryptoManager:
         firmware_crc32 = CryptoManager._calculate_crc32_stm32(data)
         encrypted_crc32 = CryptoManager._calculate_crc32_stm32(encrypted_data)
         
+        # 调试信息：显示原始数据的前16字节和CRC32
+        logger.info(f"Original firmware first 16 bytes: {data[:16].hex().upper()}")
+        logger.info(f"Original firmware CRC32: 0x{firmware_crc32:08X}")
+        
         # 生成密钥哈希
         key_hash = hashlib.md5(key).digest()
         
@@ -235,8 +240,9 @@ class CryptoManager:
         header += struct.pack('<I', encrypted_crc32)  # encrypted_crc32
         header += iv  # iv (16 bytes)
         header += key_hash  # key_hash (16 bytes)
-        # fw_version (8 bytes) - 默认版本1.0.0.1
-        header += struct.pack('<HHHH', 1, 0, 0, 1)
+        # fw_version (8 bytes) - 解析固件版本
+        major, minor, patch, build = self._parse_firmware_version(firmware_version)
+        header += struct.pack('<HHHH', major, minor, patch, build)
         
         # 完整的固件文件：头部 + 加密数据
         complete_firmware = header + encrypted_data
@@ -277,6 +283,16 @@ class CryptoManager:
         STM32兼容的密钥派生算法
         与单片机端的firmware_aes_derive_key()保持一致
         """
+        # 特殊处理：如果密码是32个字符的十六进制字符串，直接作为密钥使用
+        if len(password) == 32:
+            try:
+                # 尝试将其作为十六进制解析
+                key_bytes = bytes.fromhex(password)
+                if len(key_bytes) == 16:  # AES-128密钥长度
+                    return key_bytes
+            except ValueError:
+                pass  # 如果不是有效的十六进制，继续正常的密钥派生
+        
         # 默认盐值（模拟STM32 unique ID）
         if salt is None:
             salt = [0x05D8FF35, 0x3132564E]  # 默认唯一ID
@@ -310,6 +326,33 @@ class CryptoManager:
             temp_key[16:32] = key
         
         return bytes(key)
+    
+    def _parse_firmware_version(self, version_str: str) -> tuple:
+        """
+        解析固件版本字符串为(major, minor, patch, build)元组
+        支持格式：v1.1.23.2025, 1.1.23.2025, v1.1.23, 1.1.23等
+        """
+        if not version_str:
+            return (1, 0, 0, 1)  # 默认版本
+        
+        # 移除v前缀
+        clean_version = version_str.lstrip('v')
+        
+        try:
+            # 分割版本号
+            parts = [int(x) for x in clean_version.split('.')]
+            
+            # 补齐到4段
+            while len(parts) < 4:
+                parts.append(0)
+            
+            # 只取前4段
+            parts = parts[:4]
+            
+            return tuple(parts)
+        except (ValueError, AttributeError):
+            # 解析失败时返回默认版本
+            return (1, 0, 0, 1)
     
     @staticmethod
     def _calculate_crc32_stm32(data: bytes) -> int:
@@ -368,8 +411,8 @@ class CryptoManager:
         for byte in data:
             crc = crc32_table[(crc ^ byte) & 0xFF] ^ (crc >> 8)
         
-        # 与STM32端保持一致，返回无符号32位值
-        return crc & 0xFFFFFFFF
+        # 标准CRC32需要取反，与STM32端保持一致
+        return (~crc) & 0xFFFFFFFF
 
     def get_supported_algorithms(self) -> List[Dict[str, Any]]:
         """获取支持的加密算法列表"""

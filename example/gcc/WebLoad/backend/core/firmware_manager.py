@@ -374,9 +374,10 @@ class FirmwareManager:
                 logger.warning(f"固件 {firmware_id} 已加密，跳过")
                 return True
             
-            # 加密固件
+            # 加密固件，传入版本信息用于AES固件头
+            firmware_version = firmware.version
             encrypted_content, encryption_metadata = crypto_manager.encrypt_firmware(
-                content, algorithm, key, password
+                content, algorithm, key, password, firmware_version
             )
             
             # 写入加密后的固件
@@ -397,6 +398,12 @@ class FirmwareManager:
             if password:
                 firmware.encryption_metadata['password'] = password
                 logger.info(f"Password saved to metadata: {password}")
+            elif key:
+                # 当使用手动密钥时，将密钥的十六进制表示作为密码保存
+                # 这样单片机端可以使用这个"密码"重新生成相同的密钥
+                key_as_password = key.hex()
+                firmware.encryption_metadata['password'] = key_as_password
+                logger.info(f"Manual key saved as password: {key_as_password}")
             
             firmware.size = len(encrypted_content)
             firmware.checksum = crypto_manager.calculate_checksum(encrypted_content)

@@ -24,7 +24,7 @@ typedef struct {
     /* 固件加密信息 */
     bool firmware_encrypted;    /* 固件是否加密 */
     char encryption_algorithm[16]; /* 加密算法 */
-    char encryption_password[32];  /* 加密密码 */
+    char encryption_password[64];  /* 加密密码 */
     
     /* 固件元信息 */
     char firmware_version[32];  /* 固件版本 */

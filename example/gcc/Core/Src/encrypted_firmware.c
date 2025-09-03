@@ -239,6 +239,17 @@ static bool decrypt_aes_firmware_to_internal(w25q64_partition_id_t source_partit
     }
     print_str("\r\n");
     
+    /* 调试信息：显示AES头中的CRC32信息 */
+    print_str("Debug: AES header CRC32: 0x");
+    print_hex(aes_header.crc32);
+    print_str("\r\n");
+    print_str("Debug: Firmware size from header: ");
+    print_dec(aes_header.firmware_size);
+    print_str(" bytes\r\n");
+    print_str("Debug: Decrypted total: ");
+    print_dec(decrypted_total);
+    print_str(" bytes\r\n");
+    
     /* 验证 */
     if (firmware_crypto_verify_firmware(APP_START_ADDR, decrypted_total, aes_header.crc32)) {
         print_str("AES firmware verification successful!\r\n");

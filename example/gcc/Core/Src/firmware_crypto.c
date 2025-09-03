@@ -118,8 +118,8 @@ uint32_t firmware_crypto_crc32(const uint8_t* data, uint32_t size)
         crc = crc32_table[(crc ^ byte) & 0xFF] ^ (crc >> 8);
     }
     
-    // 不取反，匹配STM32硬件CRC行为
-    return crc;
+    // 标准CRC32需要取反
+    return ~crc;
 }
 
 /**

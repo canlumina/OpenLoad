@@ -1,54 +1,80 @@
 {
-  "fw_1756887283_20250903_161443_RTC4": {
-    "id": "fw_1756887283_20250903_161443_RTC4",
-    "filename": "20250903_161443_RTC4.bin",
-    "original_filename": "RTC4.bin",
-    "version": "v1.11.1.2025",
-    "size": 14320,
-    "checksum": "b0e2c598af783db77b5c86d18314f834",
-    "upload_time": "2025-09-03T16:14:43.551316",
-    "target_device": "STM32F103ZET6",
-    "is_encrypted": true,
-    "encryption_algorithm": "aes-128-cbc",
-    "encryption_metadata": {
-      "algorithm": "aes-128-cbc",
-      "key_length": 16,
-      "iv": "9d01fef87aeab041403ef48e32a6b8ff",
-      "block_size": 16,
-      "firmware_size": 14240,
-      "encrypted_size": 14256,
-      "header_size": 64,
-      "password": "cancan"
-    },
-    "metadata": {
-      "upload_source": "web_api",
-      "upload_timestamp": "2025-09-03T16:14:43.550698"
-    }
-  },
-  "fw_1756887446_20250903_161726_RTC3": {
-    "id": "fw_1756887446_20250903_161726_RTC3",
-    "filename": "20250903_161726_RTC3.bin",
-    "original_filename": "RTC3.bin",
-    "version": "v1.12.2.2025",
+  "fw_1756893082_RTC2_crc32_test": {
+    "id": "fw_1756893082_RTC2_crc32_test",
+    "filename": "RTC2_crc32_test.bin",
+    "original_filename": "RTC2_crc32_test.bin",
+    "version": "v2.21.1.2025",
     "size": 16288,
-    "checksum": "45e3d5346de1b39c3db03d77950e3a64",
-    "upload_time": "2025-09-03T16:17:26.378190",
+    "checksum": "7101dc90577292a6cddb5e78c247a429",
+    "upload_time": "2025-09-03T17:51:22.435547",
     "target_device": "STM32F103ZET6",
     "is_encrypted": true,
     "encryption_algorithm": "aes-128-cbc",
     "encryption_metadata": {
       "algorithm": "aes-128-cbc",
       "key_length": 16,
-      "iv": "5b00e8fa8227b32539d93f85d70cd0ec",
+      "iv": "78a74c5bc65d24ae2f02306067b7679c",
       "block_size": 16,
       "firmware_size": 16220,
       "encrypted_size": 16224,
       "header_size": 64,
-      "password": "yangcancancacn"
+      "password": "test_password_for_crc32_fix_123456"
+    },
+    "metadata": {
+      "source": "crc32_test",
+      "test_time": "2025-09-03T17:49:00"
+    }
+  },
+  "fw_1756894663_20250903_181743_RTC4": {
+    "id": "fw_1756894663_20250903_181743_RTC4",
+    "filename": "20250903_181743_RTC4.bin",
+    "original_filename": "RTC4.bin",
+    "version": "v3.1.23.2025",
+    "size": 14320,
+    "checksum": "0efd24d389edaf577ed018f1633cea8a",
+    "upload_time": "2025-09-03T18:17:43.588364",
+    "target_device": "STM32F103ZET6",
+    "is_encrypted": true,
+    "encryption_algorithm": "aes-128-cbc",
+    "encryption_metadata": {
+      "algorithm": "aes-128-cbc",
+      "key_length": 16,
+      "iv": "9f49288bb0de0386f9bb91af751d471b",
+      "block_size": 16,
+      "firmware_size": 14240,
+      "encrypted_size": 14256,
+      "header_size": 64,
+      "password": "0093b763c60479cf714f0742aa2e8c05"
     },
     "metadata": {
       "upload_source": "web_api",
-      "upload_timestamp": "2025-09-03T16:17:26.377514"
+      "upload_timestamp": "2025-09-03T18:17:43.586809"
+    }
+  },
+  "fw_1756895310_20250903_182830_RTC": {
+    "id": "fw_1756895310_20250903_182830_RTC",
+    "filename": "20250903_182830_RTC.bin",
+    "original_filename": "RTC.bin",
+    "version": "v3.3.3.2025",
+    "size": 16288,
+    "checksum": "9a2b52102edf250187e48b4a8d650416",
+    "upload_time": "2025-09-03T18:28:30.841632",
+    "target_device": "STM32F103ZET6",
+    "is_encrypted": true,
+    "encryption_algorithm": "aes-128-cbc",
+    "encryption_metadata": {
+      "algorithm": "aes-128-cbc",
+      "key_length": 16,
+      "iv": "5ea57d71d854e2bd0c02ce211f8792e6",
+      "block_size": 16,
+      "firmware_size": 16220,
+      "encrypted_size": 16224,
+      "header_size": 64,
+      "password": "6824b131927e54438f885d1264e37f7e"
+    },
+    "metadata": {
+      "upload_source": "web_api",
+      "upload_timestamp": "2025-09-03T18:28:30.840523"
     }
   }
 }

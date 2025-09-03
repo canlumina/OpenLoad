@@ -27,7 +27,7 @@ static bool g_wifi_initialized = false;
 
 /* OTA和加密相关变量 */
 static ota_context_t g_ota_context;
-static char g_dynamic_password[32] = "yangcan";  /* 默认密码，可动态更新 */
+static char g_dynamic_password[64] = "yangcan";  /* 默认密码，可动态更新，支持32字符十六进制密钥 */
 
 /* 配置命令处理函数前向声明 */
 static void cmd_config_show_handler(void);
