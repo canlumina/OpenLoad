@@ -182,7 +182,7 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
     }
     
     /* 分块下载实现 */
-    #define CHUNK_SIZE 1024  /* 每次下载1KB */
+    #define CHUNK_SIZE 4096  /* 每次下载4KB */
     
     /* 先调用API获取固件信息（包括密码） */
     if (http_client_connect(&ctx->http_client, host, port) == HTTP_STATUS_OK) {
@@ -291,16 +291,7 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
             chunk_end = ctx->total_size - 1;
         }
         
-        /* 调试：显示分块信息 */
-        bootloader_print("Chunk ");
-        bootloader_print_dec(chunk + 1);
-        bootloader_print("/");
-        bootloader_print_dec(chunk_count);
-        bootloader_print(" (");
-        bootloader_print_dec(chunk_start);
-        bootloader_print("-");
-        bootloader_print_dec(chunk_end);
-        bootloader_print(") ");
+        /* 删除chunk详细信息显示 */
         
         /* 每个分块最多重试3次 */
         int retry_count = 0;
@@ -308,8 +299,6 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
         bool chunk_success = false;
         
         while (retry_count < max_retries && !chunk_success) {
-            /* 记录分块开始前的写入位置 */
-            uint32_t chunk_start_offset = g_actual_write_offset;
             
             /* 重新连接 */
             http_status_t connect_status = http_client_connect(&ctx->http_client, host, port);
@@ -327,7 +316,7 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
                     g_ota_ctx = NULL;
                     return OTA_STATUS_HTTP_ERROR;
                 }
-                HAL_Delay(1000); /* 重试前等待1秒 */
+                HAL_Delay(500); /* 重试前等待0.5秒 */
                 continue;
             }
             
@@ -349,7 +338,7 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
                     g_ota_ctx = NULL;
                     return OTA_STATUS_HTTP_ERROR;
                 }
-                HAL_Delay(1000); /* 重试前等待1秒 */
+                HAL_Delay(500); /* 重试前等待0.5秒 */
                 continue;
             }
             
@@ -357,11 +346,7 @@ ota_status_t ota_download_firmware(ota_context_t *ctx, const char *url,
             http_client_disconnect(&ctx->http_client);
             chunk_success = true;
             
-            /* 显示实际收到的字节数 */
-            uint32_t chunk_bytes_received = g_actual_write_offset - chunk_start_offset;
-            bootloader_print("OK (");
-            bootloader_print_dec(chunk_bytes_received);
-            bootloader_print("B)\r\n");
+            /* 删除chunk成功显示 */
         }
         
         if (!chunk_success) {
