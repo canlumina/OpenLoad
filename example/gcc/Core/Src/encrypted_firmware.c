@@ -92,52 +92,10 @@ static bool decrypt_aes_firmware_to_internal(w25q64_partition_id_t source_partit
     uint32_t* unique_id = (uint32_t*)0x1FFFF7E8;
     uint8_t aes_key[16];
     
-    /* 调试信息：显示Unique ID */
-    print_str("Debug: STM32 Unique ID: ");
-    print_hex(unique_id[0]);
-    print_str("-");
-    print_hex(unique_id[1]);
-    print_str("-");
-    print_hex(unique_id[2]);
-    print_str("\r\n");
     
     firmware_aes_derive_key(password, unique_id, aes_key);
     
-    /* 调试信息：显示生成的AES密钥 */
-    print_str("Debug: Generated AES Key: ");
-    for (int i = 0; i < 16; i++) {
-        uint8_t byte_val = aes_key[i];
-        // 显示高4位
-        uint8_t high = (byte_val >> 4) & 0xF;
-        char h_char = high < 10 ? ('0' + high) : ('A' + high - 10);
-        char h_str[2] = {h_char, '\0'};
-        print_str(h_str);
-        
-        // 显示低4位
-        uint8_t low = byte_val & 0xF;
-        char l_char = low < 10 ? ('0' + low) : ('A' + low - 10);
-        char l_str[2] = {l_char, '\0'};
-        print_str(l_str);
-    }
-    print_str("\r\n");
     
-    /* 调试信息：显示IV */
-    print_str("Debug: IV: ");
-    for (int i = 0; i < 16; i++) {
-        uint8_t byte_val = aes_header.iv[i];
-        // 显示高4位
-        uint8_t high = (byte_val >> 4) & 0xF;
-        char h_char = high < 10 ? ('0' + high) : ('A' + high - 10);
-        char h_str[2] = {h_char, '\0'};
-        print_str(h_str);
-        
-        // 显示低4位
-        uint8_t low = byte_val & 0xF;
-        char l_char = low < 10 ? ('0' + low) : ('A' + low - 10);
-        char l_str[2] = {l_char, '\0'};
-        print_str(l_str);
-    }
-    print_str("\r\n");
     
     if (!streaming_aes_init(&aes_ctx, aes_key, aes_header.iv)) {
         print_str("Failed to initialize AES!\r\n");
@@ -220,35 +178,7 @@ static bool decrypt_aes_firmware_to_internal(w25q64_partition_id_t source_partit
     print_dec(decrypted_total);
     print_str(" bytes\r\n");
     
-    /* 调试信息：显示解密后前16字节数据 */
-    print_str("Debug: First 16 bytes of decrypted data: ");
-    uint8_t* flash_data = (uint8_t*)APP_START_ADDR;
-    for (int i = 0; i < 16; i++) {
-        uint8_t byte_val = flash_data[i];
-        uint8_t high = (byte_val >> 4) & 0xF;
-        char h_char = high < 10 ? ('0' + high) : ('A' + high - 10);
-        char h_str[2] = {h_char, '\0'};
-        print_str(h_str);
-        
-        uint8_t low = byte_val & 0xF;
-        char l_char = low < 10 ? ('0' + low) : ('A' + low - 10);
-        char l_str[2] = {l_char, '\0'};
-        print_str(l_str);
-        
-        if (i < 15) print_str(" ");
-    }
-    print_str("\r\n");
     
-    /* 调试信息：显示AES头中的CRC32信息 */
-    print_str("Debug: AES header CRC32: 0x");
-    print_hex(aes_header.crc32);
-    print_str("\r\n");
-    print_str("Debug: Firmware size from header: ");
-    print_dec(aes_header.firmware_size);
-    print_str(" bytes\r\n");
-    print_str("Debug: Decrypted total: ");
-    print_dec(decrypted_total);
-    print_str(" bytes\r\n");
     
     /* 验证 */
     if (firmware_crypto_verify_firmware(APP_START_ADDR, decrypted_total, aes_header.crc32)) {

@@ -254,13 +254,6 @@ bool firmware_crypto_verify_firmware(uint32_t firmware_addr, uint32_t expected_s
     /* 计算固件的CRC32 */
     uint32_t calculated_crc32 = firmware_crypto_crc32((uint8_t*)firmware_addr, expected_size);
     
-    /* 调试信息 */
-    print_str("Debug: Expected CRC32: 0x");
-    print_hex(expected_crc32);
-    print_str("\r\n");
-    print_str("Debug: Calculated CRC32: 0x");
-    print_hex(calculated_crc32);
-    print_str("\r\n");
     
     return (calculated_crc32 == expected_crc32);
 }

@@ -70,21 +70,6 @@ bool firmware_aes_decrypt_cbc(const uint8_t* input, uint8_t* output, uint32_t si
         return false;
     }
     
-    /* 调试：输出前16字节的加密数据和IV */
-    print_str("Debug: First encrypted block: ");
-    for (int i = 0; i < 16; i++) {
-        uint8_t byte_val = input[i];
-        uint8_t high = (byte_val >> 4) & 0xF;
-        char h_char = high < 10 ? ('0' + high) : ('A' + high - 10);
-        char h_str[2] = {h_char, '\0'};
-        print_str(h_str);
-        
-        uint8_t low = byte_val & 0xF;
-        char l_char = low < 10 ? ('0' + low) : ('A' + low - 10);
-        char l_str[2] = {l_char, '\0'};
-        print_str(l_str);
-    }
-    print_str("\r\n");
     
     /* 复制IV到临时缓冲区 */
     uint8_t temp_iv[AES_BLOCK_SIZE];
@@ -93,23 +78,6 @@ bool firmware_aes_decrypt_cbc(const uint8_t* input, uint8_t* output, uint32_t si
     /* 使用mbedTLS进行AES-CBC解密 */
     int ret = mbedtls_aes_crypt_cbc(&g_aes_dec_ctx, MBEDTLS_AES_DECRYPT, size, temp_iv, input, output);
     
-    /* 调试：输出解密结果的前16字节 */
-    if (ret == 0) {
-        print_str("Debug: First decrypted block: ");
-        for (int i = 0; i < 16; i++) {
-            uint8_t byte_val = output[i];
-            uint8_t high = (byte_val >> 4) & 0xF;
-            char h_char = high < 10 ? ('0' + high) : ('A' + high - 10);
-            char h_str[2] = {h_char, '\0'};
-            print_str(h_str);
-            
-            uint8_t low = byte_val & 0xF;
-            char l_char = low < 10 ? ('0' + low) : ('A' + low - 10);
-            char l_str[2] = {l_char, '\0'};
-            print_str(l_str);
-        }
-        print_str("\r\n");
-    }
     
     return (ret == 0);
 }
@@ -257,25 +225,9 @@ uint32_t firmware_aes_decrypt_firmware(uint32_t encrypted_addr, uint32_t output_
     uint8_t aes_key[AES_KEY_SIZE];
     uint32_t* unique_id = (uint32_t*)0x1FFFF7E8;
     
-    /* 调试信息：显示Unique ID */
-    print_str("Debug: STM32 Unique ID: ");
-    print_hex(unique_id[0]);
-    print_str("-");
-    print_hex(unique_id[1]);
-    print_str("-");
-    print_hex(unique_id[2]);
-    print_str("\r\n");
     
     firmware_aes_derive_key(password, unique_id, aes_key);
     
-    /* 调试信息：显示生成的AES密钥 */
-    print_str("Debug: Generated AES Key: ");
-    for (int i = 0; i < AES_KEY_SIZE; i++) {
-        uint32_t byte_val = aes_key[i];
-        if (byte_val < 0x10) print_str("0");
-        print_hex(byte_val);
-    }
-    print_str("\r\n");
     
     /* 初始化mbedTLS AES */
     if (!firmware_aes_init(aes_key)) return 0;
