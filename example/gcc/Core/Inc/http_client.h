@@ -49,6 +49,7 @@ typedef struct {
 bool http_client_init(http_client_t *client, esp8266_device_t *esp8266);
 http_status_t http_client_connect(http_client_t *client, const char *host, uint16_t port);
 http_status_t http_client_get(http_client_t *client, const char *path);
+http_status_t http_client_head(http_client_t *client, const char *path);
 http_status_t http_client_get_with_range(http_client_t *client, const char *path, 
                                         uint32_t start, uint32_t length);
 http_status_t http_client_send_raw_request(http_client_t *client, const char *request);

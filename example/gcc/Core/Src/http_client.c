@@ -383,6 +383,44 @@ http_status_t http_client_get(http_client_t *client, const char *path)
     return status;
 }
 
+http_status_t http_client_head(http_client_t *client, const char *path)
+{
+    if (!client || !client->connected || !path) return HTTP_STATUS_ERROR;
+    
+    char request[512];
+    
+    /* 构建HTTP HEAD请求 */
+    snprintf(request, sizeof(request),
+             "HEAD %s HTTP/1.1\r\n"
+             "Host: %s\r\n"
+             "Connection: close\r\n"
+             "\r\n",
+             path, client->host);
+    
+    /* 发送请求 */
+    http_status_t status = http_send_request(client, request);
+    if (status != HTTP_STATUS_OK) {
+        return status;
+    }
+    
+    /* 重置body_received计数器 */
+    client->body_received = 0;
+    
+    /* 解析响应头 */
+    status = http_parse_response_header(client);
+    if (status != HTTP_STATUS_OK) {
+        return status;
+    }
+    
+    /* 检查HTTP状态码 */
+    if (client->response.status_code != 200) {
+        return HTTP_STATUS_ERROR;
+    }
+    
+    /* HEAD请求不需要接收body数据 */
+    return HTTP_STATUS_OK;
+}
+
 http_status_t http_client_get_with_range(http_client_t *client, const char *path, 
                                         uint32_t start, uint32_t length)
 {
