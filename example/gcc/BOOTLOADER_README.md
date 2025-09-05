@@ -676,6 +676,6 @@ Configuration saved to flash.
 - [ ] HTTPS支持（SSL/TLS）
 - [ ] 支持固件签名验证
 - [ ] 支持 USB DFU 模式
-- [ ] 添加固件版本管理
-- [ ] Web界面固件管理
+- [x] 添加固件版本管理
+- [x] Web界面固件管理
 - [ ] 固件差分更新
