@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F103xE</Define>
               <Undefine></Undefine>
-              <IncludePath>..\..\..\platform\stm32\CMSIS\Device\ST\STM32F1xx\Include;..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Inc;..\..\..\platform\stm32\CMSIS\Include;..\..\User;..\..\Middlewares;..\..\Drivers\SYSTEM\delay;..\..\Drivers\SYSTEM\sys;..\..\Drivers\SYSTEM\usart;..\..\Drivers\BSP;..\..\..\..\src\fal\inc;..\..\..\..\src\easyflash\inc;..\..\..\..\src\SUFD\inc</IncludePath>
+              <IncludePath>..\..\..\platform\stm32\CMSIS\Device\ST\STM32F1xx\Include;..\..\..\platform\stm32\STM32F1xx_HAL_Driver\Inc;..\..\..\platform\stm32\CMSIS\Include;..\..\User;..\..\Middlewares;..\..\Drivers\SYSTEM\delay;..\..\Drivers\SYSTEM\sys;..\..\Drivers\SYSTEM\usart;..\..\Drivers\BSP</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -408,29 +408,6 @@
               <FileName>system_stm32f1xx.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\platform\stm32\CMSIS\Device\ST\STM32F1xx\Source\Templates\system_stm32f1xx.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>User/IAP</GroupName>
-        </Group>
-        <Group>
-          <GroupName>Drivers/SYSTEM</GroupName>
-          <Files>
-            <File>
-              <FileName>delay.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\SYSTEM\delay\delay.c</FilePath>
-            </File>
-            <File>
-              <FileName>sys.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\SYSTEM\sys\sys.c</FilePath>
-            </File>
-            <File>
-              <FileName>usart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\SYSTEM\usart\usart.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -523,84 +500,29 @@
               <FilePath>..\..\Drivers\BSP\bsp_led.c</FilePath>
             </File>
             <File>
-              <FileName>bsp_spi.c</FileName>
+              <FileName>dev_usart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\Drivers\BSP\bsp_spi.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>Fal</GroupName>
-          <Files>
-            <File>
-              <FileName>fal_flash.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\fal\src\fal_flash.c</FilePath>
+              <FilePath>..\..\Drivers\BSP\dev_usart.c</FilePath>
             </File>
             <File>
-              <FileName>fal.c</FileName>
+              <FileName>dma.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\fal\src\fal.c</FilePath>
+              <FilePath>..\..\Drivers\BSP\dma.c</FilePath>
             </File>
             <File>
-              <FileName>fal_flash_port.c</FileName>
+              <FileName>gpio.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\fal\src\fal_flash_port.c</FilePath>
+              <FilePath>..\..\Drivers\BSP\gpio.c</FilePath>
             </File>
             <File>
-              <FileName>fal_partition.c</FileName>
+              <FileName>ringbuff.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\fal\src\fal_partition.c</FilePath>
+              <FilePath>..\..\Drivers\BSP\ringbuff.c</FilePath>
             </File>
             <File>
-              <FileName>fal_flash_sfud_port.c</FileName>
+              <FileName>usart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\fal\src\fal_flash_sfud_port.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>EasyFlash</GroupName>
-          <Files>
-            <File>
-              <FileName>easyflash.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\easyflash\src\easyflash.c</FilePath>
-            </File>
-            <File>
-              <FileName>ef_env.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\easyflash\src\ef_env.c</FilePath>
-            </File>
-            <File>
-              <FileName>ef_port.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\easyflash\src\ef_port.c</FilePath>
-            </File>
-            <File>
-              <FileName>ef_utils.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\easyflash\src\ef_utils.c</FilePath>
-            </File>
-          </Files>
-        </Group>
-        <Group>
-          <GroupName>SFUD</GroupName>
-          <Files>
-            <File>
-              <FileName>sfud.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\SUFD\src\sfud.c</FilePath>
-            </File>
-            <File>
-              <FileName>sfud_port.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\SUFD\src\sfud_port.c</FilePath>
-            </File>
-            <File>
-              <FileName>sfud_sfdp.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\..\src\SUFD\src\sfud_sfdp.c</FilePath>
+              <FilePath>..\..\Drivers\BSP\usart.c</FilePath>
             </File>
           </Files>
         </Group>
