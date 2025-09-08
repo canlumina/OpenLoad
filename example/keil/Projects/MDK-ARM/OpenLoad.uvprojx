@@ -524,6 +524,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\Drivers\BSP\usart.c</FilePath>
             </File>
+            <File>
+              <FileName>dev_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\BSP\dev_flash.c</FilePath>
+            </File>
           </Files>
         </Group>
       </Groups>
