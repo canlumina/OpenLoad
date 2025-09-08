@@ -8,8 +8,8 @@
 /**
   * @brief  初始化FIFO缓冲区
   * @param  pfifo: FIFO结构体指针
-			pfifo_buf: FIFO缓冲区指针
-			size: 缓冲区大小
+  * @param	pfifo_buf: FIFO缓冲区指针
+  * @param	size: 缓冲区大小
   * @retval none
 */
 void fifo_register(_fifo_t *pfifo, uint8_t *pfifo_buf, uint32_t size,
@@ -43,8 +43,8 @@ void fifo_release(_fifo_t *pfifo)
 /**
   * @brief  向FIFO写入数据
   * @param  pfifo: FIFO结构体指针
-        pbuf: 写入数据缓冲区
-        size: 写入数据长度
+  * @param  pbuf: 写入数据缓冲区
+  * @param  size: 写入数据长度
   * @retval 实际写入长度
 */
 uint32_t fifo_write(_fifo_t *pfifo, const uint8_t *pbuf, uint32_t size)
@@ -88,8 +88,8 @@ uint32_t fifo_write(_fifo_t *pfifo, const uint8_t *pbuf, uint32_t size)
 /**
   * @brief  从FIFO读取数据
   * @param  pfifo: FIFO结构体指针
-			pbuf: 读取数据存放缓冲区
-			size: 读取数据长度
+  * @param	pbuf: 读取数据存放缓冲区
+  * @param	size: 读取数据长度
   * @retval 实际读取长度
 */
 uint32_t fifo_read(_fifo_t *pfifo, uint8_t *pbuf, uint32_t size)
