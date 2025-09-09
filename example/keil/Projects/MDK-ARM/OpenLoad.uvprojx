@@ -500,11 +500,6 @@
               <FilePath>..\..\Drivers\BSP\bsp_led.c</FilePath>
             </File>
             <File>
-              <FileName>dev_usart.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\BSP\dev_usart.c</FilePath>
-            </File>
-            <File>
               <FileName>dma.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\Drivers\BSP\dma.c</FilePath>
@@ -515,19 +510,9 @@
               <FilePath>..\..\Drivers\BSP\gpio.c</FilePath>
             </File>
             <File>
-              <FileName>ringbuff.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\BSP\ringbuff.c</FilePath>
-            </File>
-            <File>
               <FileName>usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\Drivers\BSP\usart.c</FilePath>
-            </File>
-            <File>
-              <FileName>dev_flash.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\Drivers\BSP\dev_flash.c</FilePath>
             </File>
             <File>
               <FileName>spi.c</FileName>
@@ -548,6 +533,26 @@
               <FileName>w25q64.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\Drivers\BSP\w25q64.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\BSP\dev_flash.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Drivers/usart</GroupName>
+          <Files>
+            <File>
+              <FileName>dev_usart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\BSP\dev_usart.c</FilePath>
+            </File>
+            <File>
+              <FileName>ringbuff.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\BSP\ringbuff.c</FilePath>
             </File>
           </Files>
         </Group>

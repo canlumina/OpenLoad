@@ -81,16 +81,18 @@ extern struct flash_dev w25q64;
 
 /* ====================== Partition Configuration ========================== */
 /* partition table */
-#define FLASH_PART_TABLE                                                                                    \
-    {                                                                                                     \
-        {FAL_PART_MAGIC_WORD, "bootloader", "stm32_onchip", 0                   , 64 * 1024        ,  0}, \
-        {FAL_PART_MAGIC_WORD, "app"       , "stm32_onchip", 64 * 1024           , (512 - 64) * 1024,  0}, \
-        {FAL_PART_MAGIC_WORD, "env"       , "w25q64"   , 0                   , 1024 * 1024      ,  0}, \
-        {FAL_PART_MAGIC_WORD, "download"  , "w25q64"   , (1024) * 1024       , 1024 * 1024      ,  0}, \
-        {FAL_PART_MAGIC_WORD, "basesys"   , "w25q64"   , (1024 + 1024) * 1024, 1024 * 1024      ,  0}, \
-        {FAL_PART_MAGIC_WORD, "fonts"     , "w25q64"   , (1024 + 2048) * 1024, 5* 1024 * 1024   ,  0}, \
+#define FLASH_PART_TABLE                                                                                        \
+    {                                                                                                           \
+        {FAL_PART_MAGIC_WORD, "bootloader", "stm32_onchip", 0                           , 64 * 1024     ,  0},  \
+        {FAL_PART_MAGIC_WORD, "app"       , "stm32_onchip", 64 * 1024                   , 448 * 1024    ,  0},  \
+        {FAL_PART_MAGIC_WORD, "env"       , "w25q64"      , 0                           , 64 * 1024     ,  0},  \
+        {FAL_PART_MAGIC_WORD, "download"  , "w25q64"      , (0 + 64) * 1024             , 448 * 1024    ,  0},  \
+        {FAL_PART_MAGIC_WORD, "backup_bl" , "w25q64"      , (64 + 448) * 1024           , 64 * 1024     ,  0},  \
+		{FAL_PART_MAGIC_WORD, "backup_app", "w25q64"      , (64 + 448 + 64) * 1024      , 448 * 1024    ,  0},  \
+        {FAL_PART_MAGIC_WORD, "fonts"     , "w25q64"      , (64 + 448 + 64 + 448) * 1024, 5 * 1024 * 1024, 0},  \
     }
-
+//剩余的flash，保留
+	
 #define assert(EXPR)                                                           \
 if (!(EXPR))                                                                   \
 {                                                                              \
