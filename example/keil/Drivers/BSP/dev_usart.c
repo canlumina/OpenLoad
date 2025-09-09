@@ -1,4 +1,5 @@
-#include <stddef.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
@@ -319,6 +320,30 @@ void uart_poll_dma_tx(uint8_t uart_id)
 							  s_uart_dev[uart_id].dmatx_buf, 
 							  size);
 	}
+}
+
+
+
+// 在使用DMA和ringbuff下的格式化输出函数
+int uart_printf(const char* format, ...) 
+{	
+	char temp_buf[512];  // 根据需要调整大小
+
+    va_list args;
+    va_start(args, format);
+
+    // 格式化到临时缓冲区
+    int len = vsnprintf(temp_buf, sizeof(temp_buf), format, args);
+    va_end(args);
+    
+    if (len > 0 && len < sizeof(temp_buf)) 
+	{
+        // 将格式化后的数据写入ringbuffer
+        uart_write(DEV_UART1, (uint8_t*)temp_buf, len);
+		uart_poll_dma_tx(DEV_UART1);
+    }
+    
+    return len;
 }
 
 

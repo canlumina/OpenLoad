@@ -14,6 +14,7 @@ extern void uart_poll_dma_tx(uint8_t uart_id);
 
 extern uint32_t s_UartTxRxCount[4];
 
+int uart_printf(const char* format, ...);
 void uart1_printf(const char* str);
 void uart2_printf(const char* str);
 

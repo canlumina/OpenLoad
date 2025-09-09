@@ -1,11 +1,14 @@
+#include <string.h>
+#include <stdio.h>
+#include "dev_flash.h"
 #include "w25q64.h"
 #include "main.h"
 #include "gpio.h"
-#include <string.h>
-#include <stdio.h>
+
+
 
 /* 分区表定义 */
-static const w25q64_partition_t w25q64_partitions[W25Q64_PARTITION_MAX] = W25Q64_PARTITION_TABLE;
+//static const w25q64_partition_t w25q64_partitions[W25Q64_PARTITION_MAX] = W25Q64_PARTITION_TABLE;
 
 /* CS引脚控制 - 使用PB12 */
 void w25q64_cs_low(void)
@@ -44,7 +47,7 @@ void w25q64_spi_transmit_buffer(const uint8_t* tx_data, uint8_t* rx_data, uint32
 }
 
 /* 初始化W25Q64 */
-void w25q64_init(void)
+int w25q64_init(void)
 {
     /* 配置CS引脚为输出 */
     GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -65,6 +68,8 @@ void w25q64_init(void)
     
     /* 唤醒芯片 */
     w25q64_power_up();
+	
+	return 0;
 }
 
 /* 读取芯片ID */
@@ -129,7 +134,7 @@ void w25q64_write_disable(void)
 }
 
 /* 读取数据 */
-void w25q64_read(uint32_t addr, uint8_t* buffer, uint32_t size)
+int w25q64_read(long addr, uint8_t* buffer, size_t size)
 {
     w25q64_cs_low();
     w25q64_spi_transmit(W25Q64_CMD_READ_DATA);
@@ -143,6 +148,8 @@ void w25q64_read(uint32_t addr, uint8_t* buffer, uint32_t size)
     }
     
     w25q64_cs_high();
+	
+	return 0;
 }
 
 /* 快速读取数据 */
@@ -199,7 +206,7 @@ bool w25q64_write_page(uint32_t addr, const uint8_t* data, uint32_t size)
 }
 
 /* 写多页数据 */
-bool w25q64_write(uint32_t addr, const uint8_t* data, uint32_t size)
+int w25q64_write(long addr, const uint8_t* data, size_t size)
 {
     uint32_t page_remain;
     
@@ -284,20 +291,15 @@ const w25q64_partition_t* w25q64_get_partition(w25q64_partition_id_t id)
         return NULL;
     }
     
-    return &w25q64_partitions[id];
+	return 0;
+    //return &w25q64_partitions[id];
 }
 
 /* 擦除指定分区 */
-bool w25q64_erase_partition(w25q64_partition_id_t id)
-{
-    const w25q64_partition_t* partition = w25q64_get_partition(id);
-    if(!partition)
-    {
-        return false;
-    }
-    
-    uint32_t addr = partition->start_addr;
-    uint32_t size = partition->size;
+int w25q64_erase(long offset, size_t lenth)
+{    
+    uint32_t addr = offset;
+    uint32_t size = lenth;
     
     /* 优先使用块擦除 */
     while(size >= W25Q64_BLOCK_SIZE)
@@ -431,3 +433,16 @@ void w25q64_reset(void)
     
     HAL_Delay(10);
 }
+
+
+
+
+struct flash_dev w25q64 =
+    {
+        .name = "w25q64",
+        .addr = 0x0,
+        .len = 8 * 1024 * 1024,
+        .blk_size = 4096,
+        .ops = {w25q64_init, w25q64_read, w25q64_write, w25q64_erase},
+        .write_gran = 1
+	};

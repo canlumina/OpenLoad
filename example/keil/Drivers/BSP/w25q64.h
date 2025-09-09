@@ -78,7 +78,7 @@ typedef struct {
 /* 函数声明 */
 
 /* 基础操作 */
-void w25q64_init(void);
+int w25q64_init(void);
 uint32_t w25q64_read_id(void);
 bool w25q64_is_busy(void);
 void w25q64_wait_busy(void);
@@ -86,12 +86,12 @@ void w25q64_write_enable(void);
 void w25q64_write_disable(void);
 
 /* 读操作 */
-void w25q64_read(uint32_t addr, uint8_t* buffer, uint32_t size);
+int w25q64_read(long addr, uint8_t* buffer, size_t size);
 void w25q64_fast_read(uint32_t addr, uint8_t* buffer, uint32_t size);
 
 /* 写操作 */
 bool w25q64_write_page(uint32_t addr, const uint8_t* data, uint32_t size);
-bool w25q64_write(uint32_t addr, const uint8_t* data, uint32_t size);
+int w25q64_write(long addr, const uint8_t* data, size_t size);
 
 /* 擦除操作 */
 bool w25q64_erase_sector(uint32_t addr);
@@ -119,3 +119,4 @@ uint8_t w25q64_spi_transmit(uint8_t data);
 void w25q64_spi_transmit_buffer(const uint8_t* tx_data, uint8_t* rx_data, uint32_t size);
 
 #endif /* W25Q64_H */
+

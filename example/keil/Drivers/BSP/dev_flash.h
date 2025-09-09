@@ -2,38 +2,107 @@
 #define __DEV_FLASH_H_
 
 #include <stdint.h>
+#include "dev_usart.h"
+#ifndef FLASH_DEV_NAME_MAX
+#define FLASH_DEV_NAME_MAX 24
+#endif
+
+
+/* partition magic word */
+#define FAL_PART_MAGIC_WORD         0x45503130
+#define FAL_PART_MAGIC_WORD_H       0x4550L
+#define FAL_PART_MAGIC_WORD_L       0x3130L
 
 /* 分区信息结构 */
-typedef struct {
-    const char* name;
-    uint32_t start_addr;
-    uint32_t size;
-    const char* description;
-} flash_partition_t;
+struct flash_partition
+{
+    uint32_t magic_word;
 
-/* 外部Flash分区定义 */
-typedef enum {
-    FLASH_PARTITION_DOWNLOAD = 0,  // 下载区
-    FLASH_PARTITION_BACKUP1,       // 备份区1
-    FLASH_PARTITION_BACKUP2,       // 备份区2
-    FLASH_PARTITION_BACKUP3,       // 备份区3
-    FLASH_PARTITION_LOG,           // 日志区
-    FLASH_PARTITION_CONFIG,        // 配置区
-    FLASH_PARTITION_RESERVED,      // 预留区
-    FLASH_PARTITION_MAX
-} flash_partition_id_t;
+    /* partition name */
+    char name[FLASH_DEV_NAME_MAX];
+    /* flash device name for partition */
+    char flash_name[FLASH_DEV_NAME_MAX];
+
+    /* partition offset address on flash device */
+    long offset;
+    size_t len;
+
+    uint32_t reserved;
+};
+typedef struct flash_partition *flash_partition_t;;
 
 
-/* 分区表 - 总容量8MB */
-#define W25Q64_PARTITION_TABLE { \
-    {"Download",  0x000000, 0x200000, "Firmware download area (2MB)"},     \
-    {"Backup1",   0x200000, 0x070000, "Firmware backup slot 1 (448KB)"},   \
-    {"Backup2",   0x270000, 0x070000, "Firmware backup slot 2 (448KB)"},   \
-    {"Backup3",   0x2E0000, 0x070000, "Firmware backup slot 3 (448KB)"},   \
-    {"Log",       0x350000, 0x080000, "System log area (512KB)"},          \
-    {"Config",    0x3D0000, 0x010000, "Configuration area (64KB)"},        \
-    {"Reserved",  0x3E0000, 0x420000, "Reserved area (4.125MB)"}           \
+
+
+/* flash设备基本结构 */
+struct flash_dev
+{
+    char name[FLASH_DEV_NAME_MAX];
+
+    /* flash device start address and len  */
+    uint32_t addr;
+    size_t len;
+    /* the block size in the flash for erase minimum granularity */
+    size_t blk_size;
+
+    struct
+    {
+        int (*init)(void);
+        int (*read)(long offset, uint8_t *buf, size_t size);
+        int (*write)(long offset, const uint8_t *buf, size_t size);
+        int (*erase)(long offset, size_t size);
+    } ops;
+
+    /* write minimum granularity, unit: bit. 
+       1(nor flash)/ 8(stm32f2/f4)/ 32(stm32f1)/ 64(stm32l4)
+       0 will not take effect. */
+    size_t write_gran;
+};
+typedef struct flash_dev *flash_dev_t;
+
+struct part_flash_info
+{
+    const struct flash_dev *flash_dev;
+};
+
+
+
+
+/* ===================== Flash device Configuration ========================= */
+extern const struct flash_dev stm32_onchip_flash;
+extern struct flash_dev w25q64;
+/* flash device table */
+#define FLASH_DEV_TABLE  \
+    {                        \
+        &stm32_onchip_flash, \
+        &w25q64,         \
+    }
+
+
+/* ====================== Partition Configuration ========================== */
+/* partition table */
+#define FLASH_PART_TABLE                                                                                    \
+    {                                                                                                     \
+        {FAL_PART_MAGIC_WORD, "bootloader", "stm32_onchip", 0                   , 64 * 1024        ,  0}, \
+        {FAL_PART_MAGIC_WORD, "app"       , "stm32_onchip", 64 * 1024           , (512 - 64) * 1024,  0}, \
+        {FAL_PART_MAGIC_WORD, "env"       , "w25q64"   , 0                   , 1024 * 1024      ,  0}, \
+        {FAL_PART_MAGIC_WORD, "download"  , "w25q64"   , (1024) * 1024       , 1024 * 1024      ,  0}, \
+        {FAL_PART_MAGIC_WORD, "basesys"   , "w25q64"   , (1024 + 1024) * 1024, 1024 * 1024      ,  0}, \
+        {FAL_PART_MAGIC_WORD, "fonts"     , "w25q64"   , (1024 + 2048) * 1024, 5* 1024 * 1024   ,  0}, \
+    }
+
+#define assert(EXPR)                                                           \
+if (!(EXPR))                                                                   \
+{                                                                              \
+    uart_printf("(%s) has assert failed at %s.\r\n", #EXPR, __func__ );        \
+    while (1);                                                                 \
 }
 
 
+int flash_init(void);
+const struct flash_partition *flash_partition_find(const char *name);
+const struct flash_dev *flash_device_find(const char *name);
+int flash_partition_erase_all(const struct flash_partition *part);
+int flash_partition_read(const struct flash_partition *part, uint32_t addr, uint8_t *buf, size_t size);
+int flash_partition_write(const struct flash_partition *part, uint32_t addr, const uint8_t *buf, size_t size);
 #endif
