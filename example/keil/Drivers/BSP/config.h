@@ -1,7 +1,13 @@
 #ifndef __CONFIG_H_
 #define __CONFIG_H_
 
+// bootloader相关配置
+#define BOOTLOADER_VERSIOIN "1.0.0"
+
+
 // 串口相关配置
+#define DEV_UART1	0
+#define DEV_UART2	1
 #define UART1_TX_BUF_SIZE           2048
 #define UART1_RX_BUF_SIZE           2048
 #define	UART1_DMA_RX_BUF_SIZE		1024
@@ -44,4 +50,10 @@ extern struct flash_dev w25q64;
     }
 //剩余的flash，保留
 
+	
+
+	
+	
+	
+	
 #endif

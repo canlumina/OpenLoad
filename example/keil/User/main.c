@@ -1,14 +1,6 @@
 #include <string.h>
-#include "gpio.h"
-#include "dma.h"
-#include "spi.h"
-#include "usart.h"
-#include "dev_usart.h"
-#include "dev_flash.h"
-#include "config.h"
-
-#include "bsp_key.h"
-#include "bsp_led.h"
+#include "bootloader.h"
+#include "main.h"
 
 void SystemClock_Config(void);
 
@@ -17,26 +9,27 @@ int main(void)
 	HAL_Init();                         /* 初始化HAL库 */
 	SystemClock_Config(); 				/* 设置时钟, 72Mhz */
 
-	led_init();                         /* 初始化LED */
-	key_init();                         /* 初始化按键 */
-	MX_GPIO_Init();
-	MX_DMA_Init();
-	MX_SPI2_Init();
-	MX_USART1_UART_Init();
-	MX_USART2_UART_Init();   
+	bootloader_init();
 
-	uart_device_init(DEV_UART1);
-	uart_device_init(DEV_UART2);
-	flash_init();
-	/* 等待串口稳定 */
-	HAL_Delay(100);
+	if(bootloader_check_entry(3000))
+	{
+		/* 进入Bootloader命令模式 */
+		bootloader_cmd_mode();
+	}
+	else
+	{
+		/* 跳转到应用程序 */
+		bootloader_jump_to_app();		
+	}
+	
+	/* 如果跳转失败，进入Bootloader命令模式 */
+	bootloader_cmd_mode();	
 	
 	while(1)
 	{
-		HAL_Delay(1000);
+		/* 正常情况下不会执行到这里 */
 	}
 	
-	return 0;
 }
 
 /**

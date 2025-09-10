@@ -95,9 +95,9 @@ void flash_show_part_table(void)
         }
     }
     log_i("==================== flash partition table ====================");
-    log_f("| %-*.*s | %-*.*s |   offset   |    length  |\r\n", part_name_max, FLASH_DEV_NAME_MAX, item1, flash_dev_name_max,
+    log_f("| %-*.*s | %-*.*s |   offset   |    length  |", part_name_max, FLASH_DEV_NAME_MAX, item1, flash_dev_name_max,
             FLASH_DEV_NAME_MAX, item2);
-    log_i("-------------------------------------------------------------");
+    log_i("---------------------------------------------------------------");
     for (i = 0; i < partition_table_len; i++)
     {
         part = &partition_table[i];
@@ -105,7 +105,7 @@ void flash_show_part_table(void)
         log_f("| %-*.*s | %-*.*s | 0x%08lx | 0x%08x |", part_name_max, FLASH_DEV_NAME_MAX, part->name, flash_dev_name_max,
                 FLASH_DEV_NAME_MAX, part->flash_name, part->offset, part->len);
     }
-    log_i("=============================================================");
+    log_i("===============================================================");
 }
 
 
