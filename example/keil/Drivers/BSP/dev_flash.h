@@ -2,16 +2,18 @@
 #define __DEV_FLASH_H_
 
 #include <stdint.h>
+#include "config.h"
 #include "dev_usart.h"
+
 #ifndef FLASH_DEV_NAME_MAX
 #define FLASH_DEV_NAME_MAX 24
 #endif
 
 
 /* partition magic word */
-#define FAL_PART_MAGIC_WORD         0x45503130
-#define FAL_PART_MAGIC_WORD_H       0x4550L
-#define FAL_PART_MAGIC_WORD_L       0x3130L
+#define FLASH_PART_MAGIC_WORD         0x45503130
+#define FLASH_PART_MAGIC_WORD_H       0x4550L
+#define FLASH_PART_MAGIC_WORD_L       0x3130L
 
 /* 分区信息结构 */
 struct flash_partition
@@ -30,8 +32,6 @@ struct flash_partition
     uint32_t reserved;
 };
 typedef struct flash_partition *flash_partition_t;;
-
-
 
 
 /* flash设备基本结构 */
@@ -65,33 +65,6 @@ struct part_flash_info
     const struct flash_dev *flash_dev;
 };
 
-
-
-
-/* ===================== Flash device Configuration ========================= */
-extern const struct flash_dev stm32_onchip_flash;
-extern struct flash_dev w25q64;
-/* flash device table */
-#define FLASH_DEV_TABLE  \
-    {                        \
-        &stm32_onchip_flash, \
-        &w25q64,         \
-    }
-
-
-/* ====================== Partition Configuration ========================== */
-/* partition table */
-#define FLASH_PART_TABLE                                                                                        \
-    {                                                                                                           \
-        {FAL_PART_MAGIC_WORD, "bootloader", "stm32_onchip", 0                           , 64 * 1024     ,  0},  \
-        {FAL_PART_MAGIC_WORD, "app"       , "stm32_onchip", 64 * 1024                   , 448 * 1024    ,  0},  \
-        {FAL_PART_MAGIC_WORD, "env"       , "w25q64"      , 0                           , 64 * 1024     ,  0},  \
-        {FAL_PART_MAGIC_WORD, "download"  , "w25q64"      , (0 + 64) * 1024             , 448 * 1024    ,  0},  \
-        {FAL_PART_MAGIC_WORD, "backup_bl" , "w25q64"      , (64 + 448) * 1024           , 64 * 1024     ,  0},  \
-		{FAL_PART_MAGIC_WORD, "backup_app", "w25q64"      , (64 + 448 + 64) * 1024      , 448 * 1024    ,  0},  \
-        {FAL_PART_MAGIC_WORD, "fonts"     , "w25q64"      , (64 + 448 + 64 + 448) * 1024, 5 * 1024 * 1024, 0},  \
-    }
-//剩余的flash，保留
 	
 #define assert(EXPR)                                                           \
 if (!(EXPR))                                                                   \

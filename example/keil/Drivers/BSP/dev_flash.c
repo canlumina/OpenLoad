@@ -35,7 +35,7 @@ int flash_device_init(void)
         {
             device_table[i]->ops.init();
         }
-        uart_printf("Flash device | %*.*s | addr: 0x%08x | len: 0x%08x | blk_size: 0x%08x |initialized finish.\r\n",
+        log_f("Flash device | %*.*s | addr: 0x%08x | len: 0x%08x | blk_size: 0x%08x |initialized finish.",
                 FLASH_DEV_NAME_MAX, FLASH_DEV_NAME_MAX, device_table[i]->name, device_table[i]->addr, device_table[i]->len,
                 device_table[i]->blk_size);
     }
@@ -94,18 +94,18 @@ void flash_show_part_table(void)
             }
         }
     }
-    uart_printf("==================== flash partition table ====================\r\n");
-    uart_printf("| %-*.*s | %-*.*s |   offset   |    length  |\r\n", part_name_max, FLASH_DEV_NAME_MAX, item1, flash_dev_name_max,
+    log_i("==================== flash partition table ====================");
+    log_f("| %-*.*s | %-*.*s |   offset   |    length  |\r\n", part_name_max, FLASH_DEV_NAME_MAX, item1, flash_dev_name_max,
             FLASH_DEV_NAME_MAX, item2);
-    uart_printf("-------------------------------------------------------------\r\n");
+    log_i("-------------------------------------------------------------");
     for (i = 0; i < partition_table_len; i++)
     {
         part = &partition_table[i];
 		
-        uart_printf("| %-*.*s | %-*.*s | 0x%08lx | 0x%08x |\r\n", part_name_max, FLASH_DEV_NAME_MAX, part->name, flash_dev_name_max,
+        log_f("| %-*.*s | %-*.*s | 0x%08lx | 0x%08x |", part_name_max, FLASH_DEV_NAME_MAX, part->name, flash_dev_name_max,
                 FLASH_DEV_NAME_MAX, part->flash_name, part->offset, part->len);
     }
-    uart_printf("=============================================================\r\n");
+    log_i("=============================================================");
 }
 
 
@@ -119,13 +119,13 @@ static int check_and_update_part_cache(const struct flash_partition *table, size
         flash_device = flash_device_find(table[i].flash_name);
         if (flash_device == NULL)
         {
-            uart_printf("Warning: Do NOT found the flash device(%s).\r\n", table[i].flash_name);
+            log_f("Warning: Do NOT found the flash device(%s).", table[i].flash_name);
             continue;
         }
 
         if (table[i].offset >= (long)flash_device->len)
         {
-            uart_printf("Initialize failed! Partition(%s) offset address(%ld) out of flash bound(<%d).\r\n",
+            log_f("Initialize failed! Partition(%s) offset address(%ld) out of flash bound(<%d).",
                     table[i].name, table[i].offset, flash_device->len);
             partition_table_len = 0;
 
@@ -241,21 +241,21 @@ int flash_partition_read(const struct flash_partition *part, uint32_t addr, uint
 
     if (addr + size > part->len)
     {
-        uart_printf("Partition read error! Partition address out of bound.\r\n");
+        log_i("Partition read error! Partition address out of bound.");
         return -1;
     }
 
     flash_dev = flash_device_find(part->flash_name);
     if (flash_dev == NULL)
     {
-        uart_printf("Partition read error! Don't found flash device(%s) of the partition(%s).\r\n", part->flash_name, part->name);
+        log_f("Partition read error! Don't found flash device(%s) of the partition(%s).", part->flash_name, part->name);
         return -1;
     }
 
     ret = flash_dev->ops.read(part->offset + addr, buf, size);
     if (ret < 0)
     {
-        uart_printf("Partition read error! Flash device(%s) read error!\r\n", part->flash_name);
+        log_f("Partition read error! Flash device(%s) read error!", part->flash_name);
     }
 
     return ret;
@@ -282,21 +282,21 @@ int flash_partition_write(const struct flash_partition *part, uint32_t addr, con
 
     if (addr + size > part->len)
     {
-        uart_printf("Partition write error! Partition address out of bound.\r\n");
+        log_i("Partition write error! Partition address out of bound.");
         return -1;
     }
 
     flash_dev = flash_device_find(part->flash_name);
     if (flash_dev == NULL)
     {
-        uart_printf("Partition write error!  Don't found flash device(%s) of the partition(%s).\r\n", part->flash_name, part->name);
+        log_f("Partition write error!  Don't found flash device(%s) of the partition(%s).", part->flash_name, part->name);
         return -1;
     }
 
     ret = flash_dev->ops.write(part->offset + addr, buf, size);
     if (ret < 0)
     {
-        uart_printf("Partition write error! Flash device(%s) write error!\r\n", part->flash_name);
+        log_f("Partition write error! Flash device(%s) write error!", part->flash_name);
     }
 
     return ret;
@@ -321,7 +321,7 @@ int flash_partition_erase(const struct flash_partition *part, uint32_t addr, siz
 
     if (addr + size > part->len)
     {
-        uart_printf("Partition erase error! Partition address out of bound.\r\n");
+        log_i("Partition erase error! Partition address out of bound.");
         return -1;
     }
 
@@ -329,14 +329,14 @@ int flash_partition_erase(const struct flash_partition *part, uint32_t addr, siz
 		flash_dev = flash_device_find_by_part(part);
     if (flash_dev == NULL)
     {
-        uart_printf("Partition erase error! Don't found flash device(%s) of the partition(%s).\r\n", part->flash_name, part->name);
+        log_f("Partition erase error! Don't found flash device(%s) of the partition(%s).", part->flash_name, part->name);
         return -1;
     }
 
     ret = flash_dev->ops.erase(part->offset + addr, size);
     if (ret < 0)
     {
-        uart_printf("Partition erase error! Flash device(%s) erase error!\r\n", part->flash_name);
+        log_f("Partition erase error! Flash device(%s) erase error!", part->flash_name);
     }
 
     return ret;
@@ -379,12 +379,12 @@ __exit:
     if ((result > 0) && (init_ok))
     {
         init_ok = 1;
-        uart_printf("Flash Abstraction Layer initialize success.\r\n");
+        log_i("Flash Abstraction Layer initialize success.");
     }
     else if(result <= 0)
     {
         init_ok = 0;
-        uart_printf("Flash Abstraction Layer initialize failed.\r\n");
+        log_i("Flash Abstraction Layer initialize failed.");
     }
 
     return result;

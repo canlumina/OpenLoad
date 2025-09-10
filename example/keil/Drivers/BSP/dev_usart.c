@@ -6,6 +6,7 @@
 #include "usart.h"
 #include "ringbuff.h"
 #include "dev_usart.h"
+#include "config.h"
 
 /*当前文件需要根据平台设备定义UART设备使用DMA和ringbuff*/
 
@@ -25,16 +26,6 @@ typedef struct
 	UART_HandleTypeDef *huart;  /*!< UART句柄指针 */   
 	
 }uart_device_t;
-
-#define UART1_TX_BUF_SIZE           2048
-#define UART1_RX_BUF_SIZE           2048
-#define	UART1_DMA_RX_BUF_SIZE		1024
-#define	UART1_DMA_TX_BUF_SIZE		512
-
-#define UART2_TX_BUF_SIZE           2048
-#define UART2_RX_BUF_SIZE           2048
-#define	UART2_DMA_RX_BUF_SIZE		1024
-#define	UART2_DMA_TX_BUF_SIZE		512
 
 
 static uint8_t s_uart1_tx_buf[UART1_TX_BUF_SIZE];

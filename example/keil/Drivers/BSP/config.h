@@ -1,52 +1,47 @@
-#ifndef __CONFIG_H__
-#define __CONFIG_H__
+#ifndef __CONFIG_H_
+#define __CONFIG_H_
 
-#include <stdint.h>
-#include <stdbool.h>
+// 串口相关配置
+#define UART1_TX_BUF_SIZE           2048
+#define UART1_RX_BUF_SIZE           2048
+#define	UART1_DMA_RX_BUF_SIZE		1024
+#define	UART1_DMA_TX_BUF_SIZE		512
 
-/* 配置版本 */
-#define CONFIG_VERSION  1
+#define UART2_TX_BUF_SIZE           2048
+#define UART2_RX_BUF_SIZE           2048
+#define	UART2_DMA_RX_BUF_SIZE		1024
+#define	UART2_DMA_TX_BUF_SIZE		512
 
-/* WiFi配置 */
-typedef struct {
-    char ssid[64];          /* WiFi网络名称 */
-    char password[64];      /* WiFi密码 */
-    uint32_t timeout_ms;    /* 连接超时时间(毫秒) */
-} wifi_config_t;
+#define UART1_BAUDRATE				115200
+#define UART2_BAUDRATE				115200
 
-/* OTA服务器配置 */
-typedef struct {
-    char host[64];          /* 服务器域名或IP */
-    uint16_t port;          /* 服务器端口 */
-    char path[128];         /* 固件文件路径 */
-    uint32_t timeout_ms;    /* 下载超时时间(毫秒) */
-} ota_server_config_t;
 
-/* 系统配置 */
-typedef struct {
-    uint32_t bootloader_delay_ms;   /* Bootloader等待时间(毫秒) */
-    uint32_t uart_baudrate;         /* 调试串口波特率 */
-    bool auto_ota_enable;           /* 自动OTA使能 */
-    uint8_t max_retry_count;        /* 最大重试次数 */
-} system_config_t;
+// flash相关配置
+#define FLASH_DEV_NAME_MAX 12
 
-/* 总配置结构 */
-typedef struct {
-    uint32_t version;               /* 配置版本 */
-    uint32_t crc32;                /* CRC32校验码 */
-    wifi_config_t wifi;             /* WiFi配置 */
-    ota_server_config_t ota;        /* OTA配置 */
-    system_config_t system;         /* 系统配置 */
-} bootloader_config_t;
+/* ===================== Flash device Configuration ========================= */
+extern const struct flash_dev stm32_onchip_flash;
+extern struct flash_dev w25q64;
+/* flash device table */
+#define FLASH_DEV_TABLE  \
+    {                        \
+        &stm32_onchip_flash, \
+        &w25q64,         \
+    }
 
-/* 配置管理函数 */
-bool config_init(void);
-bool config_load_default(void);
-bool config_save(void);
-bool config_load(void);
-const bootloader_config_t* config_get(void);
-bool config_set_wifi(const char* ssid, const char* password);
-bool config_set_ota_server(const char* host, uint16_t port, const char* path);
-bool config_validate(void);
 
-#endif /* __CONFIG_H__ */
+/* ====================== Partition Configuration ========================== */
+/* partition table */
+#define FLASH_PART_TABLE                                                                                        \
+    {                                                                                                           \
+        {FLASH_PART_MAGIC_WORD, "bootloader", "stm32_onchip", 0                           , 64 * 1024     ,  0},  \
+        {FLASH_PART_MAGIC_WORD, "app"       , "stm32_onchip", 64 * 1024                   , 448 * 1024    ,  0},  \
+        {FLASH_PART_MAGIC_WORD, "env"       , "w25q64"      , 0                           , 64 * 1024     ,  0},  \
+        {FLASH_PART_MAGIC_WORD, "download"  , "w25q64"      , (0 + 64) * 1024             , 448 * 1024    ,  0},  \
+        {FLASH_PART_MAGIC_WORD, "backup_bl" , "w25q64"      , (64 + 448) * 1024           , 64 * 1024     ,  0},  \
+		{FLASH_PART_MAGIC_WORD, "backup_app", "w25q64"      , (64 + 448 + 64) * 1024      , 448 * 1024    ,  0},  \
+        {FLASH_PART_MAGIC_WORD, "fonts"     , "w25q64"      , (64 + 448 + 64 + 448) * 1024, 5 * 1024 * 1024, 0},  \
+    }
+//剩余的flash，保留
+
+#endif
