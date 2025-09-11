@@ -1,15 +1,16 @@
 #include <string.h>
 #include "bootloader_cmd.h"
 #include "dev_usart.h"
-
+#include "dev_flash.h"
+#include "xmodem.h"
+#include "config.h"
 
 
 
 /* 命令表 */
 const bootloader_cmd_t cmd_table[] = {
     {"help",    "h",  "Show command help",           CMD_HELP,         cmd_help_handler},
-//    {"update",  "u",  "Update firmware (XMODEM/OTA)", CMD_UPDATE,       cmd_update_handler},
-//    {"info",    "i",  "Show system information",    CMD_INFO,         cmd_info_handler},
+    {"update",  "u",  "Update firmware (XMODEM/OTA)", CMD_UPDATE,       cmd_update_handler},
 //    {"erase",   "e",  "Erase application area",     CMD_ERASE,        cmd_erase_handler},
 //    {"reset",   "r",  "Reset system",               CMD_RESET,        cmd_reset_handler},
 //    {"jump",    "j",  "Jump to application",        CMD_JUMP,         cmd_jump_handler},
@@ -105,11 +106,57 @@ void cmd_help_handler(void)
     print_cmd("===============================================\r\n");
 }
 
-void cmd_info_handler(void)
+static uint8_t read_char(void)
 {
+    uint8_t ch;
+    while(uart_read(DEV_UART1, &ch, 1) == 0);
+    uart_write(DEV_UART1, &ch, 1);
+    uart_poll_dma_tx(DEV_UART1);
+    return ch;
+}
+
+
+/* XMODEM固件更新子菜单 */
+static void cmd_update_xmodem_handler(void)
+{
+
+    const struct flash_partition *partition = NULL;
+	
+	print_cmd("===== XMODEM Firmware Update =====\r\n");
+    partition = flash_partition_find(DOWNLOAD);
+	
+	
+	xmodem_receive(partition, USE_1K);
 
 }
 
+
+void cmd_update_handler(void)
+{
+    uint8_t ch;
+    
+    print_cmd("===== Firmware Update =====\r\n");
+    print_cmd("Select transfer method:\r\n");
+    print_cmd("1 = XMODEM\r\n");
+    print_cmd("2 = HTTP OTA\r\n");
+    print_cmd("Select (1-2): ");
+    
+    ch = read_char();
+    print_cmd("\r\n");
+    
+    if(ch == '1')
+    {
+        cmd_update_xmodem_handler();
+    }
+    else if(ch == '2')
+    {
+        //cmd_update_ota_handler();
+    }
+    else
+    {
+        print_cmd("Invalid selection!\r\n");
+    }
+}
 
 
 

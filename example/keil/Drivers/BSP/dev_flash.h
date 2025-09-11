@@ -2,6 +2,7 @@
 #define __DEV_FLASH_H_
 
 #include <stdint.h>
+#include <stddef.h>
 #include "config.h"
 #include "dev_usart.h"
 

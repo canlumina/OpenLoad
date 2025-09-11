@@ -1,6 +1,7 @@
 #ifndef __BOOTLOADER_CMD_H
 #define __BOOTLOADER_CMD_H
 
+#include <stdint.h>
 #define print_cmd uart1_printf
 
 /* 命令ID */

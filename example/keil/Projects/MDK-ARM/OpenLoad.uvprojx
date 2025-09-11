@@ -427,6 +427,16 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>App/protocol</GroupName>
+          <Files>
+            <File>
+              <FileName>xmodem.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\Drivers\BSP\xmodem.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>Drivers/BSP</GroupName>
           <Files>
             <File>
