@@ -78,6 +78,7 @@ if (!(EXPR))                                                                   \
 int flash_init(void);
 const struct flash_partition *flash_partition_find(const char *name);
 const struct flash_dev *flash_device_find(const char *name);
+int flash_partition_erase(const struct flash_partition *part, uint32_t addr, size_t size);
 int flash_partition_erase_all(const struct flash_partition *part);
 int flash_partition_read(const struct flash_partition *part, uint32_t addr, uint8_t *buf, size_t size);
 int flash_partition_write(const struct flash_partition *part, uint32_t addr, const uint8_t *buf, size_t size);

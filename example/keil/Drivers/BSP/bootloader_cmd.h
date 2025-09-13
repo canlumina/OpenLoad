@@ -25,7 +25,12 @@ typedef enum {
     CMD_CONFIG_SAVE,
     CMD_CONFIG_RESET,
     CMD_VERSION,
-    CMD_VERSION_COMPARE
+    CMD_VERSION_COMPARE,
+    CMD_SECURE_DOWNLOAD,
+    CMD_SECURE_INSTALL,
+    CMD_SECURE_VERIFY,
+    CMD_SECURE_BACKUP,
+    CMD_SECURE_RESTORE
 } cmd_id_t;
 
 /* 命令结构 */
@@ -47,6 +52,13 @@ void cmd_update_handler(void);
 void cmd_info_handler(void);
 void cmd_erase_handler(void);
 void cmd_reset_handler(void);
+
+/* 安全命令处理函数 */
+void cmd_secure_download_handler(void);
+void cmd_secure_install_handler(void);
+void cmd_secure_verify_handler(void);
+void cmd_secure_backup_handler(void);
+void cmd_secure_restore_handler(void);
 void cmd_jump_handler(void);
 void cmd_extinfo_handler(void);
 void cmd_extbackup_handler(void);

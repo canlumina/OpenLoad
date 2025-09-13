@@ -22,18 +22,30 @@ int flash_device_init(void)
 
     if (init_ok)
     {
+        log_f("Flash devices already initialized, skipping");
         return 0;
     }
+    
+    log_f("Starting flash device initialization...");
 
     for (i = 0; i < device_table_len; i++)
     {
         assert(device_table[i]->ops.read);
         assert(device_table[i]->ops.write);
         assert(device_table[i]->ops.erase);
+        
+        log_f("Initializing flash device: %s", device_table[i]->name);
+        
         /* init flash device on flash table */
         if (device_table[i]->ops.init)
         {
-            device_table[i]->ops.init();
+            if (strstr(device_table[i]->name, "w25q64") != NULL) {
+                log_f("Starting W25Q64 initialization...");
+                device_table[i]->ops.init();
+                log_f("W25Q64 initialization completed!");
+            } else {
+                device_table[i]->ops.init();
+            }
         }
         log_f("Flash device | %*.*s | addr: 0x%08x | len: 0x%08x | blk_size: 0x%08x |initialized finish.",
                 FLASH_DEV_NAME_MAX, FLASH_DEV_NAME_MAX, device_table[i]->name, device_table[i]->addr, device_table[i]->len,

@@ -1,16 +1,17 @@
 #include <string.h>
+#include <stdio.h>
 #include "bootloader_cmd.h"
 #include "dev_usart.h"
 #include "dev_flash.h"
-#include "xmodem.h"
 #include "config.h"
+// #include "secure_bootloader_cmd.h"  // 文件不存在，暂时注释
 
 
 
 /* 命令表 */
 const bootloader_cmd_t cmd_table[] = {
     {"help",    "h",  "Show command help",           CMD_HELP,         cmd_help_handler},
-    {"update",  "u",  "Update firmware (XMODEM/OTA)", CMD_UPDATE,       cmd_update_handler},
+    {"update",  "u",  "Update firmware (IAP/OTA)", CMD_UPDATE,       cmd_update_handler},
 //    {"erase",   "e",  "Erase application area",     CMD_ERASE,        cmd_erase_handler},
 //    {"reset",   "r",  "Reset system",               CMD_RESET,        cmd_reset_handler},
 //    {"jump",    "j",  "Jump to application",        CMD_JUMP,         cmd_jump_handler},
@@ -124,9 +125,11 @@ static void cmd_update_xmodem_handler(void)
 	
 	print_cmd("===== XMODEM Firmware Update =====\r\n");
     partition = flash_partition_find(DOWNLOAD);
-	
-	
-	xmodem_receive(partition, USE_1K);
+
+	print_cmd("Initializing XMODEM protocol...\r\n");
+	print_cmd("Please start sending your file using XMODEM now!\r\n");
+	print_cmd("Waiting for XMODEM transfer...\r\n");
+
 
 }
 
