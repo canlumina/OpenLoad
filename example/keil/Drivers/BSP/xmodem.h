@@ -26,30 +26,19 @@ typedef enum{
 }data_block_select_t;
 
 /* 流式写入控制 */
-typedef struct {
-    /* 分区信息 */
-    const struct flash_partition *partition;  // 当前操作的分区
+typedef struct 
+{
+    uint32_t target_addr;            // 目标地址（内部或外部Flash）
+    uint32_t write_offset;           // 写入偏移
+    uint32_t total_size;             // 总大小
+    uint8_t page_buffer[256];        // 页缓冲区
+    uint16_t page_offset;            // 页内偏移
+    bool use_external_flash;        // 使用外部Flash
+    const struct flash_partition *partition;  // 当前操作的分区   
     
-    /* 写入位置跟踪 */
-    uint32_t write_addr;                      // 当前写入地址（相对于分区起始）
-    uint32_t total_written;                   // 已写入的总字节数
-    
-    /* 页缓冲管理 - 用于处理非页对齐的写入 */
-    uint8_t page_buffer[256];                 // 页缓冲区（W25Q64页大小）
-    uint16_t page_buffer_offset;              // 页缓冲区内的偏移
-    uint32_t page_buffer_addr;                // 页缓冲区对应的Flash地址
-    bool page_buffer_dirty;                   // 页缓冲区是否有待写入数据
-    
-    /* 擦除管理 */
-    uint32_t next_erase_addr;                 // 下一个需要擦除的地址
-    uint32_t erase_block_size;                // 擦除块大小（扇区或块）
-    bool initial_erase_done;                  // 是否已完成初始擦除
-    
-    /* 状态和统计 */
-    bool initialized;                          // 是否已初始化
-    uint32_t expected_size;                    // 期望接收的总大小（如果已知）
-    uint16_t crc16;                           // 数据CRC16校验值
-    uint8_t checksum;                         // 数据校验和
+	/* 扇区擦除跟踪 */
+    uint32_t last_erased_sector;    // 最后擦除的扇区
+    bool sector_erase_pending;      // 扇区擦除待处理                       // 数据校验和
 } stream_writer_t;
 
 /* 流式写入API */
