@@ -22,3 +22,14 @@ example/gcc/**/compile_commands.json
 example/gcc/**/*.ninja
 example/gcc/**/.ninja_*
 example/gcc/**/rules.ninja
+
+# Claude Code
+.claude/
+
+# VS Code
+.vscode/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
