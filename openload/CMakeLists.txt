@@ -1,0 +1,63 @@
+# openload/CMakeLists.txt
+#
+# 框架核心: 平台无关。由 example 工程通过 add_subdirectory(openload) 引入。
+# 输出 STATIC library "openload"。
+#
+# 协议、加密、命令按配置裁剪——用 cmake -D 传, 或在 example 顶层 CMakeLists 设置:
+#   set(OPENLOAD_ENABLE_XMODEM      ON  CACHE BOOL "")
+#   set(OPENLOAD_ENABLE_HTTP_OTA    OFF CACHE BOOL "")
+#   set(OPENLOAD_ENABLE_AES_128_CTR OFF CACHE BOOL "")
+#   set(OPENLOAD_ENABLE_SHA256      OFF CACHE BOOL "")
+
+cmake_minimum_required(VERSION 3.22)
+
+option(OPENLOAD_ENABLE_XMODEM      "Enable XMODEM receiver"      ON)
+option(OPENLOAD_ENABLE_YMODEM      "Enable YMODEM receiver"      OFF)
+option(OPENLOAD_ENABLE_HTTP_OTA    "Enable HTTP OTA receiver"    OFF)
+option(OPENLOAD_ENABLE_AES_128_CTR "Enable AES-128-CTR"          OFF)
+option(OPENLOAD_ENABLE_SHA256      "Enable SHA-256"              OFF)
+
+set(OPENLOAD_SOURCES
+    core/sys.c
+    core/io.c
+    core/flash.c
+    core/partition.c
+    core/image.c
+    core/logger.c
+    core/cli.c
+    core/boot.c
+    core/updater.c
+    core/ringbuf.c
+    core/errno_str.c
+    crypto/crc32.c
+    commands/builtins.c
+)
+
+if(OPENLOAD_ENABLE_XMODEM)
+    list(APPEND OPENLOAD_SOURCES proto/xmodem.c)
+endif()
+
+if(OPENLOAD_ENABLE_YMODEM)
+    list(APPEND OPENLOAD_SOURCES proto/ymodem.c)
+endif()
+
+if(OPENLOAD_ENABLE_HTTP_OTA)
+    list(APPEND OPENLOAD_SOURCES proto/http_ota.c)
+endif()
+
+if(OPENLOAD_ENABLE_AES_128_CTR)
+    list(APPEND OPENLOAD_SOURCES crypto/aes_ctr.c)
+endif()
+
+if(OPENLOAD_ENABLE_SHA256)
+    list(APPEND OPENLOAD_SOURCES crypto/sha256.c)
+endif()
+
+add_library(openload STATIC ${OPENLOAD_SOURCES})
+
+target_include_directories(openload PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# example 工程的 openload_config.h 必须在 include 路径里 — 由调用方提供
+# 通过 target_include_directories(openload PUBLIC <example_dir>) 追加。

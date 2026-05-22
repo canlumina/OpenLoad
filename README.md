@@ -1,265 +1,182 @@
-# STM32F103ZET6 通用Bootloader设计文档
+# OpenLoad
 
-## 1. 项目概述
+> 面向资源受限 MCU 的、**可裁剪、可移植**的开源 bootloader 框架。
+> 接口抽象 + 编译期裁剪, 用户提供底层驱动即可接入任意单片机。
 
-本项目旨在开发一个通用的STM32F103ZET6 bootloader，支持Flash分区管理、外部Flash扩展、YModem协议固件下载等功能。
+[![status](https://img.shields.io/badge/status-M1%20done-green)](docs/REQUIREMENTS.md#7-第一版交付范围v1-scope)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-### 1.1 主要特性
-- Flash分区管理（内部Bootloader区/App区 + 外部Download区/Backup区）
-- 外部Flash支持（通过SPI）
-- YModem协议固件下载
-- 串口DMA + 空闲中断 + 环形缓冲区
-- 按键检测启动逻辑
-- 固件完整性校验
+---
 
-### 1.2 硬件配置
-- 主控：STM32F103ZET6 (512KB Flash, 64KB RAM)
-- 外部Flash：W25Q64 (8MB) 通过SPI2连接
-- 串口：USART1 (PA9-TX, PA10-RX) 用于固件下载
-- 按键：PA0 (低电平有效)
-- LED指示：PB5(状态指示)
+## 这是什么
 
-## 2. Flash分区设计
+OpenLoad **不是**某颗芯片的 bootloader, 而是一套 **接口规范 + 协议引擎 + 升级状态机**:
 
-### 2.1 内部Flash分区 (512KB总容量)
 ```
-地址范围                 | 大小    | 分区名称     | 用途
-0x0800 0000 - 0x0800 FFFF | 64KB   | Bootloader   | 引导程序
-0x0801 0000 - 0x0807 FFFF | 448KB  | Application  | 应用程序
-```
-
-### 2.2 外部Flash分区 (8MB)
-```
-地址范围                 | 大小   | 分区名称      | 用途
-0x0000 0000 - 0x0000 FFFF | 64KB  | Backup_Boot   | 备份引导
-0x0001 0000 - 0x0001 FFFF | 64KB  | Download      | 临时下载区
-0x0002 0000 - 0x007F FFFF | 8MB-128KB | Firmware_Store | 固件存储
+┌──────────────────────────────────────────────┐
+│  用户工程 (你写)                              │
+│  实现 ops 接口: uart / spi flash / sys        │
+├──────────────────────────────────────────────┤
+│  OpenLoad Core (本框架, 纯 C, 平台无关)       │
+│  ├─ Boot State Machine                       │
+│  ├─ Partition Manager + Flash 抽象           │
+│  ├─ Protocol Engine (XMODEM / YMODEM / HTTP) │
+│  ├─ Crypto (CRC32 / AES / SHA / Ed25519)     │
+│  ├─ CLI + 命令注册                            │
+│  └─ Logger                                   │
+├──────────────────────────────────────────────┤
+│  Porting API: ol_flash_ops_t / ol_io_ops_t   │
+│              / ol_sys_ops_t                  │
+└──────────────────────────────────────────────┘
 ```
 
-## 3. 系统架构
+每个功能都通过 `openload_config.h` 的 `#define` 开关裁剪, **未启用的代码不进 ROM**。
 
-### 3.1 模块划分
-```
-bootloader/
-├── Core/                    # 核心系统文件
-│   ├── Inc/
-│   └── Src/
-├── Drivers/                 # 驱动层
-│   ├── CMSIS/
-│   ├── STM32F1xx_HAL_Driver/
-│   └── BSP/                # 板级支持包
-│       ├── flash_driver.c  # 内部/外部Flash驱动
-│       ├── uart_driver.c   # 串口驱动
-│       └── spi_flash.c     # 外部Flash驱动
-├── Middlewares/            # 中间件
-│   ├── ymodem.c           # YModem协议
-│   ├── ringbuffer.c       # 环形缓冲区
-│   └── crc.c              # CRC校验
-├── Application/            # 应用层
-│   ├── bootloader.c       # 主程序逻辑
-│   ├── flash_manager.c    # 内部/外部Flash分区管理
-│   └── firmware_update.c  # 固件更新
-└── Config/                # 配置文件
-    └── bootloader_config.h
-```
+## 主要特性
 
-### 3.2 启动流程
-```mermaid
-graph TD
-    A[系统复位] --> B[硬件初始化]
-    B --> C[检查按键状态]
-    C --> D{按键按下?}
-    D -->|是| E[进入下载模式]
-    D -->|否| F[等待2秒]
-    F --> G{2秒内按键按下?}
-    G -->|是| E
-    G -->|否| H[检查App有效性]
-    H --> I{App有效?}
-    I -->|是| J[跳转到App]
-    I -->|否| E
-    
-    E --> K[初始化串口DMA]
-    K --> L[等待YModem数据]
-    L --> M[接收固件到外部Flash Download区]
-    M --> N{接收完成?}
-    N -->|否| L
-    N -->|是| O[校验固件]
-    O --> P{校验通过?}
-    P -->|是| Q[从外部Flash复制到App区]
-    P -->|否| R[报告错误]
-    Q --> S[擦除外部Flash Download区]
-    S --> J
-    R --> L
+- 🪶 **极轻量** — 默认配置 (XMODEM + CRC32 + CLI) 约 **14 KB** Flash
+- 🧩 **接口驱动** — 5 个 ops 接口, 移植 ≈ 200 行代码
+- 🛠 **协议矩阵** — XMODEM / XMODEM-1K / YMODEM / HTTP OTA / 自定义可挂载
+- 🔐 **渐进安全** — CRC32 → AES-128-CTR → SHA-256 → Ed25519 签名
+- 📦 **流式升级** — 接收 → 外部 staging → 校验 → 内部覆盖, 全程不缓存整个固件
+- 🧪 **静态注册** — `OL_CMD_REGISTER` / `OL_FLASH_DEV_REGISTER` / `OL_IO_DEV_REGISTER` 用链接段自动发现, 无需手工 init list
+
+## 当前进度
+
+| 里程碑 | 状态 | 内容 |
+|--------|------|------|
+| **M1 核心 MVP** | ✅ | Porting API · 分区管理 · CLI · XMODEM/-1K · CRC32 · Staging 升级 · STM32F103 参考实现 |
+| M2 联网升级 | ⏳ | YMODEM · HTTP OTA · ESP8266 port |
+| M3 加固 | 🔲 | AES-128-CTR · SHA-256 · 防回滚 · CLI 密码 · backup/rollback |
+| M4+ 扩展 | 🔲 | Ed25519 签名 · USB DFU · MQTT OTA · A/B Dual Bank · STM32F4 port |
+
+详见 [REQUIREMENTS.md](docs/REQUIREMENTS.md)。
+
+## 快速开始 (STM32F103ZET6 板子)
+
+### 前提
+
+- ARM GCC 工具链 (`arm-none-eabi-gcc` 在 PATH)
+- CMake ≥ 3.22 + Ninja
+- ST-Link / J-Link
+
+### 编译
+
+```bash
+cd examples/stm32f103zet6_gcc
+
+cmake --preset=Release
+cmake --build build/Release
+
+# 产物: build/Release/openload_bootloader.{elf,bin,map}
 ```
 
-## 4. 关键模块设计
+### 烧录
 
-### 4.1 Flash管理模块
-```c
-typedef struct {
-    uint32_t start_addr;    // 起始地址
-    uint32_t size;          // 分区大小
-    uint32_t used_size;     // 已使用大小
-    uint8_t  status;        // 分区状态
-} flash_partition_t;
-
-// Flash操作接口
-int flash_init(void);
-int flash_erase_partition(uint8_t partition_id);
-int flash_write_data(uint32_t addr, uint8_t *data, uint32_t len);
-int flash_read_data(uint32_t addr, uint8_t *data, uint32_t len);
+```bash
+STM32_Programmer_CLI -c port=SWD \
+    -d build/Release/openload_bootloader.bin 0x08000000 -v
 ```
 
-### 4.2 串口DMA + 环形缓冲区
-```c
-typedef struct {
-    uint8_t *buffer;        // 缓冲区指针
-    uint32_t size;          // 缓冲区大小
-    uint32_t head;          // 头指针
-    uint32_t tail;          // 尾指针
-} ring_buffer_t;
+### 测试
 
-// 串口接收处理
-void uart_dma_init(void);
-void uart_idle_callback(void);
-uint32_t ringbuf_read(ring_buffer_t *rb, uint8_t *data, uint32_t len);
+串口 115200 8N1, 上电应看到:
+
+```
+[I] OpenLoad 0.1.0-m1 starting
+[I] press button or send any char in 3000 ms to enter CLI
+OpenLoad> help
+  help       List all commands
+  info       Show bootloader and app info
+  reset      Reboot the SoC
+  jump       Verify and jump to app partition
+  part       List partitions
+  erase      Erase a partition
+  update     Receive firmware and install (proto staging target)
+  install    Install pre-staged firmware to target
 ```
 
-### 4.3 YModem协议处理
-```c
-typedef struct {
-    uint8_t soh;            // 帧头 0x01
-    uint8_t seq;            // 序号
-    uint8_t seq_inv;        // 序号取反
-    uint8_t data[128];      // 数据
-    uint16_t crc;           // CRC校验
-} ymodem_packet_t;
+### 制作可升级 App
 
-// YModem接口
-int ymodem_receive_init(void);
-int ymodem_receive_packet(ymodem_packet_t *packet);
-int ymodem_send_ack(void);
-int ymodem_send_nak(void);
+App 工程链接到 `0x08010040` (boot 64K + image header 64B), 编译完用工具加 header:
+
+```bash
+python tools/image_tool.py myapp.bin \
+    --board-id 0x0103 --version 1.2.0.0 \
+    -o myapp-ol.bin
 ```
 
-### 4.4 固件更新流程
-```c
-typedef struct {
-    uint32_t magic;         // 魔数 0x12345678
-    uint32_t version;       // 版本号
-    uint32_t size;          // 固件大小
-    uint32_t crc32;         // CRC32校验
-    uint32_t timestamp;     // 时间戳
-} firmware_header_t;
+然后在 OpenLoad CLI 里:
 
-// 固件更新接口
-int firmware_download(void);  // 通过YModem下载到外部Flash Download区
-int firmware_verify(uint32_t addr);  // 校验外部Flash中的固件
-int firmware_install(void);  // 从外部Flash Download区复制到内部App区
+```
+OpenLoad> update xmodem download app
 ```
 
-## 5. 通信协议
+通过终端 (Tera Term / Xshell) 的 XMODEM 发送 `myapp-ol.bin`, 接收完毕框架自动校验 + 拷贝 + 跳转。
 
-### 5.1 YModem协议帧格式
+## 移植到新单片机
+
+5 步, 约半天:
+
+1. 实现 `ol_sys_ops_t` (tick / reboot / jump / disable_irq)
+2. 注册 `ol_flash_dev_t` (至少内部 Flash)
+3. 注册 `ol_io_dev_t` (至少 console UART)
+4. 调整 `linker.ld` 的 BOOT 区大小与 `.ol_*` 链接段
+5. 写 `partitions.def` 定义分区表
+
+完整指南: [docs/PORTING_GUIDE.md](docs/PORTING_GUIDE.md)
+
+## 目录结构
+
 ```
-SOH + 序号 + 序号取反 + 128字节数据 + CRC16
-STX + 序号 + 序号取反 + 1024字节数据 + CRC16
-```
-
-### 5.2 控制字符定义
-```c
-#define SOH     0x01    // 128字节数据包
-#define STX     0x02    // 1024字节数据包
-#define EOT     0x04    // 传输结束
-#define ACK     0x06    // 确认
-#define NAK     0x15    // 否认
-#define CAN     0x18    // 取消
-#define C       0x43    // CRC模式
-```
-
-## 6. 状态管理
-
-### 6.1 系统状态定义
-```c
-typedef enum {
-    BOOT_STATE_INIT,        // 初始化
-    BOOT_STATE_CHECK_KEY,   // 检查按键
-    BOOT_STATE_WAIT_TIMEOUT,// 等待超时
-    BOOT_STATE_DOWNLOAD,    // 下载模式
-    BOOT_STATE_VERIFY,      // 校验固件
-    BOOT_STATE_INSTALL,     // 安装固件
-    BOOT_STATE_JUMP_APP,    // 跳转应用
-    BOOT_STATE_ERROR        // 错误状态
-} boot_state_t;
-```
-
-### 6.2 LED状态指示
-- 常亮：正常启动
-- 慢闪(1Hz)：等待按键
-- 快闪(5Hz)：下载模式
-- 双闪：校验错误
-- 三闪：跳转应用
-
-## 7. 安全机制
-
-### 7.1 固件完整性校验
-- 每个固件包含Header信息
-- CRC32校验确保数据完整性
-- 版本号检查防止固件降级
-
-### 7.2 容错机制
-- 下载失败时保留原有App
-- 提供固件恢复功能
-- 看门狗保护防止死机
-
-## 8. 配置参数
-
-### 8.1 系统配置
-```c
-#define BOOTLOADER_VERSION      "1.0.0"
-#define FIRMWARE_MAGIC          0x12345678
-#define MAX_FIRMWARE_SIZE       (448 * 1024)  // 448KB
-#define UART_BAUDRATE          115200
-#define KEY_CHECK_TIMEOUT      2000           // 2秒
-#define DOWNLOAD_TIMEOUT       30000          // 30秒
+OpenLoad/
+├── openload/                   # 框架核心 (平台无关)
+│   ├── include/openload/       # 公开头文件
+│   ├── core/                   # boot / cli / partition / image / updater / logger
+│   ├── proto/                  # xmodem, ymodem, http_ota
+│   ├── crypto/                 # crc32, aes, sha256, ed25519
+│   ├── commands/               # 内置 CLI 命令
+│   └── CMakeLists.txt
+│
+├── ports/                      # 芯片参考实现
+│   └── stm32f1/                # STM32F103ZET6 + W25Q64
+│
+├── examples/                   # 工程模板
+│   └── stm32f103zet6_gcc/      # CMake + GCC + ST HAL
+│
+├── tools/
+│   └── image_tool.py           # 给 bin 加 OpenLoad image header
+│
+├── docs/
+│   ├── REQUIREMENTS.md         # 需求规格 + v1 交付范围
+│   ├── ARCHITECTURE.md         # 架构设计 + 完整接口签名
+│   └── PORTING_GUIDE.md        # 新板子接入指南
+│
+└── legacy/                     # 旧版本代码归档 (M2 完成后删除)
 ```
 
-### 8.2 内存配置
-```c
-#define BOOTLOADER_START       0x08000000
-#define BOOTLOADER_SIZE        (64 * 1024)
-#define EXTERNAL_DOWNLOAD_START 0x00010000  // 外部Flash Download区地址
-#define DOWNLOAD_SIZE          (64 * 1024)
-#define APPLICATION_START      0x08010000
-#define APPLICATION_SIZE       (448 * 1024)
-```
+## 体积参考
 
-## 9. 调试与测试
+GCC 14.x, `-Os`, STM32F103ZET6:
 
-### 9.1 调试接口
-- 串口调试输出
-- LED状态指示
-- 关键状态记录
+| 配置 | bootloader.bin |
+|------|----------------|
+| 仅 XMODEM + CRC32 + CLI (M1 默认) | **~14 KB** |
+| + YMODEM + HTTP OTA (M2 目标) | ~20 KB |
+| 全功能 + 签名 (M3+ 目标) | ~28 KB |
 
-### 9.2 测试用例
-- 正常启动测试
-- 按键检测测试
-- YModem下载测试
-- 固件校验测试
-- 错误恢复测试
+## 设计文档
 
-## 10. 使用说明
+- 📋 [需求规格](docs/REQUIREMENTS.md) — 设计哲学 / 功能清单 / 验收标准
+- 🏗 [架构设计](docs/ARCHITECTURE.md) — 接口签名 / 关键流程 / 配置项 / 旧代码迁移对照
+- 🔌 [移植指南](docs/PORTING_GUIDE.md) — 5 步把 OpenLoad 跑到一颗新单片机
 
-### 10.1 固件制作
-1. 编译应用程序生成bin文件
-2. 添加固件头信息
-3. 计算CRC32校验值
-4. 使用YModem发送工具下载
+## 状态
 
-### 10.2 升级流程
-1. 按住按键上电进入下载模式
-2. 使用串口工具选择YModem发送
-3. 选择固件文件开始传输
-4. 等待传输完成自动重启
+当前是 **0.1.0-m1**, M1 已完成核心可用 (M1 范围内的 XMODEM 升级路径已端到端编译验证)。
 
-这个设计提供了一个完整、可靠的bootloader解决方案，具有良好的扩展性和维护性。
+实板烧录与端到端联调由用户在自己的硬件上完成; 欢迎反馈 issue。
+
+## License
+
+MIT — 见 [LICENSE](LICENSE)。

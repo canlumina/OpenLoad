@@ -1,0 +1,18 @@
+/*
+ * 分区表 - X-macro 风格.
+ * 这个文件被 partitions.c 多次 include, 每次以不同的 OL_PART 宏定义展开。
+ *
+ * 字段:  device,     name,         offset,        size,    flags
+ *
+ * STM32F103ZET6 内部 Flash (512 KB):
+ *   boot  = 0x00000..0x10000 (64 KB)   bootloader 自己, 不可写
+ *   app   = 0x10000..0x80000 (448 KB)  应用程序; 含 image header
+ *
+ * W25Q64 外部 Flash (8 MB):
+ *   download = 0x000000..0x080000 (512 KB)  XMODEM/HTTP staging
+ *   backup   = 0x200000..0x270000 (448 KB)  保留供 M3 备份/回滚
+ */
+OL_PART(internal, "boot",     0x00000000u, 0x00010000u, OL_PART_FLAG_READABLE)
+OL_PART(internal, "app",      0x00010000u, 0x00070000u, OL_PART_FLAG_READABLE | OL_PART_FLAG_WRITABLE | OL_PART_FLAG_EXECUTABLE)
+OL_PART(w25q64,   "download", 0x00000000u, 0x00080000u, OL_PART_FLAG_READABLE | OL_PART_FLAG_WRITABLE)
+OL_PART(w25q64,   "backup",   0x00200000u, 0x00070000u, OL_PART_FLAG_READABLE | OL_PART_FLAG_WRITABLE)
