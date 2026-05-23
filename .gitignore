@@ -33,3 +33,6 @@ example/gcc/**/rules.ninja
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Firmware binaries (烧录测试用的 App / bootloader bin, 不进版本库)
+*.bin

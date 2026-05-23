@@ -83,8 +83,16 @@ int ol_updater_install(const char *staging_part, const char *target_part)
     uint32_t total    = OL_IMAGE_HDR_SIZE + payload;
     if (total > dst->size) { return OL_E_IMAGE_SIZE; }
 
-    OL_LOGI("erase target %s (%u bytes)", dst->name, total);
-    rc = ol_part_erase(dst, 0, total);
+    /* erase 必须按 target device 的 sector_size 对齐, 否则底层驱动会拒绝.
+       向上取整到 sector boundary, 但夹在 dst->size 内. */
+    ol_flash_dev_t *dst_dev = ol_part_get_device(dst);
+    uint32_t sector    = (dst_dev && dst_dev->sector_size) ? dst_dev->sector_size : 1;
+    uint32_t erase_len = (total + sector - 1) & ~(sector - 1);
+    if (erase_len > dst->size) { erase_len = dst->size; }
+
+    OL_LOGI("erase target %s (%u bytes, sector=%u)",
+            dst->name, erase_len, sector);
+    rc = ol_part_erase(dst, 0, erase_len);
     if (rc != OL_OK) { return rc; }
 
     OL_LOGI("copy %u bytes -> %s", total, dst->name);

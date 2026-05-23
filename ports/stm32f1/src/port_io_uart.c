@@ -25,30 +25,40 @@ extern UART_HandleTypeDef huart1;
 extern DMA_HandleTypeDef  hdma_usart1_rx;
 
 #define DMA_RX_SIZE     256                 /* 循环模式 DMA buffer */
-#define RX_FIFO_SIZE    1024                /* 必须是 2 的幂 */
+#define RX_FIFO_SIZE    2048                /* 必须是 2 的幂; ≥ 1K XMODEM 帧 1029B */
 
 static uint8_t      s_dma_rx[DMA_RX_SIZE];
 static uint8_t      s_rx_fifo_storage[RX_FIFO_SIZE];
 static ol_ringbuf_t s_rx_fifo;
 static volatile uint16_t s_last_dma_pos;
 
-/* 把 [last_pos .. cur_pos) 的 DMA 数据搬入 ringbuf. 循环模式下 cur_pos 可能回卷 */
+/* 把 [last_pos .. cur_pos) 的 DMA 数据搬入 ringbuf. 循环模式下 cur_pos 可能回卷.
+ *
+ * 重入保护: 本函数被 USART1 IDLE ISR (优先级 5) + DMA1_Ch5 HT/TC ISR (优先级 4)
+ * + 主线程 uart_read 三处调用. DMA ISR 优先级数字更小 -> 能 preempt USART ISR,
+ * 重入会破坏 s_last_dma_pos / ringbuf head. 用 PRIMASK 关全局中断包裹整个搬运,
+ * 几十字节 memcpy 微秒级, 对系统延迟无影响. */
 static void drain_dma_to_fifo(void)
 {
-    uint16_t cur = DMA_RX_SIZE - (uint16_t)__HAL_DMA_GET_COUNTER(&hdma_usart1_rx);
-    if (cur == s_last_dma_pos) { return; }
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
 
-    if (cur > s_last_dma_pos) {
-        ol_ringbuf_write(&s_rx_fifo, &s_dma_rx[s_last_dma_pos], cur - s_last_dma_pos);
-    } else {
-        /* 回卷: 先写 [last_pos..end), 再写 [0..cur) */
-        ol_ringbuf_write(&s_rx_fifo, &s_dma_rx[s_last_dma_pos],
-                         DMA_RX_SIZE - s_last_dma_pos);
-        if (cur > 0) {
-            ol_ringbuf_write(&s_rx_fifo, &s_dma_rx[0], cur);
+    uint16_t cur = DMA_RX_SIZE - (uint16_t)__HAL_DMA_GET_COUNTER(&hdma_usart1_rx);
+    if (cur != s_last_dma_pos) {
+        if (cur > s_last_dma_pos) {
+            ol_ringbuf_write(&s_rx_fifo, &s_dma_rx[s_last_dma_pos], cur - s_last_dma_pos);
+        } else {
+            /* 回卷: 先写 [last_pos..end), 再写 [0..cur) */
+            ol_ringbuf_write(&s_rx_fifo, &s_dma_rx[s_last_dma_pos],
+                             DMA_RX_SIZE - s_last_dma_pos);
+            if (cur > 0) {
+                ol_ringbuf_write(&s_rx_fifo, &s_dma_rx[0], cur);
+            }
         }
+        s_last_dma_pos = cur;
     }
-    s_last_dma_pos = cur;
+
+    __set_PRIMASK(primask);
 }
 
 /* -------- IRQ Hooks (USART1_IRQHandler 内部调用) -------- */
