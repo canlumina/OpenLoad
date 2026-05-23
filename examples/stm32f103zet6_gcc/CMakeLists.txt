@@ -44,9 +44,15 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
-    openload                          # 框架核心
+    # --whole-archive: 强制把 openload + port 静态库内的所有 .o 拉进 elf,
+    # 否则 OL_FLASH_DEV_REGISTER / OL_IO_DEV_REGISTER / OL_CMD_REGISTER /
+    # OL_RECEIVER_REGISTER 所在的 TU 因 "无外部引用" 被 linker GC, 导致
+    # `.ol_flash_devs` 等链接段为空, 运行时找不到设备。
+    "-Wl,--whole-archive"
+    openload                          # 框架核心 (builtins / xmodem 等)
     openload_port_stm32f1             # STM32F1 port (含 console/flash/sys ops)
-    STM32_Drivers                     # HAL/CMSIS .c
+    "-Wl,--no-whole-archive"
+    STM32_Drivers                     # HAL/CMSIS .c (普通链, 按需拉)
 )
 
 # ---------- 链接脚本与 linker flags ----------
