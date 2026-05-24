@@ -37,6 +37,10 @@ const char *ol_strerror(int e)
     case OL_E_CRYPTO_KEY:           return "crypto key";
     case OL_E_CRYPTO_DECRYPT:       return "crypto decrypt";
 
+    case OL_E_AT_ERROR:             return "AT error/fail";
+    case OL_E_NET_NO_LINK:          return "network no link";
+    case OL_E_NET_HTTP:             return "http status";
+
     default:                        return "unknown";
     }
 }

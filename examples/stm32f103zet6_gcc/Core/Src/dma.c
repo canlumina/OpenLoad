@@ -1,58 +1,28 @@
-/* USER CODE BEGIN Header */
-/**
-  ******************************************************************************
-  * @file    dma.c
-  * @brief   This file provides code for the configuration
-  *          of all the requested memory to memory DMA transfers.
-  ******************************************************************************
-  * @attention
-  *
-  * Copyright (c) 2025 STMicroelectronics.
-  * All rights reserved.
-  *
-  * This software is licensed under terms that can be found in the LICENSE file
-  * in the root directory of this software component.
-  * If no LICENSE file comes with this software, it is provided AS-IS.
-  *
-  ******************************************************************************
-  */
-/* USER CODE END Header */
-
-/* Includes ------------------------------------------------------------------*/
+/*
+ * DMA1 controller 初始化 + IRQ enable
+ *
+ * 使用情况:
+ *   Ch4 = USART1 TX  (port_io_uart, 保留备用 — M2 阶段仍走阻塞)
+ *   Ch5 = USART1 RX  (port_io_uart 循环模式)
+ *   Ch6 = USART2 RX  (port_uart2 循环模式,    OPENLOAD_ENABLE_ESP8266)
+ *   Ch7 = USART2 TX  (port_uart2 保留备用,    OPENLOAD_ENABLE_ESP8266)
+ */
 #include "dma.h"
+#include "openload/config.h"
 
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
-
-/*----------------------------------------------------------------------------*/
-/* Configure DMA                                                              */
-/*----------------------------------------------------------------------------*/
-
-/* USER CODE BEGIN 1 */
-
-/* USER CODE END 1 */
-
-/**
-  * Enable DMA controller clock
-  */
 void MX_DMA_Init(void)
 {
+    __HAL_RCC_DMA1_CLK_ENABLE();
 
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
+    HAL_NVIC_SetPriority(DMA1_Channel4_IRQn, 4, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+    HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 4, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 
-  /* DMA interrupt init */
-  /* DMA1_Channel4_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel4_IRQn, 4, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
-  /* DMA1_Channel5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 4, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
-
+#if OPENLOAD_ENABLE_ESP8266
+    HAL_NVIC_SetPriority(DMA1_Channel6_IRQn, 4, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
+    HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 4, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
+#endif
 }
-
-/* USER CODE BEGIN 2 */
-
-/* USER CODE END 2 */
-

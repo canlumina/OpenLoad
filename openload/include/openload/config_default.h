@@ -58,6 +58,11 @@
 #define OPENLOAD_ENABLE_HTTP_OTA            0   /* M2 */
 #endif
 
+/* ESP8266 AT 桥接 (ports/stm32f1 选编), 控制 UART2 + AT 引擎是否参与构建. */
+#ifndef OPENLOAD_ENABLE_ESP8266
+#define OPENLOAD_ENABLE_ESP8266             0
+#endif
+
 /* ============================================================
  *                       Crypto
  * ============================================================ */

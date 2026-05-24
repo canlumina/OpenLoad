@@ -43,6 +43,11 @@
 #define OL_E_CRYPTO_KEY             -64
 #define OL_E_CRYPTO_DECRYPT         -65
 
+/* Network / Modem (-80 ~ -95) */
+#define OL_E_AT_ERROR               -80  /* AT 命令返回 ERROR / FAIL */
+#define OL_E_NET_NO_LINK            -81  /* TCP 链路未建立 / 已断 */
+#define OL_E_NET_HTTP               -82  /* HTTP 状态码非 2xx */
+
 /**
  * @brief 返回错误码对应的简短英文字符串 (用于日志).
  * @param  e   错误码

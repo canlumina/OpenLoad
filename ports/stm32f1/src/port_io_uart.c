@@ -15,10 +15,15 @@
 #include "openload/ops/io_ops.h"
 #include "openload/ringbuf.h"
 #include "openload/errno.h"
+#include "openload/config.h"
 #include "port_stm32f1.h"
 #include "stm32f1xx_hal.h"
 #include <stdint.h>
 #include <string.h>
+
+#if OPENLOAD_ENABLE_ESP8266
+#  include "port_uart2.h"
+#endif
 
 /* CubeMX 生成的全局句柄 — 通常在 usart.c/dma.c 内定义 */
 extern UART_HandleTypeDef huart1;
@@ -74,6 +79,11 @@ void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart)
     if (huart->Instance == USART1) {
         drain_dma_to_fifo();
     }
+#if OPENLOAD_ENABLE_ESP8266
+    else if (huart->Instance == USART2) {
+        port_uart2_dma_half();
+    }
+#endif
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -82,6 +92,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         drain_dma_to_fifo();
         /* 循环模式下 DMA 自动回卷, last_pos 已在 drain 中追平 */
     }
+#if OPENLOAD_ENABLE_ESP8266
+    else if (huart->Instance == USART2) {
+        port_uart2_dma_full();
+    }
+#endif
 }
 
 /* -------- ol_io_ops_t -------- */

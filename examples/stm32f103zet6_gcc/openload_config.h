@@ -18,6 +18,11 @@
 #define OPENLOAD_ENABLE_YMODEM          1
 #define OPENLOAD_ENABLE_HTTP_OTA        0
 
+/* M2-12: 启用 ESP8266 AT 桥接 (UART2 + AT 引擎). 跟 CMakeLists.txt 里的
+ * STM32F1_PORT_ENABLE_ESP8266 必须保持一致 — 前者控 C 宏 (it.c/dma.c/dispatcher
+ * 是否包含 UART2 分支), 后者控 port 库是否编入 port_uart2.c. */
+#define OPENLOAD_ENABLE_ESP8266         1
+
 /* 升级策略: 外部 staging → 内部 app 覆盖 */
 #define OPENLOAD_UPGRADE_STRATEGY       OL_UPGRADE_STAGING
 

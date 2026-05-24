@@ -6,7 +6,9 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-add_library(openload_port_stm32f1 STATIC
+option(STM32F1_PORT_ENABLE_ESP8266 "Compile UART2 + ESP8266 AT driver" OFF)
+
+set(STM32F1_PORT_SOURCES
     src/port_sys.c
     src/port_flash_int.c
     src/port_flash_w25q64.c
@@ -14,6 +16,12 @@ add_library(openload_port_stm32f1 STATIC
     src/port_button.c
     src/board_init.c
 )
+
+if(STM32F1_PORT_ENABLE_ESP8266)
+    list(APPEND STM32F1_PORT_SOURCES src/port_uart2.c src/port_io_esp8266.c)
+endif()
+
+add_library(openload_port_stm32f1 STATIC ${STM32F1_PORT_SOURCES})
 
 target_include_directories(openload_port_stm32f1 PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include

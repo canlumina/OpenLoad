@@ -6,6 +6,7 @@
  */
 #pragma once
 
+#include "openload/config.h"
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -23,6 +24,11 @@ void port_stm32f1_init(void);
  *        框架内部据此处理空闲中断, 将 DMA 接收的数据搬入 ringbuf。
  */
 void port_uart1_idle_isr(void);
+
+#if OPENLOAD_ENABLE_ESP8266
+/** USART2 IDLE 中断钩子 (ESP8266 链路). 同 UART1, 由 it.c 调用. */
+void port_uart2_idle_isr(void);
+#endif
 
 #ifdef __cplusplus
 }

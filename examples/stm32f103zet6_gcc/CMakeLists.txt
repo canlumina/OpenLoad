@@ -15,6 +15,10 @@ project(openload_bootloader LANGUAGES C ASM)
 # 注: openload/CMakeLists.txt 中的 OPENLOAD_ENABLE_* 选项默认值已对齐 M1
 # M2: 把 YMODEM 编入 (option() 不会覆盖已存在的 cache, 用 FORCE 显式覆盖)
 set(OPENLOAD_ENABLE_YMODEM ON CACHE BOOL "Enable YMODEM receiver" FORCE)
+# M2-12: 启用 ports/stm32f1 的 ESP8266 (UART2) 支持. 同步在 openload_config.h
+# 也把 OPENLOAD_ENABLE_ESP8266 置 1 — port_io_uart 的 dispatcher / it.c / dma.c
+# 都看的是 C 宏, CMake 这边只控编入.
+set(STM32F1_PORT_ENABLE_ESP8266 ON CACHE BOOL "Enable UART2 + ESP8266 port" FORCE)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../openload    ${CMAKE_BINARY_DIR}/_openload)
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../ports/stm32f1
@@ -38,6 +42,8 @@ add_executable(${PROJECT_NAME}
     Core/Src/syscalls.c
     Core/Src/system_stm32f1xx.c
     partitions.c
+    commands.c
+    wifi_cfg.c
     startup_stm32f103xe.s
 )
 
