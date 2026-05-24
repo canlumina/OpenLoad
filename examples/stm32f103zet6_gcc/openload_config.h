@@ -12,11 +12,11 @@
 /* 按键 + UART + magic 三类触发都启用 (默认即如此, 显式注明清晰) */
 #define OPENLOAD_BOOT_DELAY_MS          3000
 
-/* M1: XMODEM + 1K. M2: 加 YMODEM. HTTP OTA 仍未启用 (等 ESP8266 port). */
+/* M1: XMODEM + 1K. M2: 加 YMODEM + HTTP OTA. */
 #define OPENLOAD_ENABLE_XMODEM          1
 #define OPENLOAD_ENABLE_XMODEM_1K       1
 #define OPENLOAD_ENABLE_YMODEM          1
-#define OPENLOAD_ENABLE_HTTP_OTA        0
+#define OPENLOAD_ENABLE_HTTP_OTA        1
 
 /* M2-12: 启用 ESP8266 AT 桥接 (UART2 + AT 引擎). 跟 CMakeLists.txt 里的
  * STM32F1_PORT_ENABLE_ESP8266 必须保持一致 — 前者控 C 宏 (it.c/dma.c/dispatcher

@@ -14,7 +14,9 @@ project(openload_bootloader LANGUAGES C ASM)
 # ---------- 引入框架核心 + STM32F1 port ----------
 # 注: openload/CMakeLists.txt 中的 OPENLOAD_ENABLE_* 选项默认值已对齐 M1
 # M2: 把 YMODEM 编入 (option() 不会覆盖已存在的 cache, 用 FORCE 显式覆盖)
-set(OPENLOAD_ENABLE_YMODEM ON CACHE BOOL "Enable YMODEM receiver" FORCE)
+set(OPENLOAD_ENABLE_YMODEM   ON CACHE BOOL "Enable YMODEM receiver"   FORCE)
+# M2-11: HTTP OTA receiver. 依赖 ESP8266 port 提供的 "net" io_dev (CIPSTART/IPD).
+set(OPENLOAD_ENABLE_HTTP_OTA ON CACHE BOOL "Enable HTTP OTA receiver" FORCE)
 # M2-12: 启用 ports/stm32f1 的 ESP8266 (UART2) 支持. 同步在 openload_config.h
 # 也把 OPENLOAD_ENABLE_ESP8266 置 1 — port_io_uart 的 dispatcher / it.c / dma.c
 # 都看的是 C 宏, CMake 这边只控编入.
