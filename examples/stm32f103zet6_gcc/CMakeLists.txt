@@ -13,6 +13,9 @@ project(openload_bootloader LANGUAGES C ASM)
 
 # ---------- 引入框架核心 + STM32F1 port ----------
 # 注: openload/CMakeLists.txt 中的 OPENLOAD_ENABLE_* 选项默认值已对齐 M1
+# M2: 把 YMODEM 编入 (option() 不会覆盖已存在的 cache, 用 FORCE 显式覆盖)
+set(OPENLOAD_ENABLE_YMODEM ON CACHE BOOL "Enable YMODEM receiver" FORCE)
+
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../openload    ${CMAKE_BINARY_DIR}/_openload)
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../ports/stm32f1
                                                        ${CMAKE_BINARY_DIR}/_port_stm32f1)

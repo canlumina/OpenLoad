@@ -12,10 +12,10 @@
 /* 按键 + UART + magic 三类触发都启用 (默认即如此, 显式注明清晰) */
 #define OPENLOAD_BOOT_DELAY_MS          3000
 
-/* M1 范围: XMODEM + 1K 必启, 其它先关 */
+/* M1: XMODEM + 1K. M2: 加 YMODEM. HTTP OTA 仍未启用 (等 ESP8266 port). */
 #define OPENLOAD_ENABLE_XMODEM          1
 #define OPENLOAD_ENABLE_XMODEM_1K       1
-#define OPENLOAD_ENABLE_YMODEM          0
+#define OPENLOAD_ENABLE_YMODEM          1
 #define OPENLOAD_ENABLE_HTTP_OTA        0
 
 /* 升级策略: 外部 staging → 内部 app 覆盖 */
