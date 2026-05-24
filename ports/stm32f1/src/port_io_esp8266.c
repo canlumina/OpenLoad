@@ -228,7 +228,11 @@ int port_esp_tcp_close(void)
 #include "openload/ops/io_ops.h"
 
 static struct {
-    uint8_t  pending[1024];     /* 单段 +IPD payload 缓存; HTTP OTA 段间透明 */
+    /* 单段 +IPD payload 缓存. ESP8266 单段最大 ~1460 字节 (TCP MSS),
+     * buffer 必须 >= 1460, 否则 port_esp_tcp_recv 末尾的"吃尾"逻辑会
+     * 把超出的 body 字节静默丢弃, HTTP OTA 永远收不齐. 取 2048 = 上层
+     * port_uart2 ringbuf 同尺寸, 留余量. */
+    uint8_t  pending[2048];
     uint32_t pending_len;
     uint32_t pending_pos;
     uint8_t  connected;
@@ -295,11 +299,27 @@ static int net_flush(ol_io_dev_t *dev)
     return OL_OK;
 }
 
+/* HTTP OTA 在 begin 阶段调 io->ops->connect, end 阶段调 disconnect —
+ * 框架不直接依赖 port_esp_net_open/close, 保持 receiver 与 port 解耦. */
+static int net_connect(ol_io_dev_t *dev, const char *host, uint16_t port)
+{
+    (void)dev;
+    return port_esp_net_open(host, port);
+}
+
+static int net_disconnect(ol_io_dev_t *dev)
+{
+    (void)dev;
+    return port_esp_net_close();
+}
+
 static const ol_io_ops_t s_net_ops = {
-    .read      = net_read,
-    .write     = net_write,
-    .available = net_available,
-    .flush     = net_flush,
+    .read       = net_read,
+    .write      = net_write,
+    .available  = net_available,
+    .flush      = net_flush,
+    .connect    = net_connect,
+    .disconnect = net_disconnect,
 };
 
 static ol_io_dev_t s_net_dev = {
