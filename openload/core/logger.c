@@ -9,6 +9,9 @@
 #include "openload/logger.h"
 #include "openload/ops/io_ops.h"
 #include "openload/config.h"
+#if OPENLOAD_ENABLE_OPLOG
+#  include "openload/oplog.h"
+#endif
 #include <stdarg.h>
 #include <string.h>
 #include <stddef.h>
@@ -182,7 +185,13 @@ void ol_vlog(ol_log_level_t lvl, const char *fmt, va_list ap)
     static const char *clr[] = { "", "\x1b[31m", "\x1b[33m", "\x1b[32m", "\x1b[36m" };
     static const char *rst   = "\x1b[0m";
 #endif
-    char buf[OPENLOAD_LOG_BUF_SIZE];
+
+    /* 先格式化裸消息 (无前缀/无颜色/无换行), 供 oplog 入盘使用; 控制台输出
+     * 在这个基础上再加装饰. */
+    char raw[OPENLOAD_LOG_BUF_SIZE];
+    int  raw_len = ol_vsnprintf(raw, sizeof(raw), fmt, ap);
+
+    char buf[OPENLOAD_LOG_BUF_SIZE + 16];
     int  pos = 0;
 #if OPENLOAD_LOG_COLOR
     const char *c = clr[lvl];
@@ -194,7 +203,9 @@ void ol_vlog(ol_log_level_t lvl, const char *fmt, va_list ap)
         buf[pos++] = ']';
         buf[pos++] = ' ';
     }
-    pos += ol_vsnprintf(buf + pos, (int)sizeof(buf) - pos, fmt, ap);
+    for (int i = 0; i < raw_len && pos < (int)sizeof(buf); ++i) {
+        buf[pos++] = raw[i];
+    }
 #if OPENLOAD_LOG_COLOR
     const char *r = rst;
     while (*r && pos < (int)sizeof(buf) - 2) { buf[pos++] = *r++; }
@@ -204,6 +215,14 @@ void ol_vlog(ol_log_level_t lvl, const char *fmt, va_list ap)
         buf[pos++] = '\n';
     }
     write_console(buf, pos);
+
+#if OPENLOAD_ENABLE_OPLOG
+    /* 仅 ERR/WRN 自动入盘, 避免 INFO 风暴拖慢 SPI flash 写 (单次 ~1ms).
+     * 显式入盘走 ol_oplog_append. */
+    if (lvl == OL_LOG_ERR || lvl == OL_LOG_WRN) {
+        ol_oplog_append((uint8_t)lvl, raw, (uint32_t)raw_len);
+    }
+#endif
 }
 
 void ol_log(ol_log_level_t lvl, const char *fmt, ...)
