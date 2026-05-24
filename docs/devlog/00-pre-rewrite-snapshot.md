@@ -1,3 +1,11 @@
+# Pre-rewrite Snapshot (archived)
+
+> **历史快照** — 本文件是 OpenLoad 重构 (commit `73dac58`) 之前的项目状态描述,
+> 仍引用已弃用的 SFUD / FAL / EasyFlash 中间件. 保留作为 M0 → M1 重构前的
+> 上下文参考. **现行架构请看 [../spec/ARCHITECTURE.md](../spec/ARCHITECTURE.md)**.
+
+---
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.

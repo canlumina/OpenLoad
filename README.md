@@ -3,7 +3,7 @@
 > 面向资源受限 MCU 的、**可裁剪、可移植**的开源 bootloader 框架。
 > 接口抽象 + 编译期裁剪, 用户提供底层驱动即可接入任意单片机。
 
-[![status](https://img.shields.io/badge/status-M1%20done-green)](docs/REQUIREMENTS.md#7-第一版交付范围v1-scope)
+[![status](https://img.shields.io/badge/status-M2%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
@@ -46,11 +46,11 @@ OpenLoad **不是**某颗芯片的 bootloader, 而是一套 **接口规范 + 协
 | 里程碑 | 状态 | 内容 |
 |--------|------|------|
 | **M1 核心 MVP** | ✅ | Porting API · 分区管理 · CLI · XMODEM/-1K · CRC32 · Staging 升级 · STM32F103 参考实现 |
-| M2 联网升级 | ⏳ | YMODEM · HTTP OTA · ESP8266 port |
+| **M2 联网升级** | ✅ | YMODEM · HTTP OTA · ESP8266 port · 持久化日志 (oplog) |
 | M3 加固 | 🔲 | AES-128-CTR · SHA-256 · 防回滚 · CLI 密码 · backup/rollback |
 | M4+ 扩展 | 🔲 | Ed25519 签名 · USB DFU · MQTT OTA · A/B Dual Bank · STM32F4 port |
 
-详见 [REQUIREMENTS.md](docs/REQUIREMENTS.md)。
+详见 [REQUIREMENTS.md](docs/spec/REQUIREMENTS.md)。开发过程见 [docs/devlog/](docs/devlog/)。
 
 ## 快速开始 (STM32F103ZET6 板子)
 
@@ -124,7 +124,7 @@ OpenLoad> update xmodem download app
 4. 调整 `linker.ld` 的 BOOT 区大小与 `.ol_*` 链接段
 5. 写 `partitions.def` 定义分区表
 
-完整指南: [docs/PORTING_GUIDE.md](docs/PORTING_GUIDE.md)
+完整指南: [docs/guide/PORTING_GUIDE.md](docs/guide/PORTING_GUIDE.md)
 
 ## 目录结构
 
@@ -148,11 +148,17 @@ OpenLoad/
 │   └── image_tool.py           # 给 bin 加 OpenLoad image header
 │
 ├── docs/
-│   ├── REQUIREMENTS.md         # 需求规格 + v1 交付范围
-│   ├── ARCHITECTURE.md         # 架构设计 + 完整接口签名
-│   └── PORTING_GUIDE.md        # 新板子接入指南
+│   ├── spec/                   # 需求规格 + 架构设计
+│   │   ├── REQUIREMENTS.md
+│   │   └── ARCHITECTURE.md
+│   ├── guide/                  # 使用 / 移植指南
+│   │   └── PORTING_GUIDE.md
+│   ├── devlog/                 # 开发日志 (按里程碑)
+│   │   ├── M1.md
+│   │   └── M2.md
+│   └── images/
 │
-└── legacy/                     # 旧版本代码归档 (M2 完成后删除)
+└── legacy/                     # 旧版本代码归档
 ```
 
 ## 体积参考
@@ -167,9 +173,10 @@ GCC 14.x, `-Os`, STM32F103ZET6:
 
 ## 设计文档
 
-- 📋 [需求规格](docs/REQUIREMENTS.md) — 设计哲学 / 功能清单 / 验收标准
-- 🏗 [架构设计](docs/ARCHITECTURE.md) — 接口签名 / 关键流程 / 配置项 / 旧代码迁移对照
-- 🔌 [移植指南](docs/PORTING_GUIDE.md) — 5 步把 OpenLoad 跑到一颗新单片机
+- 📋 [需求规格](docs/spec/REQUIREMENTS.md) — 设计哲学 / 功能清单 / 验收标准
+- 🏗 [架构设计](docs/spec/ARCHITECTURE.md) — 接口签名 / 关键流程 / 配置项 / 旧代码迁移对照
+- 🔌 [移植指南](docs/guide/PORTING_GUIDE.md) — 5 步把 OpenLoad 跑到一颗新单片机
+- 📒 [开发日志](docs/devlog/) — M1 / M2 落地过程, 踩坑与设计取舍
 
 ## 状态
 
