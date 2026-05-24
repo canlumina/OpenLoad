@@ -23,6 +23,9 @@
  * 是否包含 UART2 分支), 后者控 port 库是否编入 port_uart2.c. */
 #define OPENLOAD_ENABLE_ESP8266         1
 
+/* M2-13: 持久化操作日志. 依赖 partitions.def 里的 "oplog" 分区. */
+#define OPENLOAD_ENABLE_OPLOG           1
+
 /* 升级策略: 外部 staging → 内部 app 覆盖 */
 #define OPENLOAD_UPGRADE_STRATEGY       OL_UPGRADE_STAGING
 
