@@ -15,6 +15,9 @@
 #include "openload/errno.h"
 #include "openload/ops/io_ops.h"
 #include "openload/ops/sys_ops.h"
+#if OPENLOAD_ENABLE_OPLOG
+#  include "openload/oplog.h"
+#endif
 #include <stddef.h>
 #include <string.h>
 
@@ -30,6 +33,11 @@ int ol_boot_init(void)
     if (ol_tick_ms() == 0 && ol_tick_ms() == 0) {
         /* 注意: 此处仅判断 sys_ops 已注册, tick=0 是合法值 */
     }
+#if OPENLOAD_ENABLE_OPLOG
+    /* 在第一条 LOGI 之前 init oplog, 让 starting/jump 等 ERR/WRN 都能入盘.
+     * init 失败 (分区未配置等) silently disable, 不影响主流程. */
+    (void)ol_oplog_init();
+#endif
     OL_LOGI("OpenLoad %s starting", "0.1.0-m1");
     return OL_OK;
 }

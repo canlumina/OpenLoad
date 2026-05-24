@@ -63,6 +63,12 @@
 #define OPENLOAD_ENABLE_ESP8266             0
 #endif
 
+/* 持久化操作日志 (M2-13). 需用户工程提供名为 "oplog" 的分区, 大小为
+ * sector_size 的整数倍. */
+#ifndef OPENLOAD_ENABLE_OPLOG
+#define OPENLOAD_ENABLE_OPLOG               0
+#endif
+
 /* ============================================================
  *                       Crypto
  * ============================================================ */

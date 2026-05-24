@@ -23,6 +23,10 @@
 #include "openload/ops/sys_ops.h"
 #include "openload/openload.h"
 #include "openload/errno.h"
+#include "openload/config.h"
+#if OPENLOAD_ENABLE_OPLOG
+#  include "openload/oplog.h"
+#endif
 #include <string.h>
 
 /* ---------- help ---------- */
@@ -152,3 +156,67 @@ static int cmd_install(int argc, char **argv)
     return rc;
 }
 OL_CMD_REGISTER("install", "Install pre-staged firmware to target", cmd_install);
+
+#if OPENLOAD_ENABLE_OPLOG
+/* ---------- oplog ---------- */
+static int oplog_print_cb(uint32_t seq, uint32_t ts_ms, uint8_t level,
+                          const char *msg, uint8_t msg_len, void *user)
+{
+    (void)user;
+    static const char tag[] = { '?', 'E', 'W', 'I', 'D' };
+    char lvl = (level < sizeof(tag)) ? tag[level] : '?';
+    /* msg 是从 flash 直读的 44 字节字段, 可能不带 null-term; 按 msg_len 打 */
+    char tmp[OL_OPLOG_MSG_MAX + 1];
+    uint32_t n = (msg_len > OL_OPLOG_MSG_MAX) ? OL_OPLOG_MSG_MAX : msg_len;
+    if (n && msg) { memcpy(tmp, msg, n); }
+    tmp[n] = 0;
+    ol_printf("%6u [%c] %10u  %s\r\n",
+              (unsigned)seq, lvl, (unsigned)ts_ms, tmp);
+    return 0;
+}
+
+static int cmd_oplog(int argc, char **argv)
+{
+    if (argc < 2) {
+        ol_print("usage: oplog <dump|clear|stat> [n]\r\n");
+        return OL_E_INVAL;
+    }
+    if (strcmp(argv[1], "dump") == 0) {
+        uint32_t n = 0;
+        if (argc >= 3) {
+            for (const char *p = argv[2]; *p; ++p) {
+                if (*p < '0' || *p > '9') { return OL_E_INVAL; }
+                n = n * 10 + (uint32_t)(*p - '0');
+            }
+        }
+        int got = ol_oplog_iter(oplog_print_cb, NULL, n);
+        if (got < 0) {
+            ol_printf("oplog dump: %s\r\n", ol_strerror(got));
+            return got;
+        }
+        ol_printf("(%d records)\r\n", got);
+        return OL_OK;
+    }
+    if (strcmp(argv[1], "clear") == 0) {
+        int rc = ol_oplog_clear();
+        ol_printf("oplog clear: %s\r\n", ol_strerror(rc));
+        return rc;
+    }
+    if (strcmp(argv[1], "stat") == 0) {
+        ol_oplog_stat_t st;
+        int rc = ol_oplog_get_stat(&st);
+        if (rc != OL_OK) {
+            ol_printf("oplog stat: %s\r\n", ol_strerror(rc));
+            return rc;
+        }
+        ol_printf("ready=%u  used=%u/%u  write_idx=%u  next_seq=%u\r\n",
+                  (unsigned)st.ready, (unsigned)st.valid_count,
+                  (unsigned)st.total_slots, (unsigned)st.write_idx,
+                  (unsigned)st.next_seq);
+        return OL_OK;
+    }
+    ol_print("oplog: unknown subcommand\r\n");
+    return OL_E_INVAL;
+}
+OL_CMD_REGISTER("oplog", "Persistent op log (dump|clear|stat)", cmd_oplog);
+#endif
