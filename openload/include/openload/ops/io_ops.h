@@ -28,6 +28,16 @@ typedef struct {
 
     /** 可选: 刷出所有挂起的发送数据 (例如等待 DMA 完成). */
     int (*flush)(ol_io_dev_t *dev);
+
+    /**
+     * 可选: 建立网络层链路 (TCP / TLS / WebSocket 等). 串口/USB-CDC 类
+     * io 设备留 NULL. HTTP OTA 在 begin 阶段调用本接口而不直接调具体
+     * 网络栈, 框架与 port 通过 io_dev 抽象解耦.
+     */
+    int (*connect)(ol_io_dev_t *dev, const char *host, uint16_t port);
+
+    /** 可选: 断开 connect 建立的链路. */
+    int (*disconnect)(ol_io_dev_t *dev);
 } ol_io_ops_t;
 
 struct ol_io_dev {

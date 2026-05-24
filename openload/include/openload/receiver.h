@@ -35,6 +35,13 @@ typedef struct {
 
     /** 可选: 返回进度百分比 0..100. NULL 时框架显示 "..." 字样. */
     uint8_t (*progress)(ol_receiver_t *r);
+
+    /**
+     * 可选: 在 begin 之前喂入额外初始化参数. 由 ol_updater_run 在
+     * url_or_null 非 NULL 时调用 (HTTP OTA 用 URL 字符串). XMODEM/YMODEM
+     * 等不需要外部参数的协议留 NULL.
+     */
+    int (*prepare)(ol_receiver_t *r, const void *arg);
 } ol_receiver_ops_t;
 
 struct ol_receiver {

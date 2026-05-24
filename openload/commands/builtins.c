@@ -128,15 +128,17 @@ OL_CMD_REGISTER("erase", "Erase a partition", cmd_erase);
 static int cmd_update(int argc, char **argv)
 {
     if (argc < 4) {
-        ol_print("usage: update <protocol> <staging> <target>\r\n");
+        ol_print("usage: update <protocol> <staging> <target> [url]\r\n");
         ol_print("  e.g.: update xmodem download app\r\n");
+        ol_print("        update http download app http://host[:port]/path\r\n");
         return OL_E_INVAL;
     }
-    int rc = ol_updater_run(argv[1], argv[2], argv[3], NULL);
+    const char *url = (argc >= 5) ? argv[4] : NULL;
+    int rc = ol_updater_run(argv[1], argv[2], argv[3], url);
     ol_printf("update: %s\r\n", ol_strerror(rc));
     return rc;
 }
-OL_CMD_REGISTER("update", "Receive firmware and install (proto staging target)", cmd_update);
+OL_CMD_REGISTER("update", "Receive firmware and install (proto staging target [url])", cmd_update);
 
 /* ---------- install ---------- */
 static int cmd_install(int argc, char **argv)

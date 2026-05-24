@@ -132,8 +132,6 @@ int ol_updater_run(const char *receiver_name,
                    const char *target_part,
                    const char *url_or_null)
 {
-    (void)url_or_null;   /* HTTP receiver 在 M2 接入 */
-
     ol_receiver_t *r = ol_receiver_find(receiver_name);
     if (!r) {
         OL_LOGE("receiver %s not found", receiver_name);
@@ -142,6 +140,15 @@ int ol_updater_run(const char *receiver_name,
     const ol_partition_t *staging = ol_part_find(staging_part ? staging_part : target_part);
     if (!staging) { return OL_E_PART_NOT_FOUND; }
     ol_io_dev_t *io = ol_io_dev_find("console");
+
+    /* HTTP / 其它需要外部参数的 receiver 在 begin 前注入 (e.g. URL). */
+    if (url_or_null && r->ops->prepare) {
+        int rc = r->ops->prepare(r, url_or_null);
+        if (rc != OL_OK) {
+            OL_LOGE("prepare: %s", ol_strerror(rc));
+            return rc;
+        }
+    }
 
     OL_LOGI("erase staging %s", staging->name);
     int rc = ol_part_erase_all(staging);
