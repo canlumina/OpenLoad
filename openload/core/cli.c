@@ -69,31 +69,68 @@ int ol_cli_exec(const char *line)
 }
 
 /* 可选口令保护. 进入主循环前阻塞至口令正确.
-   设置 OPENLOAD_CLI_PASSWORD 为非空字符串启用; NULL 或空串则跳过. */
+   设置 OPENLOAD_CLI_PASSWORD 为非空字符串启用; NULL 或空串则跳过.
+   失败 OPENLOAD_CLI_PASSWORD_MAX_ATTEMPTS 次后锁定 LOCKOUT_MS 期间不接受
+   任何输入. 失败 / 锁定事件走 LOGW, 配合 M2-13 oplog hook 自动持久化,
+   方便事后排查物理接入攻击. */
 static void prompt_password(ol_io_dev_t *io)
 {
     const char *want = OPENLOAD_CLI_PASSWORD;
     if (!want || !want[0]) {
         return;
     }
+    uint32_t fails = 0;
     char in[64];
     while (1) {
         ol_print("password: ");
         size_t pos = 0;
-        while (pos < sizeof(in) - 1) {
+        while (1) {
             uint8_t c;
             if (ol_io_getc_timeout(io, &c, 0xFFFFFFFFu) != OL_OK) { continue; }
             if (c == '\r' || c == '\n') { break; }
             if (c == 0x7F || c == 0x08) {
-                if (pos > 0) { pos--; }
+                if (pos > 0) {
+                    pos--;
+                    ol_print("\b \b");
+                }
                 continue;
             }
-            in[pos++] = (char)c;
+            /* 仅可打印字符接受, 回显 '*' 给用户击键反馈. */
+            if (c >= 0x20 && c < 0x7F && pos < sizeof(in) - 1) {
+                in[pos++] = (char)c;
+                ol_io_putc(io, '*');
+            }
         }
         in[pos] = '\0';
         ol_print("\r\n");
-        if (strcmp(in, want) == 0) { return; }
-        ol_print("denied\r\n");
+
+        if (strcmp(in, want) == 0) {
+            if (fails) {
+                OL_LOGW("cli: password ok after %lu fail(s)", (uint32_t)fails);
+            }
+            return;
+        }
+
+        fails++;
+        OL_LOGW("cli: password fail %lu/%u",
+                (uint32_t)fails,
+                (unsigned)OPENLOAD_CLI_PASSWORD_MAX_ATTEMPTS);
+
+        if (fails >= OPENLOAD_CLI_PASSWORD_MAX_ATTEMPTS) {
+            ol_printf("locked %lu s\r\n",
+                      (uint32_t)(OPENLOAD_CLI_PASSWORD_LOCKOUT_MS / 1000u));
+            OL_LOGW("cli: locked %lu ms",
+                    (uint32_t)OPENLOAD_CLI_PASSWORD_LOCKOUT_MS);
+            uint32_t start = ol_tick_ms();
+            while ((ol_tick_ms() - start) < OPENLOAD_CLI_PASSWORD_LOCKOUT_MS) {
+                /* 期间持续清空输入, 避免缓冲积压在解锁瞬间被当成密码. */
+                uint8_t c;
+                (void)ol_io_getc_timeout(io, &c, 100);
+            }
+            fails = 0;
+        } else {
+            ol_print("denied\r\n");
+        }
     }
 }
 

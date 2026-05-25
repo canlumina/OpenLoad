@@ -118,6 +118,14 @@
 #ifndef OPENLOAD_CLI_PASSWORD
 #define OPENLOAD_CLI_PASSWORD               ((const char *)0)
 #endif
+/** 连续输错多少次后进入锁定. */
+#ifndef OPENLOAD_CLI_PASSWORD_MAX_ATTEMPTS
+#define OPENLOAD_CLI_PASSWORD_MAX_ATTEMPTS  3
+#endif
+/** 锁定时长 (毫秒). 锁定期间任何输入丢弃, 不再校验密码. */
+#ifndef OPENLOAD_CLI_PASSWORD_LOCKOUT_MS
+#define OPENLOAD_CLI_PASSWORD_LOCKOUT_MS    30000u
+#endif
 
 /* ============================================================
  *                        Logger
