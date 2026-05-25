@@ -1,0 +1,24 @@
+/*
+ * 分区表 - X-macro 风格.
+ * 这个文件被 partitions.c 多次 include, 每次以不同的 OL_PART 宏定义展开。
+ *
+ * 字段:  device,     name,         offset,        size,    flags
+ *
+ * STM32F407VGT6 内部 Flash (1 MB), 非均匀 sector:
+ *   boot  = 0x00000..0x10000 (64 KB)   sector 0-3 (16K×4), bootloader, 不可写
+ *   app   = 0x20000..0xA0000 (512 KB)  sector 5-8 (128K×4), 应用 + image header
+ *   (sector 4 64K 与 sector 9-11 各 128K 留 spare / dual bank)
+ *
+ * W25Q16 外部 Flash (2 MB), DevEBox 板载 U3, 接 SPI1:
+ *   download = 0x000000..0x080000 (512 KB)  XMODEM/HTTP staging
+ *   backup   = 0x080000..0x100000 (512 KB)  M3 备份/回滚 (与 app 等大)
+ *   wifi_cfg = 0x100000..0x101000 (4 KB)    WiFi 凭据持久化
+ *   oplog    = 0x101000..0x105000 (16 KB)   操作日志 (4 sector)
+ *   (剩余 0x105000..0x200000 ~1MB 暂留)
+ */
+OL_PART(internal, "boot",     0x00000000u, 0x00010000u, OL_PART_FLAG_READABLE)
+OL_PART(internal, "app",      0x00020000u, 0x00080000u, OL_PART_FLAG_READABLE | OL_PART_FLAG_WRITABLE | OL_PART_FLAG_EXECUTABLE)
+OL_PART(w25q16,   "download", 0x00000000u, 0x00080000u, OL_PART_FLAG_READABLE | OL_PART_FLAG_WRITABLE)
+OL_PART(w25q16,   "backup",   0x00080000u, 0x00080000u, OL_PART_FLAG_READABLE | OL_PART_FLAG_WRITABLE)
+OL_PART(w25q16,   "wifi_cfg", 0x00100000u, 0x00001000u, OL_PART_FLAG_READABLE | OL_PART_FLAG_WRITABLE)
+OL_PART(w25q16,   "oplog",    0x00101000u, 0x00004000u, OL_PART_FLAG_READABLE | OL_PART_FLAG_WRITABLE)
