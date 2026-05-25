@@ -33,6 +33,11 @@
  * CLI: install ... force 可单次绕过. */
 #define OPENLOAD_ANTI_ROLLBACK          1
 
+/* M3-2: 启用 backup / rollback. install 前先备份现 app -> backup 分区,
+ * install 失败自动回滚; boot 检测到 INSTALLING magic 或 app verify 失败
+ * 也自动回滚. partitions.def 必须含 "backup" 分区. */
+#define OPENLOAD_ENABLE_BACKUP          1
+
 /* 日志 INFO 级 + ANSI 彩色 (使用 Tera Term/Xshell 终端时美观) */
 #define OPENLOAD_LOG_LEVEL              3
 #define OPENLOAD_LOG_COLOR              1

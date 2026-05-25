@@ -162,6 +162,29 @@ static int cmd_install(int argc, char **argv)
 }
 OL_CMD_REGISTER("install", "Install pre-staged firmware (staging target [force])", cmd_install);
 
+#if OPENLOAD_ENABLE_BACKUP
+/* ---------- backup / rollback ---------- */
+static int cmd_backup(int argc, char **argv)
+{
+    const char *target = (argc > 1) ? argv[1] : "app";
+    const char *backup = (argc > 2) ? argv[2] : "backup";
+    int rc = ol_updater_backup(target, backup);
+    ol_printf("backup %s -> %s: %s\r\n", target, backup, ol_strerror(rc));
+    return rc;
+}
+OL_CMD_REGISTER("backup", "Backup current target (default: app -> backup)", cmd_backup);
+
+static int cmd_rollback(int argc, char **argv)
+{
+    const char *backup = (argc > 1) ? argv[1] : "backup";
+    const char *target = (argc > 2) ? argv[2] : "app";
+    int rc = ol_updater_rollback(backup, target);
+    ol_printf("rollback %s -> %s: %s\r\n", backup, target, ol_strerror(rc));
+    return rc;
+}
+OL_CMD_REGISTER("rollback", "Restore target from backup (default: backup -> app)", cmd_rollback);
+#endif
+
 #if OPENLOAD_ENABLE_OPLOG
 /* ---------- oplog ---------- */
 static int oplog_print_cb(uint32_t seq, uint32_t ts_ms, uint8_t level,
