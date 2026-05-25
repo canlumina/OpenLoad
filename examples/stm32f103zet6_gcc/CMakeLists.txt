@@ -19,6 +19,8 @@ set(OPENLOAD_ENABLE_YMODEM   ON CACHE BOOL "Enable YMODEM receiver"   FORCE)
 set(OPENLOAD_ENABLE_HTTP_OTA ON CACHE BOOL "Enable HTTP OTA receiver" FORCE)
 # M2-13: 持久化操作日志 (oplog 分区).
 set(OPENLOAD_ENABLE_OPLOG    ON CACHE BOOL "Enable persistent op log" FORCE)
+# M3-4: AES-128-CTR image decryption (vendor third_party/tiny-aes).
+set(OPENLOAD_ENABLE_AES_128_CTR ON CACHE BOOL "Enable AES-128-CTR" FORCE)
 # M2-12: 启用 ports/stm32f1 的 ESP8266 (UART2) 支持. 同步在 openload_config.h
 # 也把 OPENLOAD_ENABLE_ESP8266 置 1 — port_io_uart 的 dispatcher / it.c / dma.c
 # 都看的是 C 宏, CMake 这边只控编入.

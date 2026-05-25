@@ -38,6 +38,18 @@
  * 也自动回滚. partitions.def 必须含 "backup" 分区. */
 #define OPENLOAD_ENABLE_BACKUP          1
 
+/* M3-4: 启用 AES-128-CTR 解密. 加密 image 通过 image_tool.py --aes-key
+ * 生成. Key 编进 bootloader (下方 OPENLOAD_AES_KEY_BYTES). 现阶段 key
+ * 暴露在 bootloader 二进制里, 反向工程可取出; M3+ 可叠 OTP/RDP 升级. */
+#define OPENLOAD_ENABLE_AES_128_CTR     1
+
+/* 16 字节 AES-128 密钥. 跟 image_tool.py --aes-key 必须一致.
+ * 测试默认值: "OpenLoad demoKey" → 0x4F,0x70,...
+ * 量产必须改成项目随机生成, 不要泄漏. */
+#define OPENLOAD_AES_KEY_BYTES \
+    0x4F, 0x70, 0x65, 0x6E, 0x4C, 0x6F, 0x61, 0x64, \
+    0x20, 0x64, 0x65, 0x6D, 0x6F, 0x4B, 0x65, 0x79
+
 /* 日志 INFO 级 + ANSI 彩色 (使用 Tera Term/Xshell 终端时美观) */
 #define OPENLOAD_LOG_LEVEL              3
 #define OPENLOAD_LOG_COLOR              1
