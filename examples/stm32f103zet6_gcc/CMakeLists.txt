@@ -51,15 +51,16 @@ add_executable(${PROJECT_NAME}
     Core/Src/stm32f1xx_hal_msp.c
     Core/Src/syscalls.c
     Core/Src/system_stm32f1xx.c
-    partitions.c
-    commands.c
-    wifi_cfg.c
+    ${CMAKE_SOURCE_DIR}/../common/partitions.c
+    ${CMAKE_SOURCE_DIR}/../common/commands.c
+    ${CMAKE_SOURCE_DIR}/../common/wifi_cfg.c
     startup_stm32f103xe.s
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     Core/Inc
     ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/../common
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

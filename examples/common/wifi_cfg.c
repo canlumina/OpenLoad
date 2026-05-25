@@ -1,7 +1,7 @@
 /*
  * WiFi 凭据持久化实现
  *
- * 走 OpenLoad partition API, 不直接依赖 W25Q64 驱动 — 换 flash 设备只需调整
+ * 走 OpenLoad partition API, 不直接依赖具体 flash 驱动 — 换 flash 设备只需调整
  * partitions.def, 本文件无需修改.
  */
 #include "wifi_cfg.h"

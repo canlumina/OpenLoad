@@ -1,5 +1,5 @@
 /*
- * WiFi 凭据持久化 (W25Q16 上 wifi_cfg 分区)
+ * WiFi 凭据持久化 (外部 SPI Flash 上 wifi_cfg 分区)
  *
  * 单条记录, 4KB sector. 格式:
  *   { magic, version, ssid[64], pass[64], reserved, crc32 } 共 144 字节,
