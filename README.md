@@ -3,7 +3,7 @@
 > 面向资源受限 MCU 的、**可裁剪、可移植**的开源 bootloader 框架。
 > 接口抽象 + 编译期裁剪, 用户提供底层驱动即可接入任意单片机。
 
-[![status](https://img.shields.io/badge/status-M4%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
+[![status](https://img.shields.io/badge/status-M5%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
@@ -49,7 +49,8 @@ OpenLoad **不是**某颗芯片的 bootloader, 而是一套 **接口规范 + 协
 | **M2 联网升级** | ✅ | YMODEM · HTTP OTA · ESP8266 port · 持久化日志 (oplog) |
 | **M3 加固** | ✅ | 防回滚 · CLI 密码 + 失败锁定 · backup/rollback · AES-128-CTR |
 | **M4 真实性/抗篡改** | ✅ | SHA-256 摘要 · Ed25519 签名验证 (M4-3/M4-4 需切 F4+, 见 [M4.md](docs/devlog/M4.md)) |
-| M5+ 平台扩展 | 🔲 | STM32F4 port · A/B Dual Bank · HTTPS · USB DFU · MQTT OTA · RDP/OTP key 锁定 |
+| **M5 平台扩展 + 模块化** | ✅ | STM32F407VGT6 port (DevEBox) · W25QXX 通用驱动 · examples/common/ 共享 · 仓库自包含化 (见 [M5.md](docs/devlog/M5.md)) |
+| M6+ 后续 | 🔲 | A/B Dual Bank · HTTPS · USB DFU · MQTT OTA · RDP/OTP key 锁定 |
 
 详见 [REQUIREMENTS.md](docs/spec/REQUIREMENTS.md)。开发过程见 [docs/devlog/](docs/devlog/)。
 
@@ -179,7 +180,7 @@ GCC 14.x, `-Os`, STM32F103ZET6:
 - 📋 [需求规格](docs/spec/REQUIREMENTS.md) — 设计哲学 / 功能清单 / 验收标准
 - 🏗 [架构设计](docs/spec/ARCHITECTURE.md) — 接口签名 / 关键流程 / 配置项 / 旧代码迁移对照
 - 🔌 [移植指南](docs/guide/PORTING_GUIDE.md) — 5 步把 OpenLoad 跑到一颗新单片机
-- 📒 [开发日志](docs/devlog/) — M1 / M2 / M3 / M4 落地过程, 踩坑与设计取舍
+- 📒 [开发日志](docs/devlog/) — M1 / M2 / M3 / M4 / M5 落地过程, 踩坑与设计取舍
 
 ## 状态
 
