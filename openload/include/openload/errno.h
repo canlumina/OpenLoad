@@ -32,6 +32,7 @@
 #define OL_E_IMAGE_BOARD            -36
 #define OL_E_IMAGE_VERSION          -37  /* 防回滚命中 */
 #define OL_E_IMAGE_SIGNATURE        -38  /* 签名验证失败 */
+#define OL_E_IMAGE_HASH             -39  /* SHA-256 摘要不匹配 */
 
 /* Receiver (-48 ~ -63) */
 #define OL_E_RX_CANCELED            -48

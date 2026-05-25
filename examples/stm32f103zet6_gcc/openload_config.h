@@ -43,6 +43,13 @@
  * 暴露在 bootloader 二进制里, 反向工程可取出; M3+ 可叠 OTP/RDP 升级. */
 #define OPENLOAD_ENABLE_AES_128_CTR     1
 
+/* M4-1: SHA-256 摘要. 当 hdr.firmware_sha256 非全 0 时在 ol_image_verify
+ * 内追加 SHA-256 校验 (CRC32 之后). image_tool.py 默认对明文 payload
+ * 算 SHA, 截前 16 字节 (128-bit 抗碰撞) 写入头. 加密 image 时 SHA 也是
+ * 明文 SHA, 跟 firmware_crc32 同语义; install 解密回写 hdr 时 SHA 字段
+ * 原样保留, 解密后 target verify 自动覆盖到 SHA 校验. */
+#define OPENLOAD_ENABLE_SHA256          1
+
 /* 16 字节 AES-128 密钥. 跟 image_tool.py --aes-key 必须一致.
  * 测试默认值: "OpenLoad demoKey" → 0x4F,0x70,...
  * 量产必须改成项目随机生成, 不要泄漏. */

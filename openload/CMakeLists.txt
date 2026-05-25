@@ -56,7 +56,8 @@ if(OPENLOAD_ENABLE_AES_128_CTR)
 endif()
 
 if(OPENLOAD_ENABLE_SHA256)
-    list(APPEND OPENLOAD_SOURCES crypto/sha256.c)
+    list(APPEND OPENLOAD_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/sha256/sha256.c)
 endif()
 
 add_library(openload STATIC ${OPENLOAD_SOURCES})
@@ -75,6 +76,13 @@ if(OPENLOAD_ENABLE_AES_128_CTR)
         ECB=0
         CTR=1
         AES128=1
+    )
+endif()
+
+# Brad Conte SHA-256 (public domain).
+if(OPENLOAD_ENABLE_SHA256)
+    target_include_directories(openload PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/sha256
     )
 endif()
 

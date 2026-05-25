@@ -18,6 +18,7 @@ OpenLoad image_tool — 给裸 bin 加 OpenLoad 固件头.
 
 import argparse
 import binascii
+import hashlib
 import os
 import struct
 import sys
@@ -84,6 +85,10 @@ def main():
                     help="AES-128 key (32 hex 字符); 启用 image 加密")
     ap.add_argument("--aes-iv",    type=lambda x: parse_hex_bytes(x, 16), default=None,
                     help="AES-CTR IV (32 hex 字符); 默认随机生成")
+    ap.add_argument("--sha256", dest="sha256", action="store_true", default=True,
+                    help="盖 SHA-256 摘要前 16 字节到 hdr.firmware_sha256 (默认开)")
+    ap.add_argument("--no-sha256", dest="sha256", action="store_false",
+                    help="不盖 SHA, hdr.firmware_sha256 留全 0 (设备跳过 SHA 校验)")
     args = ap.parse_args()
 
     payload = args.input.read_bytes()
@@ -92,8 +97,10 @@ def main():
 
     out_path = args.output or args.input.with_name(args.input.stem + "-ol.bin")
 
-    # firmware_crc32 始终是明文 CRC (设备解密后用这个值校验)
+    # firmware_crc32 / firmware_sha256 始终对 *明文* payload 算
+    # (设备解密后用这两个值校验; 加密时 SHA 也是明文 SHA, 跟 CRC 同语义)
     fw_crc = binascii.crc32(payload) & 0xFFFFFFFF
+    fw_sha = hashlib.sha256(payload).digest()[:16] if args.sha256 else b"\x00" * 16
 
     flags = 0
     iv = b"\x00" * 16
@@ -113,7 +120,7 @@ def main():
         fw_crc,
         args.version,
         args.timestamp,
-        b"\x00" * 16,                # sha256
+        fw_sha,                      # sha256[16] (明文 SHA 前 16 字节, 未启用为 0)
         iv,                          # aes_iv
         b"\x00" * 4,                 # reserved
         0,                           # hdr_crc32 placeholder
@@ -132,6 +139,8 @@ def main():
     if flags & FLAG_ENCRYPTED:
         print(f"aes_iv   : {iv.hex()}")
     print(f"fw_crc32 : 0x{fw_crc:08x} (plaintext)")
+    if args.sha256:
+        print(f"fw_sha   : {fw_sha.hex()} (plaintext, truncated 128b)")
     print(f"hdr_crc32: 0x{hdr_crc:08x}")
 
 

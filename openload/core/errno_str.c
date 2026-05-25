@@ -28,6 +28,7 @@ const char *ol_strerror(int e)
     case OL_E_IMAGE_BOARD:          return "image board id";
     case OL_E_IMAGE_VERSION:        return "image version (rollback)";
     case OL_E_IMAGE_SIGNATURE:      return "image signature";
+    case OL_E_IMAGE_HASH:           return "image sha256";
 
     case OL_E_RX_CANCELED:          return "receiver canceled";
     case OL_E_RX_PROTOCOL:          return "receiver protocol";
