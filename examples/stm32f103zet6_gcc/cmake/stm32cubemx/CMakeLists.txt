@@ -1,17 +1,16 @@
 # ----------------------------------------------------------------------------
-#  STM32CubeMX 子构建: 提供 HAL + CMSIS + startup
+#  STM32CubeMX 子构建: 提供 HAL + CMSIS (本地化复制到 ../Drivers/)
 #
-#  HAL 源码与 CMSIS 头文件目前直接引用 legacy/example/gcc/Drivers/。
-#  TODO (M2): 待 legacy/ 删除时, 把 Drivers 复制到 ports/stm32f1/cubemx_f1/
+#  HAL/CMSIS 文件已复制到 examples/stm32f103zet6_gcc/Drivers/, 工程自包含,
+#  任意机器 clone 即编, 不再依赖外部 vendor 路径.
 # ----------------------------------------------------------------------------
 cmake_minimum_required(VERSION 3.22)
 
 enable_language(C ASM)
 
-# legacy 中 HAL 库的绝对路径
-set(LEGACY_GCC_ROOT "${CMAKE_SOURCE_DIR}/../../legacy/example/gcc")
-set(HAL_DRV         "${LEGACY_GCC_ROOT}/Drivers/STM32F1xx_HAL_Driver")
-set(CMSIS           "${LEGACY_GCC_ROOT}/Drivers/CMSIS")
+set(DRIVERS_ROOT "${CMAKE_SOURCE_DIR}/Drivers")
+set(HAL_DRV      "${DRIVERS_ROOT}/STM32F1xx_HAL_Driver")
+set(CMSIS        "${DRIVERS_ROOT}/CMSIS")
 
 set(STM32_DEFS
     USE_HAL_DRIVER

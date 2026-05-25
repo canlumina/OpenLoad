@@ -149,15 +149,12 @@ OpenLoad/
 │   ├── test_image.c
 │   └── CMakeLists.txt
 │
-├── docs/
-│   ├── REQUIREMENTS.md
-│   ├── ARCHITECTURE.md             # 本文件
-│   ├── PORTING_GUIDE.md
-│   ├── PROTOCOL_SPEC.md
-│   └── MIGRATION_FROM_V0.md
-│
-└── legacy/                         # 旧代码归档 (可选保留, M2 后删除)
-    └── example/                    # 当前的 example/ 移到这里
+└── docs/
+    ├── REQUIREMENTS.md
+    ├── ARCHITECTURE.md             # 本文件
+    ├── PORTING_GUIDE.md
+    ├── PROTOCOL_SPEC.md
+    └── MIGRATION_FROM_V0.md
 ```
 
 ---
@@ -889,7 +886,6 @@ steps:
 | `Core/Inc/stm32f1xx_*.h` | 保留 | `ports/stm32f1/include/` (HAL conf) |
 | `Core/mbedtls/` | **整个删除** | 自实现轻量 crypto |
 | `middleware/mbedtls/` | **整个删除** | 同上 |
-| `docs/bootloader_development_plan.md` | 归档 | `legacy/docs/` 或直接删除 |
 | `docs/MBEDTLS_INTEGRATION.md` | **直接删除** | 不再使用 mbedtls |
 
 ---

@@ -109,7 +109,3 @@ OpenLoad> update xmodem download app
 | 仅 XMODEM + CRC32 (M1 默认) | ~14 KB |
 | + YMODEM + HTTP OTA (M2 目标) | ~20 KB |
 | 全功能 (M3 目标) | ~28 KB |
-
-## 与 legacy 工程并存
-
-本工程通过相对路径引用 `legacy/example/gcc/Drivers/` 的 STM32 HAL 库。当 M2 完成、legacy 删除时, 该路径会被替换为本工程自带的 Drivers 目录。

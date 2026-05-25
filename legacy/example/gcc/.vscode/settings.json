@@ -1,8 +1,0 @@
-{
-    "files.associations": {
-        "gpio.h": "c",
-        "dev_usart.h": "c",
-        "w25q64.h": "c",
-        "xmodem.h": "c"
-    }
-}

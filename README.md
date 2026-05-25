@@ -148,20 +148,19 @@ OpenLoad/
 ├── tools/
 │   └── image_tool.py           # 给 bin 加 OpenLoad image header
 │
-├── docs/
-│   ├── spec/                   # 需求规格 + 架构设计
-│   │   ├── REQUIREMENTS.md
-│   │   └── ARCHITECTURE.md
-│   ├── guide/                  # 使用 / 移植指南
-│   │   └── PORTING_GUIDE.md
-│   ├── devlog/                 # 开发日志 (按里程碑)
-│   │   ├── M1.md
-│   │   ├── M2.md
-│   │   ├── M3.md
-│   │   └── M4.md
-│   └── images/
-│
-└── legacy/                     # 旧版本代码归档
+└── docs/
+    ├── spec/                   # 需求规格 + 架构设计
+    │   ├── REQUIREMENTS.md
+    │   └── ARCHITECTURE.md
+    ├── guide/                  # 使用 / 移植指南
+    │   └── PORTING_GUIDE.md
+    ├── devlog/                 # 开发日志 (按里程碑)
+    │   ├── M1.md
+    │   ├── M2.md
+    │   ├── M3.md
+    │   └── M4.md
+    ├── images/
+    └── board/                  # 板原理图 / 硬件资料
 ```
 
 ## 体积参考
