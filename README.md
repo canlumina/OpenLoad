@@ -3,7 +3,7 @@
 > 面向资源受限 MCU 的、**可裁剪、可移植**的开源 bootloader 框架。
 > 接口抽象 + 编译期裁剪, 用户提供底层驱动即可接入任意单片机。
 
-[![status](https://img.shields.io/badge/status-M3%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
+[![status](https://img.shields.io/badge/status-M4%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
@@ -48,7 +48,8 @@ OpenLoad **不是**某颗芯片的 bootloader, 而是一套 **接口规范 + 协
 | **M1 核心 MVP** | ✅ | Porting API · 分区管理 · CLI · XMODEM/-1K · CRC32 · Staging 升级 · STM32F103 参考实现 |
 | **M2 联网升级** | ✅ | YMODEM · HTTP OTA · ESP8266 port · 持久化日志 (oplog) |
 | **M3 加固** | ✅ | 防回滚 · CLI 密码 + 失败锁定 · backup/rollback · AES-128-CTR |
-| M4+ 扩展 | 🔲 | SHA-256 · Ed25519 签名 · A/B Dual Bank · HTTPS · USB DFU · MQTT OTA · STM32F4 port |
+| **M4 真实性/抗篡改** | ✅ | SHA-256 摘要 · Ed25519 签名验证 (M4-3/M4-4 需切 F4+, 见 [M4.md](docs/devlog/M4.md)) |
+| M5+ 平台扩展 | 🔲 | STM32F4 port · A/B Dual Bank · HTTPS · USB DFU · MQTT OTA · RDP/OTP key 锁定 |
 
 详见 [REQUIREMENTS.md](docs/spec/REQUIREMENTS.md)。开发过程见 [docs/devlog/](docs/devlog/)。
 
@@ -155,7 +156,9 @@ OpenLoad/
 │   │   └── PORTING_GUIDE.md
 │   ├── devlog/                 # 开发日志 (按里程碑)
 │   │   ├── M1.md
-│   │   └── M2.md
+│   │   ├── M2.md
+│   │   ├── M3.md
+│   │   └── M4.md
 │   └── images/
 │
 └── legacy/                     # 旧版本代码归档
@@ -168,15 +171,16 @@ GCC 14.x, `-Os`, STM32F103ZET6:
 | 配置 | bootloader.bin |
 |------|----------------|
 | 仅 XMODEM + CRC32 + CLI (M1 默认) | **~14 KB** |
-| + YMODEM + HTTP OTA (M2 目标) | ~20 KB |
-| 全功能 + 签名 (M3+ 目标) | ~28 KB |
+| + YMODEM + HTTP OTA + oplog (M2) | ~37 KB |
+| + 防回滚 + backup + AES-128 (M3) | ~41 KB |
+| + SHA-256 + Ed25519 (M4) | ~48 KB |
 
 ## 设计文档
 
 - 📋 [需求规格](docs/spec/REQUIREMENTS.md) — 设计哲学 / 功能清单 / 验收标准
 - 🏗 [架构设计](docs/spec/ARCHITECTURE.md) — 接口签名 / 关键流程 / 配置项 / 旧代码迁移对照
 - 🔌 [移植指南](docs/guide/PORTING_GUIDE.md) — 5 步把 OpenLoad 跑到一颗新单片机
-- 📒 [开发日志](docs/devlog/) — M1 / M2 落地过程, 踩坑与设计取舍
+- 📒 [开发日志](docs/devlog/) — M1 / M2 / M3 / M4 落地过程, 踩坑与设计取舍
 
 ## 状态
 
