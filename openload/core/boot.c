@@ -18,6 +18,9 @@
 #if OPENLOAD_ENABLE_OPLOG
 #  include "openload/oplog.h"
 #endif
+#if OPENLOAD_ENABLE_BACKUP
+#  include "openload/updater.h"
+#endif
 #include <stddef.h>
 #include <string.h>
 
@@ -119,10 +122,43 @@ int ol_boot_jump_to(const char *app_partition_name)
 
 void ol_boot_run(void)
 {
+#if OPENLOAD_ENABLE_BACKUP
+    /* install 中断检测: 上次 install 中途断电会留下 INSTALLING magic.
+     * 此时 app 可能写到一半, ol_image_verify 大概率也能挡, 但 CRC 偶然
+     * 通过的边界下 magic 是更硬的指示器. 直接从 backup 恢复. */
+    {
+        uint32_t m = 0;
+        if (ol_magic_read(&m) == OL_OK && m == OL_MAGIC_INSTALLING) {
+            OL_LOGW("previous install was interrupted, rollback from backup");
+            int rc = ol_updater_rollback("backup", "app");
+            if (rc == OL_OK) {
+                OL_LOGW("rollback ok");
+            } else {
+                OL_LOGE("rollback failed: %s", ol_strerror(rc));
+            }
+            (void)ol_magic_write(OL_MAGIC_NONE);
+        }
+    }
+#endif
+
     int trigger = ol_boot_wait_trigger(OPENLOAD_BOOT_DELAY_MS);
 
     if (!trigger) {
         int rc = ol_boot_jump_to("app");
+#if OPENLOAD_ENABLE_BACKUP
+        /* jump 失败 → app verify fail / 分区缺失等. 给 backup 一次机会. */
+        if (rc != OL_OK && rc != OL_E_PART_NOT_FOUND) {
+            OL_LOGW("app jump failed (%s), try rollback from backup",
+                    ol_strerror(rc));
+            int rr = ol_updater_rollback("backup", "app");
+            if (rr == OL_OK) {
+                OL_LOGW("rollback ok, retry jump");
+                rc = ol_boot_jump_to("app");
+            } else {
+                OL_LOGW("rollback unavailable: %s", ol_strerror(rr));
+            }
+        }
+#endif
         OL_LOGW("jump returned: %s, fall back to CLI", ol_strerror(rc));
         /* 落到 CLI 让用户修复 */
     } else {

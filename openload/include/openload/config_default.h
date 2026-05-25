@@ -97,6 +97,13 @@
 #define OPENLOAD_ANTI_ROLLBACK              0
 #endif
 
+/** 备份/回滚: 1 = install 前 backup 现 target, 失败自动 rollback; boot
+ *  时检测 INSTALLING magic 或 app verify 失败自动从 backup 恢复.
+ *  需 partitions.def 提供名为 "backup" 的分区, 大小 >= app. */
+#ifndef OPENLOAD_ENABLE_BACKUP
+#define OPENLOAD_ENABLE_BACKUP              0
+#endif
+
 /** 板子 ID, 用于跨型号刷固件保护. 0 = 不检查. */
 #ifndef OPENLOAD_BOARD_ID
 #define OPENLOAD_BOARD_ID                   0x0001

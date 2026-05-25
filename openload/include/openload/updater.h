@@ -31,6 +31,7 @@ int ol_updater_install(const char *staging_part, const char *target_part);
 
 /* ol_updater_install_ex flags */
 #define OL_INSTALL_F_FORCE      (1u << 0)   /* 跳过防回滚检查 */
+#define OL_INSTALL_F_NO_BACKUP  (1u << 1)   /* 跳过自动 backup (rollback 走该路径) */
 
 /**
  * @brief install 的扩展版本, 通过 flags 控制. flags=0 等同 ol_updater_install.

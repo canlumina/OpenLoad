@@ -58,3 +58,4 @@ int      ol_magic_write(uint32_t value);
 #define OL_MAGIC_ENTER_BOOT     0x424F4F54u  /* "BOOT" — App 主动请求进入 bootloader */
 #define OL_MAGIC_APP_OK         0x4150504Bu  /* "APPK" — 上次升级安装并跳转成功 */
 #define OL_MAGIC_APP_BAD        0x42414421u  /* "BAD!" — 上次启动 App 校验失败 */
+#define OL_MAGIC_INSTALLING     0x494E5354u  /* "INST" — install 进行中, 中断重启需 rollback */
