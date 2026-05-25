@@ -29,6 +29,10 @@
 /* 升级策略: 外部 staging → 内部 app 覆盖 */
 #define OPENLOAD_UPGRADE_STRATEGY       OL_UPGRADE_STAGING
 
+/* M3-1: 启用防回滚. 拒绝 firmware_version 低于当前 app 的固件刷入.
+ * CLI: install ... force 可单次绕过. */
+#define OPENLOAD_ANTI_ROLLBACK          1
+
 /* 日志 INFO 级 + ANSI 彩色 (使用 Tera Term/Xshell 终端时美观) */
 #define OPENLOAD_LOG_LEVEL              3
 #define OPENLOAD_LOG_COLOR              1

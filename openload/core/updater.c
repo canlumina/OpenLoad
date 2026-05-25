@@ -52,7 +52,8 @@ static int copy_partition(const ol_partition_t *src, uint32_t src_off,
     return OL_OK;
 }
 
-int ol_updater_install(const char *staging_part, const char *target_part)
+int ol_updater_install_ex(const char *staging_part, const char *target_part,
+                          uint32_t flags)
 {
     const ol_partition_t *src = ol_part_find(staging_part);
     const ol_partition_t *dst = ol_part_find(target_part);
@@ -66,17 +67,28 @@ int ol_updater_install(const char *staging_part, const char *target_part)
     rc = ol_image_read_header(src, &hdr);
     if (rc != OL_OK) { return rc; }
 
-    /* 防回滚 (可选). 当前 target 也必须含有效 header. */
+    /* 防回滚. flags & FORCE 时单次允许覆盖 (CLI install ... force). */
 #if OPENLOAD_ANTI_ROLLBACK
-    {
+    if (!(flags & OL_INSTALL_F_FORCE)) {
         ol_image_header_t cur;
         if (ol_image_read_header(dst, &cur) == OL_OK &&
             hdr.firmware_version < cur.firmware_version) {
-            OL_LOGE("anti-rollback: new=%u cur=%u",
-                    hdr.firmware_version, cur.firmware_version);
+            OL_LOGE("anti-rollback: new=%lu.%lu.%lu.%lu cur=%lu.%lu.%lu.%lu",
+                    OL_IMG_VER_MAJOR(hdr.firmware_version),
+                    OL_IMG_VER_MINOR(hdr.firmware_version),
+                    OL_IMG_VER_PATCH(hdr.firmware_version),
+                    OL_IMG_VER_BUILD(hdr.firmware_version),
+                    OL_IMG_VER_MAJOR(cur.firmware_version),
+                    OL_IMG_VER_MINOR(cur.firmware_version),
+                    OL_IMG_VER_PATCH(cur.firmware_version),
+                    OL_IMG_VER_BUILD(cur.firmware_version));
             return OL_E_IMAGE_VERSION;
         }
+    } else {
+        OL_LOGW("install: anti-rollback bypassed by force flag");
     }
+#else
+    (void)flags;
 #endif
 
     uint32_t payload  = hdr.firmware_size;
@@ -105,6 +117,11 @@ int ol_updater_install(const char *staging_part, const char *target_part)
 
     OL_LOGI("install ok");
     return OL_OK;
+}
+
+int ol_updater_install(const char *staging_part, const char *target_part)
+{
+    return ol_updater_install_ex(staging_part, target_part, 0);
 }
 
 int ol_updater_backup(const char *target_part, const char *backup_part)

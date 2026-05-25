@@ -25,8 +25,18 @@ int ol_updater_run(const char *receiver_name,
 /**
  * @brief 仅做 staging → target 拷贝 + 校验 (假设 staging 已存在有效固件).
  *        用于场景: 用户已通过其它工具把固件写到 W25Q64, 然后命令行 install.
+ *        启用 OPENLOAD_ANTI_ROLLBACK 时, 拒绝低于 target 当前版本的固件.
  */
 int ol_updater_install(const char *staging_part, const char *target_part);
+
+/* ol_updater_install_ex flags */
+#define OL_INSTALL_F_FORCE      (1u << 0)   /* 跳过防回滚检查 */
+
+/**
+ * @brief install 的扩展版本, 通过 flags 控制. flags=0 等同 ol_updater_install.
+ */
+int ol_updater_install_ex(const char *staging_part, const char *target_part,
+                          uint32_t flags);
 
 /**
  * @brief 把当前 target 备份到 backup 分区 (供回滚使用).

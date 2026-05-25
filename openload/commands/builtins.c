@@ -148,14 +148,19 @@ OL_CMD_REGISTER("update", "Receive firmware and install (proto staging target [u
 static int cmd_install(int argc, char **argv)
 {
     if (argc < 3) {
-        ol_print("usage: install <staging> <target>\r\n");
+        ol_print("usage: install <staging> <target> [force]\r\n");
+        ol_print("  force: bypass anti-rollback (use with caution)\r\n");
         return OL_E_INVAL;
     }
-    int rc = ol_updater_install(argv[1], argv[2]);
+    uint32_t flags = 0;
+    if (argc >= 4 && strcmp(argv[3], "force") == 0) {
+        flags |= OL_INSTALL_F_FORCE;
+    }
+    int rc = ol_updater_install_ex(argv[1], argv[2], flags);
     ol_printf("install: %s\r\n", ol_strerror(rc));
     return rc;
 }
-OL_CMD_REGISTER("install", "Install pre-staged firmware to target", cmd_install);
+OL_CMD_REGISTER("install", "Install pre-staged firmware (staging target [force])", cmd_install);
 
 #if OPENLOAD_ENABLE_OPLOG
 /* ---------- oplog ---------- */
