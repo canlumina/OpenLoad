@@ -1,5 +1,8 @@
 /*
- * STM32F4 Port - W25Q16 SPI Flash ops (SPI1)
+ * STM32F4 Port - W25Q16 SPI Flash 绑定 (SPI1)
+ *
+ * 实际命令集/状态机/ops 实现都在通用 driver: openload/devices/w25qxx.c.
+ * 这里只负责: SPI/GPIO 后端 + chip 参数注入 + 注册到 ol_flash_devs.
  *
  * DevEBox MCUDev STM32F407 核心板 板载 U3 = W25Q16, 接 SPI1:
  *   PA15 = CS   (GPIO output, 软件控制)
@@ -10,39 +13,17 @@
  * 注意 PA15/PB3/PB4 上电默认是 JTAG 引脚 (JTDI/JTDO/NTRST). F4 调用
  * HAL_GPIO_Init 把它们改成 AF/GPIO 后, JTAG 不可用; SWD (PA13/PA14)
  * 仍正常 — 本项目只用 SWD 烧录调试, 不受影响.
- *
- * 容量 2MB (16Mbit), sector=4KB, page=256B, JEDEC ID = 0xEF4015.
- *
- * 该文件内部完成 SPI1 初始化, 不引 spi.c.
  */
+#include "openload/devices/w25qxx.h"
 #include "openload/ops/flash_ops.h"
-#include "openload/ops/sys_ops.h"
 #include "openload/errno.h"
 #include "stm32f4xx_hal.h"
-#include <string.h>
 #include <stdint.h>
-
-#define W25Q16_SIZE            (2u * 1024u * 1024u)   /* 16 Mbit */
-#define W25Q16_SECTOR_SIZE     (4u * 1024u)
-#define W25Q16_PAGE_SIZE       256u
-
-#define CMD_WRITE_ENABLE       0x06
-#define CMD_READ_STATUS1       0x05
-#define CMD_READ_DATA          0x03
-#define CMD_PAGE_PROGRAM       0x02
-#define CMD_SECTOR_ERASE_4K    0x20
-#define CMD_RELEASE_PD         0xAB
-#define CMD_JEDEC_ID           0x9F
-
-#define SR_BUSY                0x01
-
-/* CS 在 PA15. */
-#define CS_LOW()               HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET)
-#define CS_HIGH()              HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET)
 
 static SPI_HandleTypeDef s_hspi1;
 
-/* -------- SPI/GPIO 初始化 -------- */
+/* -------- SPI/GPIO MspInit + Init -------- */
+
 static void spi_msp_init(void)
 {
     GPIO_InitTypeDef gi = {0};
@@ -74,10 +55,12 @@ static void spi_msp_init(void)
     gi.Speed     = GPIO_SPEED_FREQ_HIGH;
     gi.Alternate = 0;
     HAL_GPIO_Init(GPIOA, &gi);
-    CS_HIGH();
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);    /* CS 初始 HIGH */
 }
 
-static int spi_init(void)
+/* -------- SPI 后端 (注入 driver 的函数指针) -------- */
+
+static int port_spi_init(void)
 {
     spi_msp_init();
 
@@ -97,146 +80,62 @@ static int spi_init(void)
     return (HAL_SPI_Init(&s_hspi1) == HAL_OK) ? OL_OK : OL_E_IO;
 }
 
-static uint8_t spi_xfer(uint8_t b)
+static uint8_t port_spi_xfer(uint8_t b)
 {
     uint8_t rx;
     HAL_SPI_TransmitReceive(&s_hspi1, &b, &rx, 1, 100);
     return rx;
 }
 
-static void spi_write(const uint8_t *p, uint32_t n)
+static void port_spi_write(const uint8_t *p, uint32_t n)
 {
     HAL_SPI_Transmit(&s_hspi1, (uint8_t *)p, (uint16_t)n, 1000);
 }
 
-static void spi_read(uint8_t *p, uint32_t n)
+static void port_spi_read(uint8_t *p, uint32_t n)
 {
     HAL_SPI_Receive(&s_hspi1, p, (uint16_t)n, 1000);
 }
 
-/* -------- 基础动作 -------- */
-static void write_enable(void)
+static void port_cs_low(void)
 {
-    CS_LOW();
-    spi_xfer(CMD_WRITE_ENABLE);
-    CS_HIGH();
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
 }
 
-static int wait_busy(uint32_t timeout_ms)
+static void port_cs_high(void)
 {
-    uint32_t start = HAL_GetTick();
-    for (;;) {
-        CS_LOW();
-        spi_xfer(CMD_READ_STATUS1);
-        uint8_t st = spi_xfer(0xFF);
-        CS_HIGH();
-        if (!(st & SR_BUSY)) { return OL_OK; }
-        if ((HAL_GetTick() - start) >= timeout_ms) { return OL_E_TIMEOUT; }
-    }
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 }
 
-/* -------- ops 实现 -------- */
-static int w25_read(ol_flash_dev_t *dev, uint32_t off, void *buf, uint32_t len)
-{
-    (void)dev;
-    if (!buf || off + len > W25Q16_SIZE) { return OL_E_PART_OUT_OF_RANGE; }
-    uint8_t cmd[4] = { CMD_READ_DATA,
-                       (uint8_t)(off >> 16), (uint8_t)(off >> 8), (uint8_t)off };
-    CS_LOW();
-    spi_write(cmd, 4);
-    spi_read(buf, len);
-    CS_HIGH();
-    return OL_OK;
-}
+/* -------- chip 配置 + dev 注册 -------- */
 
-static int w25_write_page(uint32_t off, const uint8_t *data, uint32_t len)
-{
-    write_enable();
-    uint8_t cmd[4] = { CMD_PAGE_PROGRAM,
-                       (uint8_t)(off >> 16), (uint8_t)(off >> 8), (uint8_t)off };
-    CS_LOW();
-    spi_write(cmd, 4);
-    spi_write(data, len);
-    CS_HIGH();
-    return wait_busy(50);
-}
-
-static int w25_write(ol_flash_dev_t *dev, uint32_t off, const void *buf, uint32_t len)
-{
-    (void)dev;
-    if (!buf || off + len > W25Q16_SIZE) { return OL_E_PART_OUT_OF_RANGE; }
-    const uint8_t *p = (const uint8_t *)buf;
-    while (len) {
-        uint32_t page_off = off & (W25Q16_PAGE_SIZE - 1);
-        uint32_t chunk    = W25Q16_PAGE_SIZE - page_off;
-        if (chunk > len) { chunk = len; }
-        int rc = w25_write_page(off, p, chunk);
-        if (rc != OL_OK) { return rc; }
-        off += chunk;
-        p   += chunk;
-        len -= chunk;
-    }
-    return OL_OK;
-}
-
-static int w25_erase(ol_flash_dev_t *dev, uint32_t off, uint32_t len)
-{
-    (void)dev;
-    if ((off | len) & (W25Q16_SECTOR_SIZE - 1)) { return OL_E_PART_ALIGN; }
-    if (off + len > W25Q16_SIZE) { return OL_E_PART_OUT_OF_RANGE; }
-    while (len) {
-        write_enable();
-        uint8_t cmd[4] = { CMD_SECTOR_ERASE_4K,
-                           (uint8_t)(off >> 16), (uint8_t)(off >> 8), (uint8_t)off };
-        CS_LOW();
-        spi_write(cmd, 4);
-        CS_HIGH();
-        int rc = wait_busy(500);
-        if (rc != OL_OK) { return rc; }
-        off += W25Q16_SECTOR_SIZE;
-        len -= W25Q16_SECTOR_SIZE;
-    }
-    return OL_OK;
-}
-
-static const ol_flash_ops_t s_w25_ops = {
-    .read   = w25_read,
-    .write  = w25_write,
-    .erase  = w25_erase,
-    .lock   = 0,
-    .unlock = 0,
+static const w25qxx_config_t s_cfg = {
+    .name           = "w25q16",
+    .size           = 2u * 1024u * 1024u,   /* 16 Mbit */
+    .expected_jedec = 0xEF4015u,            /* Winbond W25Q16 */
+    .spi_init       = port_spi_init,
+    .spi_xfer       = port_spi_xfer,
+    .spi_write      = port_spi_write,
+    .spi_read       = port_spi_read,
+    .cs_low         = port_cs_low,
+    .cs_high        = port_cs_high,
 };
 
-static ol_flash_dev_t s_w25_dev = {
+static ol_flash_dev_t s_dev = {
     .name              = "w25q16",
-    .base              = 0,             /* 非 XIP, base 无意义 */
-    .size              = W25Q16_SIZE,
-    .sector_size       = W25Q16_SECTOR_SIZE,
-    .write_granularity = 1,             /* SPI Flash 允许任意字节写, 仅需擦后 */
+    .base              = 0,                  /* 非 XIP, base 无意义 */
+    .size              = 2u * 1024u * 1024u,
+    .sector_size       = W25QXX_SECTOR_SIZE,
+    .write_granularity = 1,                  /* SPI Flash 允许任意字节写, 仅需擦后 */
     .xip               = false,
-    .ops               = &s_w25_ops,
-    .priv              = 0,
+    .ops               = &w25qxx_ops,
+    .priv              = (void *)&s_cfg,     /* driver ops 从这里取后端 */
 };
 
-OL_FLASH_DEV_REGISTER(w25q16, &s_w25_dev);
+OL_FLASH_DEV_REGISTER(w25q16, &s_dev);
 
 /* 由 board_init 在 SPI/GPIO 初始化完成后调用. */
 int port_w25q16_init(void)
 {
-    int rc = spi_init();
-    if (rc != OL_OK) { return rc; }
-    HAL_Delay(10);
-    /* 解除深度掉电 */
-    CS_LOW();
-    spi_xfer(CMD_RELEASE_PD);
-    CS_HIGH();
-    HAL_Delay(1);
-    /* 读 JEDEC ID 验证存在性 (Winbond W25Q16 = 0xEF4015) */
-    CS_LOW();
-    spi_xfer(CMD_JEDEC_ID);
-    uint32_t id = ((uint32_t)spi_xfer(0xFF) << 16) |
-                  ((uint32_t)spi_xfer(0xFF) <<  8) |
-                  ((uint32_t)spi_xfer(0xFF));
-    CS_HIGH();
-    return (id != 0 && id != 0xFFFFFFu) ? OL_OK : OL_E_IO;
+    return w25qxx_chip_init(&s_cfg);
 }

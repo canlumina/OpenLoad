@@ -32,6 +32,7 @@ set(OPENLOAD_SOURCES
     core/errno_str.c
     crypto/crc32.c
     commands/builtins.c
+    devices/w25qxx.c
 )
 
 if(OPENLOAD_ENABLE_XMODEM)
