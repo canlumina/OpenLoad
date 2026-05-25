@@ -112,9 +112,9 @@ int ol_oplog_init(void)
     s_stat.valid_count = valid;
     s_stat.ready       = 1;
 
-    OL_LOGI("oplog: %u/%u used, next_seq=%u, write_idx=%u",
-            (unsigned)valid, (unsigned)total_slots,
-            (unsigned)s_stat.next_seq, (unsigned)s_stat.write_idx);
+    OL_LOGI("oplog: %lu/%lu used, next_seq=%lu, write_idx=%lu",
+            valid, total_slots,
+            s_stat.next_seq, s_stat.write_idx);
     return OL_OK;
 }
 

@@ -240,7 +240,7 @@ static int ym_poll(ol_receiver_t *r)
             return 1;
         }
         ym_parse_header(p->frame, &p->file_size);
-        OL_LOGI("ymodem: file=%s size=%u",
+        OL_LOGI("ymodem: file=%s size=%lu",
                 (const char *)p->frame, p->file_size);
         ym_send_byte(p, YM_ACK);
         ym_send_byte(p, YM_C);
@@ -269,7 +269,7 @@ static int ym_poll(ol_receiver_t *r)
         {
             int wrc = ol_part_write(p->dst, p->write_off, p->frame, data_len);
             if (wrc != OL_OK) {
-                OL_LOGE("flash write failed at off=%u: %s",
+                OL_LOGE("flash write failed at off=%lu: %s",
                         p->write_off, ol_strerror(wrc));
                 ym_send_byte(p, YM_CAN);
                 ym_send_byte(p, YM_CAN);

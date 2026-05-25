@@ -107,7 +107,7 @@ static int cmd_uart2(int argc, char **argv)
             baud = baud * 10 + (uint32_t)(*p - '0');
         }
         int rc = port_uart2_setbaud(baud);
-        ol_printf("setbaud %u: %s\r\n", baud,
+        ol_printf("setbaud %lu: %s\r\n", baud,
                   (rc == OL_OK) ? "ok" : "fail");
         return rc;
     }

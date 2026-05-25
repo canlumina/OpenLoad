@@ -48,15 +48,15 @@ static int cmd_info(int argc, char **argv)
     (void)argc; (void)argv;
     ol_printf("OpenLoad %s\r\n", OPENLOAD_VERSION_STR);
     ol_printf("board_id  : 0x%04x\r\n", OPENLOAD_BOARD_ID);
-    ol_printf("strategy  : %u\r\n", OPENLOAD_UPGRADE_STRATEGY);
-    ol_printf("log level : %u\r\n", (uint32_t)ol_log_get_level());
+    ol_printf("strategy  : %lu\r\n", (uint32_t)OPENLOAD_UPGRADE_STRATEGY);
+    ol_printf("log level : %lu\r\n", (uint32_t)ol_log_get_level());
 
     /* 试读 App 头展示当前固件版本 */
     const ol_partition_t *app = ol_part_find("app");
     if (app) {
         ol_image_header_t hdr;
         if (ol_image_read_header(app, &hdr) == OL_OK) {
-            ol_printf("app ver   : %u.%u.%u.%u (size %u)\r\n",
+            ol_printf("app ver   : %lu.%lu.%lu.%lu (size %lu)\r\n",
                       OL_IMG_VER_MAJOR(hdr.firmware_version),
                       OL_IMG_VER_MINOR(hdr.firmware_version),
                       OL_IMG_VER_PATCH(hdr.firmware_version),
@@ -98,7 +98,7 @@ static int cmd_part(int argc, char **argv)
     const ol_partition_t *tbl = ol_part_table(&cnt);
     ol_print("name        device   offset      size       flags\r\n");
     for (uint32_t i = 0; i < cnt; ++i) {
-        ol_printf("  %-10s %-8s 0x%08x  %-8u  %c%c%c\r\n",
+        ol_printf("  %-10s %-8s 0x%08lx  %-8lu  %c%c%c\r\n",
                   tbl[i].name, tbl[i].device_name,
                   tbl[i].offset, tbl[i].size,
                   (tbl[i].flags & OL_PART_FLAG_READABLE)   ? 'r' : '-',
@@ -121,7 +121,7 @@ static int cmd_erase(int argc, char **argv)
         ol_printf("not found: %s\r\n", argv[1]);
         return OL_E_PART_NOT_FOUND;
     }
-    ol_printf("erasing %s (%u bytes)...\r\n", p->name, p->size);
+    ol_printf("erasing %s (%lu bytes)...\r\n", p->name, p->size);
     int rc = ol_part_erase_all(p);
     ol_printf("%s\r\n", ol_strerror(rc));
     return rc;
@@ -170,8 +170,8 @@ static int oplog_print_cb(uint32_t seq, uint32_t ts_ms, uint8_t level,
     uint32_t n = (msg_len > OL_OPLOG_MSG_MAX) ? OL_OPLOG_MSG_MAX : msg_len;
     if (n && msg) { memcpy(tmp, msg, n); }
     tmp[n] = 0;
-    ol_printf("%6u [%c] %10u  %s\r\n",
-              (unsigned)seq, lvl, (unsigned)ts_ms, tmp);
+    ol_printf("%6lu [%c] %10lu  %s\r\n",
+              seq, lvl, ts_ms, tmp);
     return 0;
 }
 
@@ -209,10 +209,10 @@ static int cmd_oplog(int argc, char **argv)
             ol_printf("oplog stat: %s\r\n", ol_strerror(rc));
             return rc;
         }
-        ol_printf("ready=%u  used=%u/%u  write_idx=%u  next_seq=%u\r\n",
-                  (unsigned)st.ready, (unsigned)st.valid_count,
-                  (unsigned)st.total_slots, (unsigned)st.write_idx,
-                  (unsigned)st.next_seq);
+        ol_printf("ready=%u  used=%lu/%lu  write_idx=%lu  next_seq=%lu\r\n",
+                  (unsigned)st.ready, st.valid_count,
+                  st.total_slots, st.write_idx,
+                  st.next_seq);
         return OL_OK;
     }
     ol_print("oplog: unknown subcommand\r\n");

@@ -90,12 +90,12 @@ int ol_updater_install(const char *staging_part, const char *target_part)
     uint32_t erase_len = (total + sector - 1) & ~(sector - 1);
     if (erase_len > dst->size) { erase_len = dst->size; }
 
-    OL_LOGI("erase target %s (%u bytes, sector=%u)",
+    OL_LOGI("erase target %s (%lu bytes, sector=%lu)",
             dst->name, erase_len, sector);
     rc = ol_part_erase(dst, 0, erase_len);
     if (rc != OL_OK) { return rc; }
 
-    OL_LOGI("copy %u bytes -> %s", total, dst->name);
+    OL_LOGI("copy %lu bytes -> %s", total, dst->name);
     rc = copy_partition(src, 0, dst, 0, total);
     if (rc != OL_OK) { return rc; }
 

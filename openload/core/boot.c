@@ -56,7 +56,7 @@ int ol_boot_wait_trigger(uint32_t timeout_ms)
     }
 #endif
 
-    OL_LOGI("press button or send any char in %u ms to enter CLI", timeout_ms);
+    OL_LOGI("press button or send any char in %lu ms to enter CLI", timeout_ms);
     ol_io_dev_t *console = ol_io_dev_find("console");
     uint32_t     start   = ol_tick_ms();
     while ((ol_tick_ms() - start) < timeout_ms) {
@@ -105,7 +105,7 @@ int ol_boot_jump_to(const char *app_partition_name)
     /* App 实际入口在 header 之后. 用户工程的 linker.ld 与 startup 必须
        把 App 编译为基地址 = partition.base + offset + OL_IMAGE_HDR_SIZE */
     uint32_t app_addr = d->base + p->offset + OL_IMAGE_HDR_SIZE;
-    OL_LOGI("jump to 0x%08x", app_addr);
+    OL_LOGI("jump to 0x%08lx", app_addr);
 
     /* 刷出 console, 否则会丢失最后的日志 */
     ol_io_dev_t *console = ol_io_dev_find("console");

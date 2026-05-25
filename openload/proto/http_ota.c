@@ -212,7 +212,7 @@ static int parse_header_line(http_ota_priv_t *p)
     if (p->line_buf[0] == 0) {
         /* 空行: 头部结束 */
         p->state = HS_RECV_BODY;
-        OL_LOGI("http: body %u bytes (0=unknown)", (unsigned)p->body_total);
+        OL_LOGI("http: body %lu bytes (0=unknown)", p->body_total);
         return OL_OK;
     }
 
@@ -274,8 +274,8 @@ static int http_poll(ol_receiver_t *r)
 
     int wrc = ol_part_write(p->dst, p->write_off, buf, (uint32_t)n);
     if (wrc != OL_OK) {
-        OL_LOGE("http: flash write at off=%u: %s",
-                (unsigned)p->write_off, ol_strerror(wrc));
+        OL_LOGE("http: flash write at off=%lu: %s",
+                p->write_off, ol_strerror(wrc));
         return wrc;
     }
     p->write_off     += (uint32_t)n;
@@ -283,7 +283,7 @@ static int http_poll(ol_receiver_t *r)
 
     if (p->body_total && p->body_received >= p->body_total) {
         p->state = HS_DONE;
-        OL_LOGI("http: body received %u bytes", (unsigned)p->body_received);
+        OL_LOGI("http: body received %lu bytes", p->body_received);
         return 1;
     }
     return 0;

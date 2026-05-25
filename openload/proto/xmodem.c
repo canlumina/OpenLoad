@@ -204,7 +204,7 @@ static int xm_poll(ol_receiver_t *r)
        的 firmware_size 自然忽略多余字节. */
     int wrc = ol_part_write(p->dst, p->write_off, p->frame, data_len);
     if (wrc != OL_OK) {
-        OL_LOGE("flash write failed at off=%u: %s", p->write_off, ol_strerror(wrc));
+        OL_LOGE("flash write failed at off=%lu: %s", p->write_off, ol_strerror(wrc));
         xm_send_byte(p, XMODEM_CAN);
         xm_send_byte(p, XMODEM_CAN);
         return wrc;
