@@ -51,7 +51,8 @@ if(OPENLOAD_ENABLE_OPLOG)
 endif()
 
 if(OPENLOAD_ENABLE_AES_128_CTR)
-    list(APPEND OPENLOAD_SOURCES crypto/aes_ctr.c)
+    list(APPEND OPENLOAD_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tiny-aes/aes.c)
 endif()
 
 if(OPENLOAD_ENABLE_SHA256)
@@ -63,6 +64,19 @@ add_library(openload STATIC ${OPENLOAD_SOURCES})
 target_include_directories(openload PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+# tiny-AES: 仅启用 AES-128 + CTR mode, 关掉 ECB/CBC 节省 .text (~1KB).
+if(OPENLOAD_ENABLE_AES_128_CTR)
+    target_include_directories(openload PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tiny-aes
+    )
+    target_compile_definitions(openload PRIVATE
+        CBC=0
+        ECB=0
+        CTR=1
+        AES128=1
+    )
+endif()
 
 # example 工程的 openload_config.h 必须在 include 路径里 — 由调用方提供
 # 通过 target_include_directories(openload PUBLIC <example_dir>) 追加。

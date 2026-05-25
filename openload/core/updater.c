@@ -15,9 +15,13 @@
 #include "openload/logger.h"
 #include "openload/errno.h"
 #include "openload/config.h"
+#include "openload/crypto.h"
 #include "openload/ops/io_ops.h"
 #include "openload/ops/flash_ops.h"
 #include "openload/ops/sys_ops.h"
+#if OPENLOAD_ENABLE_AES_128_CTR
+#  include "aes.h"   /* third_party/tiny-aes, CMake 提供 include path */
+#endif
 #include <string.h>
 #include <stddef.h>
 
@@ -54,6 +58,48 @@ static int copy_partition(const ol_partition_t *src, uint32_t src_off,
     return OL_OK;
 }
 
+#if OPENLOAD_ENABLE_AES_128_CTR
+/* 用户工程通过 OPENLOAD_AES_KEY_BYTES 在 openload_config.h 提供 16 字节
+ * AES-128 key (initializer list). 默认全 0 让构建不挂, 但运行时第一次
+ * 解密就会因 CRC 不匹配失败 (默认 key 永远不会匹配真实加密 image). */
+#ifndef OPENLOAD_AES_KEY_BYTES
+#define OPENLOAD_AES_KEY_BYTES \
+    0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00, \
+    0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00
+#endif
+static const uint8_t g_aes_key[16] = { OPENLOAD_AES_KEY_BYTES };
+
+/* 流式 AES-CTR 解密 staging payload → target payload, 同时累计明文 CRC32.
+ * IV 取自 hdr.aes_iv, AES_ctx 内部维护 counter, 同一 ctx 连续多次
+ * AES_CTR_xcrypt_buffer 会沿 counter 接着算, 不需要 caller 维护. */
+static int decrypt_payload_to_target(const ol_partition_t *src,
+                                     const ol_partition_t *dst,
+                                     const ol_image_header_t *hdr,
+                                     uint32_t *out_crc)
+{
+    struct AES_ctx ctx;
+    AES_init_ctx_iv(&ctx, g_aes_key, hdr->aes_iv);
+
+    uint8_t  buf[OPENLOAD_COPY_CHUNK_SIZE];
+    uint32_t off  = 0;
+    uint32_t crc  = 0;
+    uint32_t left = hdr->firmware_size;
+    while (left) {
+        uint32_t n = (left > sizeof(buf)) ? sizeof(buf) : left;
+        int rc = ol_part_read(src, OL_IMAGE_HDR_SIZE + off, buf, n);
+        if (rc != OL_OK) { return rc; }
+        AES_CTR_xcrypt_buffer(&ctx, buf, n);
+        rc = ol_part_write(dst, OL_IMAGE_HDR_SIZE + off, buf, n);
+        if (rc != OL_OK) { return rc; }
+        crc = ol_crc32(crc, buf, n);
+        off  += n;
+        left -= n;
+    }
+    *out_crc = crc;
+    return OL_OK;
+}
+#endif
+
 int ol_updater_install_ex(const char *staging_part, const char *target_part,
                           uint32_t flags)
 {
@@ -61,13 +107,38 @@ int ol_updater_install_ex(const char *staging_part, const char *target_part,
     const ol_partition_t *dst = ol_part_find(target_part);
     if (!src || !dst) { return OL_E_PART_NOT_FOUND; }
 
-    OL_LOGI("verify staging %s", src->name);
-    int rc = ol_image_verify(src);
+    /* 先读 hdr 确认完整性 (hdr_crc 校验), 才能区分明文 / 密文路径. */
+    ol_image_header_t hdr;
+    int rc = ol_image_read_header(src, &hdr);
     if (rc != OL_OK) { return rc; }
 
-    ol_image_header_t hdr;
-    rc = ol_image_read_header(src, &hdr);
-    if (rc != OL_OK) { return rc; }
+    int is_encrypted = (hdr.flags & OL_IMG_F_ENCRYPTED) != 0;
+#if !OPENLOAD_ENABLE_AES_128_CTR
+    if (is_encrypted) {
+        OL_LOGE("staging is encrypted but AES support not built in");
+        return OL_E_NOT_SUPPORTED;
+    }
+#endif
+
+    /* 明文路径走完整 ol_image_verify (含 board_id + payload CRC).
+     * 密文路径 payload 是密文, firmware_crc32 是明文 CRC, 完整 verify 必
+     * 失败 — 改在解密时流式累计校验. 但 hdr CRC + board_id 现在就要查. */
+    if (!is_encrypted) {
+        OL_LOGI("verify staging %s", src->name);
+        rc = ol_image_verify(src);
+        if (rc != OL_OK) { return rc; }
+    } else {
+        OL_LOGI("staging %s encrypted, decrypt-on-fly", src->name);
+#if OPENLOAD_BOARD_ID
+        if (hdr.board_id != 0 && hdr.board_id != OPENLOAD_BOARD_ID) {
+            return OL_E_IMAGE_BOARD;
+        }
+#endif
+        if (hdr.firmware_size == 0 ||
+            hdr.firmware_size > src->size - OL_IMAGE_HDR_SIZE) {
+            return OL_E_IMAGE_SIZE;
+        }
+    }
 
     /* 防回滚. flags & FORCE 时单次允许覆盖 (CLI install ... force, 或
      * rollback 路径自动用 FORCE 把旧固件写回去). */
@@ -138,9 +209,35 @@ int ol_updater_install_ex(const char *staging_part, const char *target_part,
     rc = ol_part_erase(dst, 0, erase_len);
     if (rc != OL_OK) { goto install_failed; }
 
-    OL_LOGI("copy %lu bytes -> %s", total, dst->name);
-    rc = copy_partition(src, 0, dst, 0, total);
-    if (rc != OL_OK) { goto install_failed; }
+    if (!is_encrypted) {
+        OL_LOGI("copy %lu bytes -> %s", total, dst->name);
+        rc = copy_partition(src, 0, dst, 0, total);
+        if (rc != OL_OK) { goto install_failed; }
+    } else {
+#if OPENLOAD_ENABLE_AES_128_CTR
+        /* 1. 解密 payload 流式落 target, 累计明文 CRC32. */
+        OL_LOGI("decrypt %lu bytes -> %s", payload, dst->name);
+        uint32_t plain_crc = 0;
+        rc = decrypt_payload_to_target(src, dst, &hdr, &plain_crc);
+        if (rc != OL_OK) { goto install_failed; }
+        if (plain_crc != hdr.firmware_crc32) {
+            OL_LOGE("decrypted CRC mismatch: calc=0x%08lx hdr=0x%08lx",
+                    plain_crc, hdr.firmware_crc32);
+            rc = OL_E_IMAGE_PAYLOAD_CRC;
+            goto install_failed;
+        }
+
+        /* 2. 写 target hdr: 清 ENCRYPTED, 清 aes_iv, 重算 hdr_crc.
+         * 这样 target 上是纯明文 image, boot 走标准 ol_image_verify 链. */
+        ol_image_header_t out_hdr = hdr;
+        out_hdr.flags &= ~OL_IMG_F_ENCRYPTED;
+        memset(out_hdr.aes_iv, 0, sizeof(out_hdr.aes_iv));
+        ol_image_seal_header(&out_hdr);
+        rc = ol_part_write(dst, 0, (const uint8_t *)&out_hdr,
+                           OL_IMAGE_HDR_SIZE);
+        if (rc != OL_OK) { goto install_failed; }
+#endif
+    }
 
     OL_LOGI("verify target");
     rc = ol_image_verify(dst);
