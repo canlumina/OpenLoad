@@ -164,7 +164,10 @@ int ol_updater_install_ex(const char *staging_part, const char *target_part,
 #endif
 
     uint32_t payload  = hdr.firmware_size;
-    uint32_t total    = OL_IMAGE_HDR_SIZE + payload;
+    /* SIGNED image 末尾追加 64 字节 ed25519 签名 (sig 不加密, 即使
+     * payload 是 AES-CTR 密文, sig 也是明文). install 全程要把它一起搬. */
+    uint32_t sig_len  = (hdr.flags & OL_IMG_F_SIGNED) ? 64u : 0u;
+    uint32_t total    = OL_IMAGE_HDR_SIZE + payload + sig_len;
     if (total > dst->size) { return OL_E_IMAGE_SIZE; }
 
     /* M3-2 backup-before. 在 erase target 之前抢救现 target 的有效固件到
@@ -227,8 +230,17 @@ int ol_updater_install_ex(const char *staging_part, const char *target_part,
             goto install_failed;
         }
 
+        /* 1b. SIGNED 时把 sig (64 字节, 明文) 从 src 复制到 dst 末尾.
+         * sig 不参与 AES, 跟 payload 同分区紧接其后, 直接 byte copy. */
+        if (sig_len) {
+            rc = copy_partition(src, OL_IMAGE_HDR_SIZE + payload,
+                                dst, OL_IMAGE_HDR_SIZE + payload, sig_len);
+            if (rc != OL_OK) { goto install_failed; }
+        }
+
         /* 2. 写 target hdr: 清 ENCRYPTED, 清 aes_iv, 重算 hdr_crc.
-         * 这样 target 上是纯明文 image, boot 走标准 ol_image_verify 链. */
+         * SIGNED flag 必须保留 — 不然 ol_image_verify(dst) 不会走签名分支,
+         * 攻击者可借此绕过签名 (擦掉 SIGNED 等于擦掉签名要求). */
         ol_image_header_t out_hdr = hdr;
         out_hdr.flags &= ~OL_IMG_F_ENCRYPTED;
         memset(out_hdr.aes_iv, 0, sizeof(out_hdr.aes_iv));
@@ -284,7 +296,8 @@ int ol_updater_backup(const char *target_part, const char *backup_part)
     ol_image_header_t hdr;
     int rc = ol_image_read_header(src, &hdr);
     if (rc != OL_OK) { return rc; }
-    uint32_t total = OL_IMAGE_HDR_SIZE + hdr.firmware_size;
+    uint32_t sig_len = (hdr.flags & OL_IMG_F_SIGNED) ? 64u : 0u;
+    uint32_t total = OL_IMAGE_HDR_SIZE + hdr.firmware_size + sig_len;
     if (total > dst->size) { return OL_E_IMAGE_SIZE; }
 
     /* erase 按 image 大小 + sector 对齐, 不整盘擦. 448KB backup 整擦

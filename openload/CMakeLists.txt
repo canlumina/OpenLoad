@@ -60,6 +60,12 @@ if(OPENLOAD_ENABLE_SHA256)
         ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/sha256/sha256.c)
 endif()
 
+if(OPENLOAD_ENABLE_ED25519)
+    list(APPEND OPENLOAD_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tweetnacl/tweetnacl.c
+        crypto/tweetnacl_stub.c)
+endif()
+
 add_library(openload STATIC ${OPENLOAD_SOURCES})
 
 target_include_directories(openload PUBLIC
@@ -83,6 +89,19 @@ endif()
 if(OPENLOAD_ENABLE_SHA256)
     target_include_directories(openload PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/sha256
+    )
+endif()
+
+# tweetnacl ed25519 (public domain). M4-2.
+if(OPENLOAD_ENABLE_ED25519)
+    target_include_directories(openload PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tweetnacl
+    )
+    # vendor code, 一些 sign-compare / unterminated-string 不修, 局部静音
+    set_source_files_properties(
+        ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/tweetnacl/tweetnacl.c
+        PROPERTIES COMPILE_OPTIONS
+        "-Wno-sign-compare;-Wno-unterminated-string-initialization"
     )
 endif()
 

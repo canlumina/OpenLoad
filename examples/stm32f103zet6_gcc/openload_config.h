@@ -50,6 +50,22 @@
  * 原样保留, 解密后 target verify 自动覆盖到 SHA 校验. */
 #define OPENLOAD_ENABLE_SHA256          1
 
+/* M4-2: Ed25519 签名. 当 hdr.flags & OL_IMG_F_SIGNED 时校验 image 末尾
+ * 64 字节签名. 签名 = ed25519_sign(SHA-256(plain_payload), secret_key);
+ * verify = ed25519_verify(SHA-256, sig, OPENLOAD_ED25519_PUBKEY_BYTES).
+ * 跟 M4-1 SHA-256 自然联动, 不重复算 hash. AES + SHA + Ed25519 三层叠加
+ * 时, sig 始终是明文 (不参与 AES). pubkey 编进 bootloader 常量. */
+#define OPENLOAD_ENABLE_ED25519         1
+
+/* 32 字节 Ed25519 公钥. 跟 tools/gen_demo_ed25519.py 生成的 demo seed
+ * 对应 (seed = "OpenLoad-demo-ed25519-seed-v1!!!").
+ * 量产必须用真随机 seed, 不要泄漏 secret key.  */
+#define OPENLOAD_ED25519_PUBKEY_BYTES \
+    0x75,0x42,0xCE,0x6A,0xEC,0xF5,0xF1,0xE6, \
+    0xDC,0x80,0x9E,0x5F,0x49,0xBA,0xFE,0xDB, \
+    0x04,0x58,0x83,0xA6,0x3C,0x93,0x1D,0xFD, \
+    0x2E,0x1E,0xCF,0xFC,0xC0,0x1F,0xDB,0x98
+
 /* 16 字节 AES-128 密钥. 跟 image_tool.py --aes-key 必须一致.
  * 测试默认值: "OpenLoad demoKey" → 0x4F,0x70,...
  * 量产必须改成项目随机生成, 不要泄漏. */
