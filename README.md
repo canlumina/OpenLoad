@@ -3,7 +3,7 @@
 > 面向资源受限 MCU 的、**可裁剪、可移植**的开源 bootloader 框架。
 > 接口抽象 + 编译期裁剪, 用户提供底层驱动即可接入任意单片机。
 
-[![status](https://img.shields.io/badge/status-M2%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
+[![status](https://img.shields.io/badge/status-M3%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
@@ -47,8 +47,8 @@ OpenLoad **不是**某颗芯片的 bootloader, 而是一套 **接口规范 + 协
 |--------|------|------|
 | **M1 核心 MVP** | ✅ | Porting API · 分区管理 · CLI · XMODEM/-1K · CRC32 · Staging 升级 · STM32F103 参考实现 |
 | **M2 联网升级** | ✅ | YMODEM · HTTP OTA · ESP8266 port · 持久化日志 (oplog) |
-| M3 加固 | 🔲 | AES-128-CTR · SHA-256 · 防回滚 · CLI 密码 · backup/rollback |
-| M4+ 扩展 | 🔲 | Ed25519 签名 · USB DFU · MQTT OTA · A/B Dual Bank · STM32F4 port |
+| **M3 加固** | ✅ | 防回滚 · CLI 密码 + 失败锁定 · backup/rollback · AES-128-CTR |
+| M4+ 扩展 | 🔲 | SHA-256 · Ed25519 签名 · A/B Dual Bank · HTTPS · USB DFU · MQTT OTA · STM32F4 port |
 
 详见 [REQUIREMENTS.md](docs/spec/REQUIREMENTS.md)。开发过程见 [docs/devlog/](docs/devlog/)。
 
