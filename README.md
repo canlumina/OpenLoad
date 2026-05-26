@@ -3,7 +3,7 @@
 > 面向资源受限 MCU 的、**可裁剪、可移植**的开源 bootloader 框架。
 > 接口抽象 + 编译期裁剪, 用户提供底层驱动即可接入任意单片机。
 
-[![status](https://img.shields.io/badge/status-M5%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
+[![status](https://img.shields.io/badge/status-M6%20part1%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 ---
@@ -50,7 +50,8 @@ OpenLoad **不是**某颗芯片的 bootloader, 而是一套 **接口规范 + 协
 | **M3 加固** | ✅ | 防回滚 · CLI 密码 + 失败锁定 · backup/rollback · AES-128-CTR |
 | **M4 真实性/抗篡改** | ✅ | SHA-256 摘要 · Ed25519 签名验证 (M4-3/M4-4 需切 F4+, 见 [M4.md](docs/devlog/M4.md)) |
 | **M5 平台扩展 + 模块化** | ✅ | STM32F407VGT6 port (DevEBox) · W25QXX 通用驱动 · examples/common/ 共享 · 仓库自包含化 (见 [M5.md](docs/devlog/M5.md)) |
-| M6+ 后续 | 🔲 | A/B Dual Bank · HTTPS · USB DFU · MQTT OTA · RDP/OTP key 锁定 |
+| **M6 信任根收口 (Part 1)** | ✅ | RDP L0→L1 软件控制 (F4) · 多 board_id (3 槽) · ESP UART2 baud 抽宏 · F1 编译回归 (见 [M6.md](docs/devlog/M6.md)) |
+| M6 Part 2 / M7 后续 | 🔲 | F1 RDP port · A/B Dual Bank · HTTPS · CI 编译矩阵 · USB DFU · MQTT OTA |
 
 详见 [REQUIREMENTS.md](docs/spec/REQUIREMENTS.md)。开发过程见 [docs/devlog/](docs/devlog/)。
 
@@ -159,32 +160,42 @@ OpenLoad/
     │   ├── M1.md
     │   ├── M2.md
     │   ├── M3.md
-    │   └── M4.md
+    │   ├── M4.md
+    │   ├── M5.md
+    │   └── M6.md
     ├── images/
     └── board/                  # 板原理图 / 硬件资料
 ```
 
 ## 体积参考
 
-GCC 14.x, `-Os`, STM32F103ZET6:
+GCC 14.x, `-Os` (Release), 全功能 (M1+M2+M3+M4+M6 全启):
+
+| 平台 | bootloader.bin | BL 区占用 |
+|------|----------------|----------|
+| STM32F103ZET6 (F1, BL 64KB) | **43.6 KB** | 66.5% |
+| STM32F407VGT6 (F4, BL 64KB) | **46.5 KB** | 71.0% |
+
+裁剪示意 (F1 Release, 仅供估算):
 
 | 配置 | bootloader.bin |
 |------|----------------|
-| 仅 XMODEM + CRC32 + CLI (M1 默认) | **~14 KB** |
+| 仅 XMODEM + CRC32 + CLI (M1 默认) | ~14 KB |
 | + YMODEM + HTTP OTA + oplog (M2) | ~37 KB |
 | + 防回滚 + backup + AES-128 (M3) | ~41 KB |
-| + SHA-256 + Ed25519 (M4) | ~48 KB |
+| + SHA-256 + Ed25519 (M4) | ~44 KB |
+| + multi board_id (M6) | ~44 KB |
 
 ## 设计文档
 
 - 📋 [需求规格](docs/spec/REQUIREMENTS.md) — 设计哲学 / 功能清单 / 验收标准
 - 🏗 [架构设计](docs/spec/ARCHITECTURE.md) — 接口签名 / 关键流程 / 配置项 / 旧代码迁移对照
 - 🔌 [移植指南](docs/guide/PORTING_GUIDE.md) — 5 步把 OpenLoad 跑到一颗新单片机
-- 📒 [开发日志](docs/devlog/) — M1 / M2 / M3 / M4 / M5 落地过程, 踩坑与设计取舍
+- 📒 [开发日志](docs/devlog/) — M1 / M2 / M3 / M4 / M5 / M6 落地过程, 踩坑与设计取舍
 
 ## 状态
 
-当前是 **0.1.0-m1**, M1 已完成核心可用 (M1 范围内的 XMODEM 升级路径已端到端编译验证)。
+M1-M5 完成 + M6 Part 1 (信任根收口) 完成。F1/F4 双平台编译均干净。
 
 实板烧录与端到端联调由用户在自己的硬件上完成; 欢迎反馈 issue。
 
