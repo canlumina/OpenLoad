@@ -21,6 +21,9 @@
 /* ESP8266 AT 桥接 (UART2). 跟 CMakeLists.txt 的 STM32F4_PORT_ENABLE_ESP8266 保持一致. */
 #define OPENLOAD_ENABLE_ESP8266         1
 
+/* 我这块 ESP-01 是老固件 (AT v0.x), 出厂 baud=9600. 新固件默认 115200, 按你的模块改. */
+#define OPENLOAD_ESP_UART_BAUD          9600
+
 /* 持久化操作日志 (oplog 分区, W25Q16). */
 #define OPENLOAD_ENABLE_OPLOG           1
 

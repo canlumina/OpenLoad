@@ -63,6 +63,12 @@
 #define OPENLOAD_ENABLE_ESP8266             0
 #endif
 
+/* ESP8266 UART2 波特率. 主流 ESP-01 新固件 (AT v1.x+) 默认 115200,
+ * 老固件 (AT v0.x) 默认 9600 — 按你手上模块固件版本设. */
+#ifndef OPENLOAD_ESP_UART_BAUD
+#define OPENLOAD_ESP_UART_BAUD              115200
+#endif
+
 /* 持久化操作日志 (M2-13). 需用户工程提供名为 "oplog" 的分区, 大小为
  * sector_size 的整数倍. */
 #ifndef OPENLOAD_ENABLE_OPLOG
