@@ -36,6 +36,6 @@ void port_stm32f4_init(void)
 #if OPENLOAD_ENABLE_ESP8266
     /* USART2 物理层. ESP8266 协议层 (AT 探活 / WiFi join) 留给 CLI 触发. */
     MX_USART2_UART_Init();
-    (void)port_uart2_init(115200);
+    (void)port_uart2_init(OPENLOAD_ESP_UART_BAUD);
 #endif
 }

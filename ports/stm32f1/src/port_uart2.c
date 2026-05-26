@@ -64,8 +64,8 @@ int port_uart2_init(uint32_t baud)
     }
     s_last_dma_pos = 0;
 
-    /* usart.c 里 MX_USART2_UART_Init 已经按 115200 启好. 若用户要别的波特率,
-       这里 deinit + 改 BaudRate + reinit. */
+    /* usart.c 里 MX_USART2_UART_Init 已经按 OPENLOAD_ESP_UART_BAUD 启好.
+       若 baud 跟当前不一致 (例如运行时 setbaud 切换), 走 deinit + 重 init. */
     if (baud && baud != huart2.Init.BaudRate) {
         HAL_UART_DeInit(&huart2);
         huart2.Init.BaudRate = baud;
