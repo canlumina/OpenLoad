@@ -330,9 +330,9 @@ OL_CMD_REGISTER("tcp", "TCP smoke (test <host> <port>)", cmd_tcp);
 static const char *rdp_level_desc(uint8_t lvl)
 {
     switch (lvl) {
-        case OL_RDP_LEVEL_NONE:      return "unlocked (debug access full)";
-        case OL_RDP_LEVEL_READ_PROT: return "read-protected (SWD locked from flash)";
-        case OL_RDP_LEVEL_FULL:      return "FULL (permanent, debug forever closed)";
+        case OL_RDP_LEVEL_NONE:      return "unlocked, debug access full";
+        case OL_RDP_LEVEL_READ_PROT: return "read-protected, SWD locked from flash";
+        case OL_RDP_LEVEL_FULL:      return "FULL, permanent, debug forever closed";
         default:                     return "unknown";
     }
 }
