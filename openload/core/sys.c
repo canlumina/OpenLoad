@@ -78,3 +78,22 @@ int ol_magic_write(uint32_t value)
     }
     return s_ops->magic_write(value);
 }
+
+int ol_rdp_get(uint8_t *level_out)
+{
+    if (!level_out) {
+        return OL_E_INVAL;
+    }
+    if (!s_ops || !s_ops->rdp_get_level) {
+        return OL_E_NOT_SUPPORTED;
+    }
+    return s_ops->rdp_get_level(level_out);
+}
+
+int ol_rdp_lock(void)
+{
+    if (!s_ops || !s_ops->rdp_lock) {
+        return OL_E_NOT_SUPPORTED;
+    }
+    return s_ops->rdp_lock();
+}

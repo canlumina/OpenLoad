@@ -36,6 +36,13 @@ typedef struct {
 
     /** 可选: 写持久化魔数. */
     int (*magic_write)(uint32_t value);
+
+    /** 可选 (M6-1): 读 STM32 RDP level (0/1/2). port 未实现返 OL_E_NOT_SUPPORTED. */
+    int (*rdp_get_level)(uint8_t *level_out);
+
+    /** 可选 (M6-1): 触发 RDP L0→L1. 实现内部硬约束 — 当前必须是 L0, 其他返
+     *  OL_E_INVAL. 完成后调用方应立即 reboot (OB_Launch 后设备一般自动复位). */
+    int (*rdp_lock)(void);
 } ol_sys_ops_t;
 
 /**
@@ -52,6 +59,13 @@ void     ol_disable_irq(void);
 void     ol_jump(uint32_t app_addr);
 int      ol_magic_read(uint32_t *out);
 int      ol_magic_write(uint32_t value);
+int      ol_rdp_get(uint8_t *level_out);
+int      ol_rdp_lock(void);
+
+/* RDP level 含义 (M6-1, F4 port 实现). */
+#define OL_RDP_LEVEL_NONE           0    /* 不锁, 调试器全访问 (出厂默认) */
+#define OL_RDP_LEVEL_READ_PROT      1    /* SWD 连得上但读 flash 锁定 */
+#define OL_RDP_LEVEL_FULL           2    /* 永久不可逆, OpenLoad 不主动设 */
 
 /* 在 App ↔ Bootloader 通信中使用的标准魔数. */
 #define OL_MAGIC_NONE           0x00000000u

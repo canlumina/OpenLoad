@@ -50,6 +50,11 @@
     0x04,0x58,0x83,0xA6,0x3C,0x93,0x1D,0xFD, \
     0x2E,0x1E,0xCF,0xFC,0xC0,0x1F,0xDB,0x98
 
+/* M6-1: STM32 RDP 软件控制 (L0→L1 lock). 启用后 sys_ops 注册 rdp_* op +
+ * CLI 暴露 `rdp` / `rdp lock` 命令. 真正触发烧 option byte 必须 user 在 CLI
+ * 二次 'y' 确认 — 不会主动锁. */
+#define OPENLOAD_ENABLE_RDP             1
+
 /* 日志 INFO 级 + ANSI 彩色 */
 #define OPENLOAD_LOG_LEVEL              3
 #define OPENLOAD_LOG_COLOR              1

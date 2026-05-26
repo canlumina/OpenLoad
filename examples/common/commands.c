@@ -313,3 +313,108 @@ static int cmd_tcp(int argc, char **argv)
 OL_CMD_REGISTER("tcp", "TCP smoke (test <host> <port>)", cmd_tcp);
 
 #endif  /* OPENLOAD_ENABLE_ESP8266 */
+
+/* ================================================================
+ *  M6-1: STM32 RDP (Read-out Protection) 软件控制
+ *
+ *  rdp           — 显示当前 RDP level (0/1/2) 与含义
+ *  rdp status    — 同上
+ *  rdp lock      — 触发 L0→L1, 带 10s 'y' 确认 + 清晰警告
+ *
+ *  L2 不在 CLI 暴露 — 永久不可逆, 走 ST_LINK 外部工具烧 option byte.
+ *  解锁出测试板: STM32_Programmer_CLI -c port=SWD -ob RDP=0xAA
+ *  (触发 mass erase, 整片 flash 被擦, 之后重烧 bootloader.)
+ * ================================================================ */
+#if OPENLOAD_ENABLE_RDP
+
+static const char *rdp_level_desc(uint8_t lvl)
+{
+    switch (lvl) {
+        case OL_RDP_LEVEL_NONE:      return "unlocked (debug access full)";
+        case OL_RDP_LEVEL_READ_PROT: return "read-protected (SWD locked from flash)";
+        case OL_RDP_LEVEL_FULL:      return "FULL (permanent, debug forever closed)";
+        default:                     return "unknown";
+    }
+}
+
+static int cmd_rdp(int argc, char **argv)
+{
+    uint8_t lvl;
+    int rc;
+
+    if (argc < 2 || strcmp(argv[1], "status") == 0) {
+        rc = ol_rdp_get(&lvl);
+        if (rc == OL_E_NOT_SUPPORTED) {
+            ol_print("rdp: not supported on this port\r\n");
+            return rc;
+        }
+        if (rc != OL_OK) {
+            ol_printf("rdp: get level failed (%d)\r\n", rc);
+            return rc;
+        }
+        ol_printf("RDP level : %u  (%s)\r\n", lvl, rdp_level_desc(lvl));
+        return OL_OK;
+    }
+
+    if (strcmp(argv[1], "lock") == 0) {
+        rc = ol_rdp_get(&lvl);
+        if (rc == OL_E_NOT_SUPPORTED) {
+            ol_print("rdp lock: not supported on this port\r\n");
+            return rc;
+        }
+        if (rc != OL_OK) {
+            ol_printf("rdp lock: cannot read current level (%d)\r\n", rc);
+            return rc;
+        }
+        if (lvl != OL_RDP_LEVEL_NONE) {
+            ol_printf("rdp lock: current is L%u, only L0 can be locked\r\n", lvl);
+            return OL_E_INVAL;
+        }
+
+        ol_print("\r\n");
+        ol_print("================ WARNING =================\r\n");
+        ol_print("RDP L0 -> L1 makes SWD/JTAG unable to read flash.\r\n");
+        ol_print("Recovery wipes the entire flash (mass erase).\r\n");
+        ol_print("After lock, this dev board can NOT be flashed normally\r\n");
+        ol_print("until you run:\r\n");
+        ol_print("  STM32_Programmer_CLI -c port=SWD -ob RDP=0xAA\r\n");
+        ol_print("==========================================\r\n");
+        ol_print("Press 'y' within 10s to confirm, anything else cancels.\r\n");
+        ol_print("> ");
+
+        ol_io_dev_t *con = ol_io_dev_find("console");
+        if (!con) { return OL_E_NOT_FOUND; }
+
+        uint32_t start = ol_tick_ms();
+        uint8_t  ch    = 0;
+        while ((ol_tick_ms() - start) < 10000U) {
+            int a = con->ops->available ? con->ops->available(con) : 0;
+            if (a > 0) {
+                con->ops->read(con, &ch, 1);
+                break;
+            }
+        }
+        ol_print("\r\n");
+
+        if (ch != 'y' && ch != 'Y') {
+            ol_print("rdp lock: cancelled\r\n");
+            return OL_OK;
+        }
+
+        ol_print("rdp lock: programming RDP=L1 (device will reset)...\r\n");
+        rc = ol_rdp_lock();
+        /* OB_Launch 一般立即触发复位, 不会返回. 防御性兜底: */
+        if (rc == OL_OK) {
+            ol_print("rdp lock: OB programmed but no auto-reset; rebooting\r\n");
+            ol_reboot();
+        }
+        ol_printf("rdp lock: failed (%d)\r\n", rc);
+        return rc;
+    }
+
+    ol_print("usage: rdp [status|lock]\r\n");
+    return OL_E_INVAL;
+}
+OL_CMD_REGISTER("rdp", "RDP status / lock L0->L1 (irreversible)", cmd_rdp);
+
+#endif  /* OPENLOAD_ENABLE_RDP */
