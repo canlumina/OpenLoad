@@ -33,7 +33,10 @@ typedef struct {
     uint8_t  firmware_sha256[16]; /* 截断的 SHA-256 前 16 字节, 未启用为 0 */
     uint8_t  aes_iv[16];          /* AES-CTR IV, 未启用为 0 */
 
-    uint8_t  reserved[4];         /* 预留, 必须为 0 (供 v2 签名扩展) */
+    uint16_t board_id_extra[2];   /* M6-2: 额外 board_id 槽 (0 = unused),
+                                     跟主 board_id 共 3 槽; 任一非 0 槽匹配
+                                     OPENLOAD_BOARD_ID 即视为板兼容. 老 image
+                                     extra 全 0, 行为同 M1 单板. */
 
     uint32_t hdr_crc32;         /* 头部前 60 字节的 CRC32, 防头部损坏误判 */
 } __attribute__((packed)) ol_image_header_t;

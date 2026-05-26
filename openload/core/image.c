@@ -111,10 +111,21 @@ int ol_image_verify(const ol_partition_t *p)
     int rc = ol_image_read_header(p, &hdr);
     if (rc != OL_OK) { return rc; }
 
-    /* board_id 检查: 0 = 不检查 (跨板通用固件) */
+    /* board_id 检查: 主 board_id == 0 跨板通用; 否则任一非 0 槽匹配即通过
+     * (M6-2 多 board_id 支持, 老 image extra=0 仍按主 board_id 严匹配). */
 #if OPENLOAD_BOARD_ID
-    if (hdr.board_id != 0 && hdr.board_id != OPENLOAD_BOARD_ID) {
-        return OL_E_IMAGE_BOARD;
+    if (hdr.board_id != 0) {
+        const uint16_t slots[3] = {
+            hdr.board_id, hdr.board_id_extra[0], hdr.board_id_extra[1]
+        };
+        int match = 0;
+        for (int i = 0; i < 3; ++i) {
+            if (slots[i] != 0 && slots[i] == OPENLOAD_BOARD_ID) {
+                match = 1;
+                break;
+            }
+        }
+        if (!match) { return OL_E_IMAGE_BOARD; }
     }
 #endif
 

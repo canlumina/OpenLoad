@@ -359,7 +359,7 @@ typedef struct {
     uint8_t  firmware_sha256[16]; /* 截断的 SHA256 前 16 字节 (可选, 未启用为 0) */
     uint8_t  aes_iv[16];          /* AES-CTR IV (可选, 未启用为 0) */
 
-    uint8_t  signature[/* TBD */]; /* 预留 v2 用于 Ed25519 */
+    uint16_t board_id_extra[2];   /* M6-2: 额外 board_id 槽 (跟主 board_id 共 3 槽) */
 
     uint32_t hdr_crc32;         /* 头部本身 CRC32, 最后 4 字节 */
 } __attribute__((packed)) ol_image_header_t;

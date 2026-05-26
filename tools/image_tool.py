@@ -40,8 +40,8 @@ HDR_FMT_VER    = 1
 # 与 image.h 一致
 FLAG_ENCRYPTED = 1 << 0
 FLAG_SIGNED    = 1 << 1
-# struct ol_image_header_t (packed, little-endian) 见 image.h
-_HDR_STRUCT = "<I B B H I I I I 16s 16s 4s I"
+# 与 image.h 一致
+_HDR_STRUCT = "<I B B H I I I I 16s 16s H H I"
 assert struct.calcsize(_HDR_STRUCT) == HDR_SIZE
 
 
@@ -90,13 +90,31 @@ def ed25519_sign(message: bytes, seed: bytes) -> bytes:
     return signer.sign(message)
 
 
+def parse_board_ids(s: str) -> tuple:
+    """单值 0x0103 -> (0x0103, 0, 0); 多值 0x0103,0x0407 -> (0x0103, 0x0407, 0).
+    最多 3, 超出报错. 单值老用法 100% 向后兼容 (extra 槽 0 = unused). M6-2."""
+    parts = [int(x.strip(), 0) for x in s.split(",") if x.strip() != ""]
+    if not parts:
+        raise argparse.ArgumentTypeError("--board-id requires at least one value")
+    if len(parts) > 3:
+        raise argparse.ArgumentTypeError(
+            f"max 3 board_ids supported (got {len(parts)})")
+    for p in parts:
+        if not (0 <= p <= 0xFFFF):
+            raise argparse.ArgumentTypeError(
+                f"board_id 0x{p:x} out of u16 range (0..0xFFFF)")
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts)
+
+
 def main():
     ap = argparse.ArgumentParser(description="Stamp an OpenLoad image header onto a raw bin.")
     ap.add_argument("input",  type=Path, help="原始 App bin")
     ap.add_argument("-o", "--output", type=Path,
                     help="输出文件 (默认: <input>-ol.bin)")
-    ap.add_argument("--board-id",  type=lambda x: int(x, 0), default=0x0103,
-                    help="板子 ID (例: 0x0103); 0 = 跨板通用")
+    ap.add_argument("--board-id",  type=parse_board_ids, default=(0x0103, 0, 0),
+                    help="板子 ID (单值 0x0103 或多值逗号分隔 0x0103,0x0407,0x0500, 最多 3); 0 = 跨板通用")
     ap.add_argument("--version",   type=parse_version, default=parse_version("0.1.0.0"),
                     help="固件版本 M.m.p.b (默认 0.1.0.0)")
     ap.add_argument("--timestamp", type=int, default=int(time.time()),
@@ -146,14 +164,15 @@ def main():
         MAGIC,
         HDR_FMT_VER,
         flags,
-        args.board_id,
+        args.board_id[0],            # 主 board_id (向后兼容, 老设备/老工具只看这个)
         len(payload),                # = 明文长度 == 密文长度 (CTR stream)
         fw_crc,
         args.version,
         args.timestamp,
         fw_sha,                      # sha256[16] (明文 SHA 前 16 字节, 未启用为 0)
         iv,                          # aes_iv
-        b"\x00" * 4,                 # reserved
+        args.board_id[1],            # M6-2: board_id_extra[0] (0 = unused)
+        args.board_id[2],            # M6-2: board_id_extra[1]
         0,                           # hdr_crc32 placeholder
     )
     hdr_crc = binascii.crc32(hdr[: HDR_SIZE - 4]) & 0xFFFFFFFF
@@ -163,7 +182,13 @@ def main():
 
     print(f"input    : {args.input}  ({len(payload)} bytes)")
     print(f"output   : {out_path}    ({len(payload) + HDR_SIZE + len(sig)} bytes)")
-    print(f"board_id : 0x{args.board_id:04x}")
+    nonzero_ids = [bid for bid in args.board_id if bid != 0]
+    if args.board_id[0] == 0:
+        print(f"board_id : 0x0000 (cross-board)")
+    elif len(nonzero_ids) == 1:
+        print(f"board_id : 0x{args.board_id[0]:04x}")
+    else:
+        print(f"board_id : " + ", ".join(f"0x{b:04x}" for b in nonzero_ids))
     print(f"version  : {(args.version >> 24) & 0xFF}.{(args.version >> 16) & 0xFF}."
           f"{(args.version >> 8) & 0xFF}.{args.version & 0xFF}")
     print(f"flags    : 0x{flags:02x}"
