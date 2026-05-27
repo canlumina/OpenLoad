@@ -337,6 +337,15 @@ static const char *rdp_level_desc(uint8_t lvl)
     }
 }
 
+static const char rdp_long_help[] =
+    "rdp [status|lock]\r\n"
+    "  status: show current RDP level (default if no arg)\r\n"
+    "  lock:   program L0 -> L1 (loses SWD flash read; 10s 'y' to confirm)\r\n"
+    "Recovery from L1 requires mass erase via external tool:\r\n"
+    "  STM32_Programmer_CLI -c port=SWD -ob RDP=0xAA\r\n"
+    "(this wipes the entire flash; bootloader must be re-flashed.)\r\n"
+    "L2 (permanent) is NOT exposed here — use the external tool if needed.\r\n";
+
 static int cmd_rdp(int argc, char **argv)
 {
     uint8_t lvl;
@@ -415,6 +424,7 @@ static int cmd_rdp(int argc, char **argv)
     ol_print("usage: rdp [status|lock]\r\n");
     return OL_E_INVAL;
 }
-OL_CMD_REGISTER("rdp", "RDP status / lock L0->L1 (irreversible)", cmd_rdp);
+OL_CMD_REGISTER_FULL("rdp", "RDP status / lock L0->L1 (irreversible)",
+                     rdp_long_help, cmd_rdp);
 
 #endif  /* OPENLOAD_ENABLE_RDP */

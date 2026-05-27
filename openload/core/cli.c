@@ -65,6 +65,20 @@ int ol_cli_exec(const char *line)
         ol_printf("unknown: %s\r\n", argv[0]);
         return OL_E_NOT_FOUND;
     }
+    /* `<cmd> help` 由 dispatcher 直接答, 不进 handler.
+     * 让所有命令零成本获得 `<cmd> help` 入口, 同时给没注册 long_help 的
+     * 命令一个统一回退提示 (避免各 handler 自行 "usage: ..." 风格不一).
+     * 副作用: handler 不能把 "help" 当业务参数 — 目前无此用法. */
+    if (argc >= 2 && strcmp(argv[1], "help") == 0) {
+        if (cmd->long_help) {
+            ol_print(cmd->long_help);
+        } else {
+            ol_printf("  %-10s %s\r\n", cmd->name,
+                      cmd->help ? cmd->help : "");
+            ol_print("(no detailed help)\r\n");
+        }
+        return OL_OK;
+    }
     return cmd->handler(argc, argv);
 }
 

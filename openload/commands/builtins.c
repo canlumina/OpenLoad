@@ -32,15 +32,34 @@
 /* ---------- help ---------- */
 static int cmd_help(int argc, char **argv)
 {
-    (void)argc; (void)argv;
     const ol_cmd_t *tbl;
     uint32_t n = ol_cmd_table(&tbl);
+
+    /* help <cmd>: 按名查 long_help (没注册的回退一行简介). */
+    if (argc >= 2) {
+        for (uint32_t i = 0; i < n; ++i) {
+            if (tbl[i].name && strcmp(tbl[i].name, argv[1]) == 0) {
+                if (tbl[i].long_help) {
+                    ol_print(tbl[i].long_help);
+                } else {
+                    ol_printf("  %-10s %s\r\n", tbl[i].name,
+                              tbl[i].help ? tbl[i].help : "");
+                    ol_print("(no detailed help)\r\n");
+                }
+                return OL_OK;
+            }
+        }
+        ol_printf("unknown: %s\r\n", argv[1]);
+        return OL_E_NOT_FOUND;
+    }
+
+    /* help (无参): 列全表. */
     for (uint32_t i = 0; i < n; ++i) {
         ol_printf("  %-10s %s\r\n", tbl[i].name, tbl[i].help ? tbl[i].help : "");
     }
     return OL_OK;
 }
-OL_CMD_REGISTER("help", "List all commands", cmd_help);
+OL_CMD_REGISTER("help", "List all commands (try `help <cmd>` for details)", cmd_help);
 
 /* ---------- info ---------- */
 static int cmd_info(int argc, char **argv)
@@ -129,6 +148,16 @@ static int cmd_erase(int argc, char **argv)
 OL_CMD_REGISTER("erase", "Erase a partition", cmd_erase);
 
 /* ---------- update ---------- */
+static const char update_long_help[] =
+    "update <protocol> <staging> <target> [url]\r\n"
+    "  protocol: xmodem | xmodem-1k | ymodem | http\r\n"
+    "  staging:  partition buffering incoming firmware\r\n"
+    "  target:   partition firmware is installed to\r\n"
+    "  url:      required for http; ignored otherwise\r\n"
+    "examples:\r\n"
+    "  update xmodem download app\r\n"
+    "  update http   download app http://192.168.1.5/app.bin\r\n";
+
 static int cmd_update(int argc, char **argv)
 {
     if (argc < 4) {
@@ -142,7 +171,9 @@ static int cmd_update(int argc, char **argv)
     ol_printf("update: %s\r\n", ol_strerror(rc));
     return rc;
 }
-OL_CMD_REGISTER("update", "Receive firmware and install (proto staging target [url])", cmd_update);
+OL_CMD_REGISTER_FULL("update",
+                     "Receive firmware and install (proto staging target [url])",
+                     update_long_help, cmd_update);
 
 /* ---------- install ---------- */
 static int cmd_install(int argc, char **argv)
@@ -203,6 +234,12 @@ static int oplog_print_cb(uint32_t seq, uint32_t ts_ms, uint8_t level,
     return 0;
 }
 
+static const char oplog_long_help[] =
+    "oplog <dump|clear|stat> [n]\r\n"
+    "  dump [n]: print last n records (0 or omitted = all)\r\n"
+    "  clear:    erase the entire op log partition\r\n"
+    "  stat:     show ring buffer state (used/total slots, write_idx, next_seq)\r\n";
+
 static int cmd_oplog(int argc, char **argv)
 {
     if (argc < 2) {
@@ -246,5 +283,6 @@ static int cmd_oplog(int argc, char **argv)
     ol_print("oplog: unknown subcommand\r\n");
     return OL_E_INVAL;
 }
-OL_CMD_REGISTER("oplog", "Persistent op log (dump|clear|stat)", cmd_oplog);
+OL_CMD_REGISTER_FULL("oplog", "Persistent op log (dump|clear|stat)",
+                     oplog_long_help, cmd_oplog);
 #endif
