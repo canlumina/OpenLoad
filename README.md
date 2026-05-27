@@ -3,6 +3,7 @@
 > 面向资源受限 MCU 的、**可裁剪、可移植**的开源 bootloader 框架。
 > 接口抽象 + 编译期裁剪, 用户提供底层驱动即可接入任意单片机。
 
+[![CI](https://github.com/canlumina/OpenLoad/actions/workflows/ci.yml/badge.svg)](https://github.com/canlumina/OpenLoad/actions/workflows/ci.yml)
 [![status](https://img.shields.io/badge/status-M6%20part1%20done-green)](docs/spec/REQUIREMENTS.md#7-第一版交付范围v1-scope)
 [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
@@ -34,7 +35,7 @@ OpenLoad **不是**某颗芯片的 bootloader, 而是一套 **接口规范 + 协
 
 ## 主要特性
 
-- 🪶 **极轻量** — 默认配置 (XMODEM + CRC32 + CLI) 约 **14 KB** Flash
+- 🪶 **极轻量** — 仅 M1 默认 (XMODEM + CRC32 + CLI) 在 STM32F1 example **~20 KB** Flash (含 HAL UART/GPIO/SPI + W25Q64 驱动, CI 实测)
 - 🧩 **接口驱动** — 5 个 ops 接口, 移植 ≈ 200 行代码
 - 🛠 **协议矩阵** — XMODEM / XMODEM-1K / YMODEM / HTTP OTA / 自定义可挂载
 - 🔐 **渐进安全** — CRC32 → AES-128-CTR → SHA-256 → Ed25519 签名
@@ -169,22 +170,26 @@ OpenLoad/
 
 ## 体积参考
 
-GCC 14.x, `-Os` (Release), 全功能 (M1+M2+M3+M4+M6 全启):
+GCC 14.2.Rel1, CI 矩阵实测 (`-Os` Release, BL 区 64KB), 含 STM32 HAL +
+W25Q64 SPI flash 驱动 + 用户工程:
 
-| 平台 | bootloader.bin | BL 区占用 |
-|------|----------------|----------|
-| STM32F103ZET6 (F1, BL 64KB) | **43.6 KB** | 66.5% |
-| STM32F407VGT6 (F4, BL 64KB) | **46.5 KB** | 71.0% |
+| 平台 | full (M1+M2+M3+M4+M6) | minimal (仅 M1) |
+|------|----------------------|-----------------|
+| STM32F103ZET6 (F1) | **44952 B** (68.6%) | **19764 B** (30.2%) |
+| STM32F407VGT6 (F4) | **45496 B** (69.4%) | **20588 B** (31.4%) |
 
-裁剪示意 (F1 Release, 仅供估算):
+Debug (`-Og`) 大约比 Release 多 5-6 KB. 数字由 [CI workflow](.github/workflows/ci.yml)
+每次 push 自动产出, 见 GitHub Actions run summary.
+
+裁剪曲线 (F1 Release, 仅供估算, 数字含 HAL + W25Q64 板级驱动):
 
 | 配置 | bootloader.bin |
 |------|----------------|
-| 仅 XMODEM + CRC32 + CLI (M1 默认) | ~14 KB |
-| + YMODEM + HTTP OTA + oplog (M2) | ~37 KB |
-| + 防回滚 + backup + AES-128 (M3) | ~41 KB |
-| + SHA-256 + Ed25519 (M4) | ~44 KB |
-| + multi board_id (M6) | ~44 KB |
+| M1 (XMODEM + CRC32 + CLI) | ~20 KB |
+| + M2 (YMODEM + HTTP OTA + oplog) | ~37 KB |
+| + M3 (防回滚 + backup + AES-128) | ~41 KB |
+| + M4 (SHA-256 + Ed25519) | ~43 KB |
+| + M6 (RDP + multi board_id) | ~45 KB |
 
 ## 设计文档
 
@@ -195,7 +200,8 @@ GCC 14.x, `-Os` (Release), 全功能 (M1+M2+M3+M4+M6 全启):
 
 ## 状态
 
-M1-M5 完成 + M6 Part 1 (信任根收口) 完成。F1/F4 双平台编译均干净。
+M1-M5 完成 + M6 Part 1 (信任根收口 + CI 编译矩阵) 完成。F1/F4 × Debug/Release ×
+full/minimal 共 **8 个 build path** 在 GitHub Actions 上自动 compile-check.
 
 实板烧录与端到端联调由用户在自己的硬件上完成; 欢迎反馈 issue。
 
