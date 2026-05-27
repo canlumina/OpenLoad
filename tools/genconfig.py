@@ -43,14 +43,17 @@ def emit_header(kconf, out_path):
 
         elif sym.type == STRING:
             val = sym.str_value
-            # 特殊处理: AES_KEY / ED25519_PUBKEY 转 C byte array literal
+            # 特殊处理: AES_KEY / ED25519_PUBKEY 转 C byte array 元素串
+            # 不包花括号 — 调用点形如:
+            #     static const uint8_t k[16] = { OPENLOAD_AES_KEY_BYTES };
+            # 自己加外层 { }
             if sym.name in ('OPENLOAD_AES_KEY', 'OPENLOAD_ED25519_PUBKEY'):
                 if len(val) % 2 != 0:
                     print(f"warning: {sym.name} hex string length not even, padding with 0",
                           file=sys.stderr)
                     val += '0'
                 hex_pairs = ', '.join(f'0x{val[i:i+2]}' for i in range(0, len(val), 2))
-                lines.append(f'#define {sym.name}_BYTES {{ {hex_pairs} }}')
+                lines.append(f'#define {sym.name}_BYTES {hex_pairs}')
             # 特殊处理: CLI_PASSWORD 空串 → ((const char *)0)
             elif sym.name == 'OPENLOAD_CLI_PASSWORD' and val == '':
                 lines.append(f'#define {sym.name} ((const char *)0)')

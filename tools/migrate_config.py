@@ -59,6 +59,10 @@ def parse_header(header_path, kconf):
         name = match.group(1)
         val_raw = match.group(2).strip()
 
+        # 去掉行内 C 块注释 /* ... */ 跟 C++ 注释 // ...
+        val_raw = re.sub(r'\s*/\*.*?\*/\s*$', '', val_raw, flags=re.DOTALL).strip()
+        val_raw = re.sub(r'\s*//.*$', '', val_raw).strip()
+
         # 跳过不在 Kconfig 中的符号
         if name not in kconf.syms:
             continue
@@ -109,6 +113,12 @@ def write_config(kconf, config_dict, out_path):
             continue
 
         val = config_dict.get(sym.name)
+
+        # 跳过 invisible 符号 (depends on 不满足, 例 ESP_UART_BAUD 当 ESP8266=n)
+        # — 除非 header 里显式给了值
+        if val is None and sym.visibility == 0:
+            continue
+
         if val is None:
             # 未在 header 中定义, 用 Kconfig 默认值
             if sym.type == BOOL:
