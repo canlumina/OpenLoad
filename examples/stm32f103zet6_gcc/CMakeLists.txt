@@ -13,22 +13,30 @@ project(openload_bootloader LANGUAGES C ASM)
 
 # ---------- 引入框架核心 + STM32F1 port ----------
 # 注: openload/CMakeLists.txt 中的 OPENLOAD_ENABLE_* 选项默认值已对齐 M1
-# M2: 把 YMODEM 编入 (option() 不会覆盖已存在的 cache, 用 FORCE 显式覆盖)
-set(OPENLOAD_ENABLE_YMODEM   ON CACHE BOOL "Enable YMODEM receiver"   FORCE)
-# M2-11: HTTP OTA receiver. 依赖 ESP8266 port 提供的 "net" io_dev (CIPSTART/IPD).
-set(OPENLOAD_ENABLE_HTTP_OTA ON CACHE BOOL "Enable HTTP OTA receiver" FORCE)
-# M2-13: 持久化操作日志 (oplog 分区).
-set(OPENLOAD_ENABLE_OPLOG    ON CACHE BOOL "Enable persistent op log" FORCE)
-# M3-4: AES-128-CTR image decryption (vendor third_party/tiny-aes).
-set(OPENLOAD_ENABLE_AES_128_CTR ON CACHE BOOL "Enable AES-128-CTR" FORCE)
-# M4-1: SHA-256 摘要 (vendor third_party/sha256).
-set(OPENLOAD_ENABLE_SHA256      ON CACHE BOOL "Enable SHA-256"     FORCE)
-# M4-2: Ed25519 签名验证 (vendor third_party/tweetnacl).
-set(OPENLOAD_ENABLE_ED25519     ON CACHE BOOL "Enable Ed25519"     FORCE)
-# M2-12: 启用 ports/stm32f1 的 ESP8266 (UART2) 支持. 同步在 openload_config.h
-# 也把 OPENLOAD_ENABLE_ESP8266 置 1 — port_io_uart 的 dispatcher / it.c / dma.c
-# 都看的是 C 宏, CMake 这边只控编入.
-set(STM32F1_PORT_ENABLE_ESP8266 ON CACHE BOOL "Enable UART2 + ESP8266 port" FORCE)
+
+# CI 矩阵的 "minimal" 变体: -DOPENLOAD_CI_MINIMAL=ON 时跳过 M2-M6 cache vars
+# 的 FORCE 写入 (让框架默认 OFF 生效) + shadow openload_config.h. 不影响
+# 默认 (full) 构建路径.
+option(OPENLOAD_CI_MINIMAL "CI: use ci_minimal/openload_config.h (M1-only profile)" OFF)
+
+if(NOT OPENLOAD_CI_MINIMAL)
+    # M2: 把 YMODEM 编入 (option() 不会覆盖已存在的 cache, 用 FORCE 显式覆盖)
+    set(OPENLOAD_ENABLE_YMODEM   ON CACHE BOOL "Enable YMODEM receiver"   FORCE)
+    # M2-11: HTTP OTA receiver. 依赖 ESP8266 port 提供的 "net" io_dev (CIPSTART/IPD).
+    set(OPENLOAD_ENABLE_HTTP_OTA ON CACHE BOOL "Enable HTTP OTA receiver" FORCE)
+    # M2-13: 持久化操作日志 (oplog 分区).
+    set(OPENLOAD_ENABLE_OPLOG    ON CACHE BOOL "Enable persistent op log" FORCE)
+    # M3-4: AES-128-CTR image decryption (vendor third_party/tiny-aes).
+    set(OPENLOAD_ENABLE_AES_128_CTR ON CACHE BOOL "Enable AES-128-CTR" FORCE)
+    # M4-1: SHA-256 摘要 (vendor third_party/sha256).
+    set(OPENLOAD_ENABLE_SHA256      ON CACHE BOOL "Enable SHA-256"     FORCE)
+    # M4-2: Ed25519 签名验证 (vendor third_party/tweetnacl).
+    set(OPENLOAD_ENABLE_ED25519     ON CACHE BOOL "Enable Ed25519"     FORCE)
+    # M2-12: 启用 ports/stm32f1 的 ESP8266 (UART2) 支持. 同步在 openload_config.h
+    # 也把 OPENLOAD_ENABLE_ESP8266 置 1 — port_io_uart 的 dispatcher / it.c / dma.c
+    # 都看的是 C 宏, CMake 这边只控编入.
+    set(STM32F1_PORT_ENABLE_ESP8266 ON CACHE BOOL "Enable UART2 + ESP8266 port" FORCE)
+endif()
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../openload    ${CMAKE_BINARY_DIR}/_openload)
 add_subdirectory(${CMAKE_SOURCE_DIR}/../../ports/stm32f1
@@ -39,7 +47,13 @@ add_subdirectory(cmake/stm32cubemx)
 
 # ---------- 把用户工程源加入 openload 框架的 include 路径 ----------
 # (config.h 通过 __has_include 找到 openload_config.h)
-target_include_directories(openload PUBLIC ${CMAKE_SOURCE_DIR})
+# CI minimal 走 ci_minimal/openload_config.h, BEFORE 关键字让它优先于主目录.
+if(OPENLOAD_CI_MINIMAL)
+    message(STATUS "OpenLoad CI: minimal profile (shadowing openload_config.h)")
+    target_include_directories(openload BEFORE PUBLIC ${CMAKE_SOURCE_DIR}/ci_minimal)
+else()
+    target_include_directories(openload PUBLIC ${CMAKE_SOURCE_DIR})
+endif()
 
 # ---------- 主 elf 目标 ----------
 add_executable(${PROJECT_NAME}
@@ -62,6 +76,15 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/../common
 )
+
+# CI minimal: 给 exe 目标也 BEFORE 加 ci_minimal/, 否则 commands.c 等用户
+# 源经 #include "openload/config.h" 时, __has_include 仍找到主目录的
+# openload_config.h, shadow 只对 openload 库 TU 生效, exe TU 不生效.
+if(OPENLOAD_CI_MINIMAL)
+    target_include_directories(${PROJECT_NAME} BEFORE PRIVATE
+        ${CMAKE_SOURCE_DIR}/ci_minimal
+    )
+endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
     # --whole-archive: 强制把 openload + port 静态库内的所有 .o 拉进 elf,

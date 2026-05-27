@@ -93,7 +93,8 @@
 
 /* M6-1: STM32 RDP (Read-out Protection) 软件控制 (L0→L1 lock).
  * 启用后 sys_ops 暴露 rdp_get_level / rdp_lock, CLI 提供 `rdp` 命令组.
- * 当前仅 F4 port 实现; F1 op 未注册, 调用返 OL_E_NOT_SUPPORTED. */
+ * F1/F4 均已实现 (F1 仅 L0/L1, F4 多 L2 但 CLI 不暴露 L2).
+ * 其他 port 未注册 op 时 CLI 返 OL_E_NOT_SUPPORTED. */
 #ifndef OPENLOAD_ENABLE_RDP
 #define OPENLOAD_ENABLE_RDP                 0
 #endif
