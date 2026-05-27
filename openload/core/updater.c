@@ -103,6 +103,11 @@ static int decrypt_payload_to_target(const ol_partition_t *src,
 int ol_updater_install_ex(const char *staging_part, const char *target_part,
                           uint32_t flags)
 {
+#if !OPENLOAD_ANTI_ROLLBACK && !OPENLOAD_ENABLE_BACKUP
+    /* flags 仅在 anti-rollback (FORCE) / backup (NO_BACKUP) 路径用到.
+     * 两特性全关时本函数不会引用它, 避免 -Wunused-parameter. */
+    (void)flags;
+#endif
     const ol_partition_t *src = ol_part_find(staging_part);
     const ol_partition_t *dst = ol_part_find(target_part);
     if (!src || !dst) { return OL_E_PART_NOT_FOUND; }
