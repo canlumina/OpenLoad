@@ -1,0 +1,11 @@
+# OpenLoad Python 工具依赖
+# 安装: pip install -r tools/requirements.txt
+
+# Kconfig 解析 + ncurses TUI (menuconfig.py / genconfig.py / migrate_config.py)
+kconfiglib>=14.1.0
+
+# Windows ncurses 支持 (Linux/macOS 自带 curses, 不需要这个包)
+windows-curses>=2.3.0; platform_system == "Windows"
+
+# 加密工具 (image_tool.py / gen_demo_ed25519.py 已在用)
+pycryptodome>=3.18.0

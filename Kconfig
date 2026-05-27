@@ -1,0 +1,302 @@
+# OpenLoad Bootloader Configuration
+#
+# 描述全部 OPENLOAD_* 配置项 + AES/Ed25519 key 字段.
+# 用 tools/menuconfig.py 编辑, tools/genconfig.py 生成 C 头跟 CMake 片段.
+# 默认值跟 openload/include/openload/config_default.h 对齐.
+
+mainmenu "OpenLoad Bootloader Configuration"
+
+
+menu "Identity"
+
+config OPENLOAD_BOARD_ID
+    hex "Board ID (16-bit)"
+    range 0x0001 0xFFFF
+    default 0x0001
+    help
+      16-bit board identifier embedded in image header. Use distinct
+      IDs per board to prevent cross-board flashing. image_tool.py
+      can list up to 3 IDs per image for multi-SKU shared firmware
+      (see M6-2).
+
+endmenu
+
+
+menu "Boot"
+
+config OPENLOAD_BOOT_DELAY_MS
+    int "Boot delay (ms)"
+    range 0 60000
+    default 3000
+    help
+      Wait this long before attempting App jump. Any trigger source
+      (button/UART/magic) during the window forces CLI entry.
+
+config OPENLOAD_ENTRY_TRIGGER_BUTTON
+    bool "Trigger CLI by button press"
+    default y
+
+config OPENLOAD_ENTRY_TRIGGER_UART
+    bool "Trigger CLI by UART activity (key press)"
+    default y
+
+config OPENLOAD_ENTRY_TRIGGER_MAGIC
+    bool "Trigger CLI by RAM magic (warm reboot from App)"
+    default y
+
+endmenu
+
+
+menu "Recovery"
+
+choice
+    prompt "Recovery policy when App verify fails"
+    default OPENLOAD_RECOVERY_POLICY_CLI
+    help
+      CLI       = stay in bootloader CLI
+      HANG      = busy loop (rely on watchdog reset)
+      ROLLBACK  = restore from backup partition (requires ENABLE_BACKUP
+                  and UPGRADE_STAGING_BACKUP)
+
+config OPENLOAD_RECOVERY_POLICY_CLI
+    bool "CLI (stay in bootloader)"
+
+config OPENLOAD_RECOVERY_POLICY_HANG
+    bool "Hang (rely on watchdog)"
+
+config OPENLOAD_RECOVERY_POLICY_ROLLBACK
+    bool "Auto rollback from backup"
+    depends on OPENLOAD_ENABLE_BACKUP
+
+endchoice
+
+endmenu
+
+
+menu "Protocols"
+
+config OPENLOAD_ENABLE_XMODEM
+    bool "XMODEM (128 B blocks)"
+    default y
+
+config OPENLOAD_ENABLE_XMODEM_1K
+    bool "XMODEM-1K (1024 B blocks)"
+    depends on OPENLOAD_ENABLE_XMODEM
+    default y
+
+config OPENLOAD_ENABLE_YMODEM
+    bool "YMODEM (batch protocol)"
+    default n
+
+config OPENLOAD_ENABLE_HTTP_OTA
+    bool "HTTP OTA (pull from URL via Wi-Fi)"
+    depends on OPENLOAD_ENABLE_ESP8266
+    default n
+
+endmenu
+
+
+menu "Network"
+
+config OPENLOAD_ENABLE_ESP8266
+    bool "ESP8266 AT bridge (UART2)"
+    default n
+    help
+      Enables UART2 + AT command engine for ESP8266 Wi-Fi module.
+      Required by HTTP_OTA receiver. Auto-syncs the port-side cache
+      var (STM32F1/F4_PORT_ENABLE_ESP8266) so port_uart2.c is
+      compiled in.
+
+config OPENLOAD_ESP_UART_BAUD
+    int "ESP UART2 baudrate"
+    depends on OPENLOAD_ENABLE_ESP8266
+    default 115200
+    help
+      New ESP firmware (AT v1.x+) defaults to 115200.
+      Old ESP-01 (AT v0.x) defaults to 9600.
+
+endmenu
+
+
+menu "Crypto"
+
+config OPENLOAD_ENABLE_CRC32
+    bool "CRC32 image verify"
+    default y
+    help
+      Always enabled — kept here for visibility only. M1 baseline.
+
+config OPENLOAD_ENABLE_AES_128_CTR
+    bool "AES-128-CTR image decryption"
+    default n
+    help
+      Decrypt encrypted images produced by `image_tool.py --aes-key`.
+      The 16-byte key is embedded in the bootloader binary (see
+      OPENLOAD_AES_KEY below).
+
+config OPENLOAD_AES_KEY
+    string "AES-128 key (32 hex chars = 16 bytes)"
+    depends on OPENLOAD_ENABLE_AES_128_CTR
+    default "4F70656E4C6F61642064656D6F4B6579"
+    help
+      16-byte AES-128 key as 32 lowercase/uppercase hex chars
+      (no spaces, no 0x prefix). Default is the demo key
+      "OpenLoad demoKey" (ASCII bytes 0x4F 0x70 ...).
+      Production: generate per-project random key, store securely.
+
+config OPENLOAD_ENABLE_SHA256
+    bool "SHA-256 image digest verify"
+    default n
+    help
+      Verify SHA-256 of plaintext payload (after CRC32) when
+      hdr.firmware_sha256 is non-zero. Also used by Ed25519
+      signature path (M4-2).
+
+config OPENLOAD_ENABLE_ED25519
+    bool "Ed25519 signature verify"
+    depends on OPENLOAD_ENABLE_SHA256
+    default n
+    help
+      Verify Ed25519 signature in image trailer (64 bytes) when
+      hdr.flags & OL_IMG_F_SIGNED. Public key embedded (see
+      OPENLOAD_ED25519_PUBKEY below).
+
+config OPENLOAD_ED25519_PUBKEY
+    string "Ed25519 public key (64 hex chars = 32 bytes)"
+    depends on OPENLOAD_ENABLE_ED25519
+    default "7542CE6AECF5F1E6DC809E5F49BAFEDB045883A63C931DFD2E1ECFFCC01FDB98"
+    help
+      32-byte Ed25519 public key as 64 hex chars.
+      Default is the demo pubkey corresponding to seed
+      "OpenLoad-demo-ed25519-seed-v1!!!" (run
+      `python tools/gen_demo_ed25519.py` to print it).
+      Production: derive from a real Ed25519 key pair, never
+      ship the demo key.
+
+endmenu
+
+
+menu "Security"
+
+config OPENLOAD_ENABLE_RDP
+    bool "RDP CLI command (STM32 Read-out Protection)"
+    default n
+    help
+      Expose `rdp status` / `rdp lock` CLI commands. F1: L0/L1.
+      F4: L0/L1 (L2 not exposed — permanent, use external tool).
+
+config OPENLOAD_ANTI_ROLLBACK
+    bool "Anti-rollback (refuse older firmware versions)"
+    default n
+    help
+      Refuse to install image whose firmware_version is lower than
+      currently running App. `install ... force` bypasses for
+      emergency downgrade.
+
+config OPENLOAD_ENABLE_BACKUP
+    bool "Backup partition + auto rollback"
+    default n
+    help
+      Before install, back up current target partition. On install
+      failure or App verify failure at boot, auto-restore from
+      backup. Requires "backup" partition in partitions.def.
+
+endmenu
+
+
+menu "Image / Update"
+
+choice
+    prompt "Upgrade strategy"
+    default OPENLOAD_UPGRADE_STRATEGY_STAGING
+    help
+      1 SINGLE_BANK   = direct write to App partition (no staging)
+      2 STAGING       = external staging → App overwrite (default)
+      3 STAGING_BACKUP= staging + atomic backup (needs ENABLE_BACKUP)
+      4 DUAL_BANK     = A/B banks (requires SoC support, M7+)
+
+config OPENLOAD_UPGRADE_STRATEGY_SINGLE_BANK
+    bool "1 — SingleBank (direct write)"
+
+config OPENLOAD_UPGRADE_STRATEGY_STAGING
+    bool "2 — Staging (default)"
+
+config OPENLOAD_UPGRADE_STRATEGY_STAGING_BACKUP
+    bool "3 — Staging + Backup"
+    depends on OPENLOAD_ENABLE_BACKUP
+
+config OPENLOAD_UPGRADE_STRATEGY_DUAL_BANK
+    bool "4 — DualBank (M7+, unimplemented)"
+
+endchoice
+
+config OPENLOAD_COPY_CHUNK_SIZE
+    int "Staging → target copy chunk size (bytes)"
+    range 64 4096
+    default 512
+    help
+      RAM buffer used when copying from staging to target partition.
+      Larger = faster but more RAM. 512 B is a balanced default.
+
+endmenu
+
+
+menu "Logging"
+
+config OPENLOAD_ENABLE_OPLOG
+    bool "Persistent op log (ring buffer in external flash)"
+    default n
+    help
+      Append-only ring of recent operations to external flash.
+      Requires "oplog" partition (sector-aligned).
+
+config OPENLOAD_LOG_LEVEL
+    int "Log level (0=NONE 1=ERR 2=WRN 3=INF 4=DBG)"
+    range 0 4
+    default 3
+
+config OPENLOAD_LOG_COLOR
+    bool "ANSI color logs"
+    default y
+
+endmenu
+
+
+menu "CLI"
+
+config OPENLOAD_ENABLE_CLI
+    bool "Enable interactive CLI"
+    default y
+
+config OPENLOAD_CLI_LINE_MAX
+    int "CLI line buffer size (bytes)"
+    range 32 1024
+    default 128
+    depends on OPENLOAD_ENABLE_CLI
+
+config OPENLOAD_CLI_PROMPT
+    string "CLI prompt"
+    default "OpenLoad> "
+    depends on OPENLOAD_ENABLE_CLI
+
+config OPENLOAD_CLI_PASSWORD
+    string "CLI password (empty = no auth)"
+    default ""
+    depends on OPENLOAD_ENABLE_CLI
+    help
+      Non-empty string enables password gate at CLI entry. Empty =
+      open access. Plain text — store hashed for production.
+
+config OPENLOAD_CLI_PASSWORD_MAX_ATTEMPTS
+    int "Max failed password attempts before lockout"
+    range 1 100
+    default 3
+    depends on OPENLOAD_ENABLE_CLI
+
+config OPENLOAD_CLI_PASSWORD_LOCKOUT_MS
+    int "Lockout duration on attempt exhaustion (ms)"
+    range 1000 600000
+    default 30000
+    depends on OPENLOAD_ENABLE_CLI
+
+endmenu
