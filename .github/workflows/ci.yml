@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md', 'LICENSE']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['docs/**', '**.md', 'LICENSE']
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: ${{ matrix.board }} / ${{ matrix.buildtype }} / ${{ matrix.variant }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [stm32f103zet6_gcc, stm32f407vgt6_gcc]
+        buildtype: [Debug, Release]
+        variant: [full, minimal]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Arm GNU Toolchain 14.2.Rel1
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '14.2.Rel1'
+
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Configure (${{ matrix.variant }})
+        working-directory: examples/${{ matrix.board }}
+        run: |
+          if [ "${{ matrix.variant }}" = "minimal" ]; then MINIMAL=ON; else MINIMAL=OFF; fi
+          cmake -S . -B build/ci -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.buildtype }} \
+            -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/gcc-arm-none-eabi.cmake \
+            -DOPENLOAD_CI_MINIMAL=$MINIMAL
+
+      - name: Build (fail on any compiler warning)
+        working-directory: examples/${{ matrix.board }}
+        run: |
+          set -o pipefail
+          cmake --build build/ci 2>&1 | tee build.log
+          # warning-as-error: 不用 -Werror 避免 ARM HAL 不可控警告, grep 法只
+          # 拦截 GCC/ld 的 "warning:" / "error:" 文本格式 (CMake 输出的 "WARN"
+          # 不带冒号不会误触).
+          if grep -E "warning:|error:" build.log; then
+            echo "::error::Build emitted warnings/errors (see lines above)"
+            exit 1
+          fi
+
+      - name: Report size
+        working-directory: examples/${{ matrix.board }}
+        run: |
+          ELF=build/ci/openload_bootloader.elf
+          BIN=build/ci/openload_bootloader.bin
+          arm-none-eabi-size "$ELF" | tee size.txt
+          BIN_BYTES=$(stat -c%s "$BIN")
+          {
+            echo "## ${{ matrix.board }} / ${{ matrix.buildtype }} / ${{ matrix.variant }}"
+            echo ""
+            echo "**openload_bootloader.bin**: ${BIN_BYTES} B"
+            echo ""
+            echo '```'
+            cat size.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.board }}-${{ matrix.buildtype }}-${{ matrix.variant }}
+          path: |
+            examples/${{ matrix.board }}/build/ci/openload_bootloader.elf
+            examples/${{ matrix.board }}/build/ci/openload_bootloader.bin
+            examples/${{ matrix.board }}/build/ci/openload_bootloader.map
+          retention-days: 14
