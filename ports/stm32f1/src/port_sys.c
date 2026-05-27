@@ -9,8 +9,15 @@
  */
 #include "openload/ops/sys_ops.h"
 #include "openload/errno.h"
+#include "openload/config.h"
 #include "stm32f1xx_hal.h"
 #include <stdint.h>
+
+#if OPENLOAD_ENABLE_RDP
+/* port_rdp.c 实现 */
+extern int sys_rdp_get_level(uint8_t *out);
+extern int sys_rdp_lock(void);
+#endif
 
 /* 标志位放在 RAM 末尾 4 字节。链接脚本需保留 .ol_magic 段:
  *   .ol_magic (NOLOAD) : { KEEP(*(.ol_magic)) } > RAM
@@ -85,6 +92,10 @@ static const ol_sys_ops_t s_sys_ops = {
     .jump        = sys_jump,
     .magic_read  = sys_magic_read,
     .magic_write = sys_magic_write,
+#if OPENLOAD_ENABLE_RDP
+    .rdp_get_level = sys_rdp_get_level,
+    .rdp_lock      = sys_rdp_lock,
+#endif
 };
 
 void port_sys_register(void)

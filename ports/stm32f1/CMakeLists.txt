@@ -14,6 +14,7 @@ set(STM32F1_PORT_SOURCES
     src/port_flash_w25q64.c
     src/port_io_uart.c
     src/port_button.c
+    src/port_rdp.c
     src/board_init.c
 )
 

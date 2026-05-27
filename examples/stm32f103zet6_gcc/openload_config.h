@@ -73,6 +73,13 @@
     0x4F, 0x70, 0x65, 0x6E, 0x4C, 0x6F, 0x61, 0x64, \
     0x20, 0x64, 0x65, 0x6D, 0x6F, 0x4B, 0x65, 0x79
 
+/* M6-1: 启用 RDP (Read-out Protection) 软件控制. F1 仅 L0/L1, 无 L2.
+ * sys_ops 暴露 rdp_get_level / rdp_lock, CLI 提供 `rdp status` /
+ * `rdp lock` (后者带 10s 倒计时 + 'y' 二次确认 — 不会主动锁).
+ * 解锁: STM32_Programmer_CLI -c port=SWD -ob RDP=0xA5
+ * (注意 F1 默认 L0 是 0xA5, 跟 F4 的 0xAA 不一样.) */
+#define OPENLOAD_ENABLE_RDP             1
+
 /* 日志 INFO 级 + ANSI 彩色 (使用 Tera Term/Xshell 终端时美观) */
 #define OPENLOAD_LOG_LEVEL              3
 #define OPENLOAD_LOG_COLOR              1
