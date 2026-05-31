@@ -168,7 +168,7 @@ OpenLoad 的差异化：**更轻量**（核心 < 20KB）、**更易上手**（�
 | F8.1 | 多级别 | NONE / ERROR / WARN / INFO / DEBUG，编译期裁剪 |
 | F8.2 | 输出接口可替换 | 默认走 `ol_io_t`，可重定向到 RTT/SWO |
 | F8.3 | 持久化日志（可选） | 启用时写入分区 `oplog`，循环覆盖 |
-| F8.4 | 颜色支持 | 启用 `OPENLOAD_LOG_COLOR` 时输出 ANSI 颜色码 |
+| F8.4 | 颜色支持 | 启用 `OPENLOAD_ENABLE_LOG_COLOR` 时输出 ANSI 颜色码 |
 
 ### F9. 配置系统
 

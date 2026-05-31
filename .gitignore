@@ -1,27 +1,12 @@
-
+# Build output —— 无前导斜杠, 匹配任意层级的 build/ (含 examples/*/build/)
 build/
 
-GEMINI.md
-# Ignore Keil project files and workspace settings
-example/keil/Output/
-example/keil/Projects/MDK-ARM/DebugConfig/
-example/keil/Projects/MDK-ARM/RTE/
-example/keil/Projects/MDK-ARM/*.uvguix.*
-example/keil/Projects/MDK-ARM/*.uvoptx
-example/keil/Projects/MDK-ARM/*.scvd
-!example/keil/Projects/MDK-ARM/*.uvprojx
+# Python 工具产物 (tools/*.py)
+__pycache__/
+*.pyc
 
-# GCC example build artifacts
-example/gcc/build/
-example/gcc/build-*/
-example/gcc/**/CMakeCache.txt
-example/gcc/**/CMakeFiles/
-example/gcc/**/cmake_install.cmake
-example/gcc/**/Makefile
-example/gcc/**/compile_commands.json
-example/gcc/**/*.ninja
-example/gcc/**/.ninja_*
-example/gcc/**/rules.ninja
+# menuconfig (kconfiglib) 保存时生成的备份
+*.config.old
 
 # Claude Code
 .claude/
@@ -36,3 +21,6 @@ desktop.ini
 
 # Firmware binaries (烧录测试用的 App / bootloader bin, 不进版本库)
 *.bin
+
+# 其它 AI 工具
+GEMINI.md

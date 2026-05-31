@@ -25,9 +25,9 @@ endif()
 if(NOT EXISTS "${OPENLOAD_KCONFIG_FILE}")
     message(FATAL_ERROR
         "OpenLoad .config not found: ${OPENLOAD_KCONFIG_FILE}\n"
-        "Run from repo root:\n"
-        "  python tools/migrate_config.py examples/stm32f407vgt6_gcc/openload_config.h "
-        "-o examples/stm32f407vgt6_gcc/.config\n"
+        "示例 .config 随仓库提供; 若丢失, 从版本库恢复:\n"
+        "  git checkout -- examples/stm32f407vgt6_gcc/.config\n"
+        "或用 menuconfig 新建一份:\n"
         "  python tools/menuconfig.py examples/stm32f407vgt6_gcc/.config")
 endif()
 

@@ -1,16 +1,19 @@
 /*
  * OpenLoad - 配置入口
  *
- * 编译期配置流程:
- *   1. 用户工程在 include 路径下提供 openload_config.h (路径任意, 通常工程根)
- *   2. 本文件首先尝试 include 它
- *   3. 然后 include config_default.h 补齐所有缺省项
+ * 编译期配置由 Kconfig 唯一管理:
+ *   1. tools/menuconfig.py 编辑 .config
+ *   2. CMake 在 configure 阶段调 tools/genconfig.py, 从 .config 生成
+ *      openload_autoconfig.h (全量 #define OPENLOAD_*)
+ *   3. 用户/示例工程提供的 openload_config.h (shim) #include 它
+ *   4. 本文件 include 该 shim, 拿到全部配置宏
  *
- * 这意味着用户配置文件可以只写关心的项, 默认值由框架兜底。
+ * 不再有 header 兜底默认值 —— Kconfig 是唯一真值来源。未注入配置时下方
+ * 哨兵直接报错, 而非静默用上错误的默认值。
  */
 #pragma once
 
-/* C++17/GCC __has_include 用于让默认值在用户未提供配置时也能工作.
+/* __has_include 探测用户/示例工程提供的 openload_config.h.
  * ARM GCC 5+ 完全支持; Keil AC6 (基于 clang) 也支持. */
 #if defined(__has_include)
 #  if __has_include("openload_config.h")
@@ -18,4 +21,9 @@
 #  endif
 #endif
 
-#include "openload/config_default.h"
+/* 哨兵: OPENLOAD_BOARD_ID 是 Identity 段无 depends 的基础项, 任一 .config 必生成。
+ * 它缺失 = openload_autoconfig.h 没被注入 (没跑 Kconfig/genconfig, 或 include
+ * 路径没指到生成目录). 直接报错, 不静默兜底. */
+#if !defined(OPENLOAD_BOARD_ID)
+#  error "OpenLoad: 配置未注入。用 tools/menuconfig.py 编辑 .config, 经 CMake/genconfig 生成 openload_autoconfig.h (见 docs/menuconfig)。"
+#endif

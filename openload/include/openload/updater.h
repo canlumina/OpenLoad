@@ -7,7 +7,7 @@
 #pragma once
 
 #include <stdint.h>
-#include "openload/config.h"   /* 拉入 OL_UPGRADE_* 常量 */
+#include "openload/config.h"   /* 拉入 OPENLOAD_* 配置宏 */
 
 /**
  * @brief 一次完整升级.
@@ -25,7 +25,7 @@ int ol_updater_run(const char *receiver_name,
 /**
  * @brief 仅做 staging → target 拷贝 + 校验 (假设 staging 已存在有效固件).
  *        用于场景: 用户已通过其它工具把固件写到 W25Q64, 然后命令行 install.
- *        启用 OPENLOAD_ANTI_ROLLBACK 时, 拒绝低于 target 当前版本的固件.
+ *        启用 OPENLOAD_ENABLE_ANTI_ROLLBACK 时, 拒绝低于 target 当前版本的固件.
  */
 int ol_updater_install(const char *staging_part, const char *target_part);
 

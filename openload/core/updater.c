@@ -103,7 +103,7 @@ static int decrypt_payload_to_target(const ol_partition_t *src,
 int ol_updater_install_ex(const char *staging_part, const char *target_part,
                           uint32_t flags)
 {
-#if !OPENLOAD_ANTI_ROLLBACK && !OPENLOAD_ENABLE_BACKUP
+#if !OPENLOAD_ENABLE_ANTI_ROLLBACK && !OPENLOAD_ENABLE_BACKUP
     /* flags 仅在 anti-rollback (FORCE) / backup (NO_BACKUP) 路径用到.
      * 两特性全关时本函数不会引用它, 避免 -Wunused-parameter. */
     (void)flags;
@@ -147,7 +147,7 @@ int ol_updater_install_ex(const char *staging_part, const char *target_part,
 
     /* 防回滚. flags & FORCE 时单次允许覆盖 (CLI install ... force, 或
      * rollback 路径自动用 FORCE 把旧固件写回去). */
-#if OPENLOAD_ANTI_ROLLBACK
+#if OPENLOAD_ENABLE_ANTI_ROLLBACK
     if (!(flags & OL_INSTALL_F_FORCE)) {
         ol_image_header_t cur;
         if (ol_image_read_header(dst, &cur) == OL_OK &&

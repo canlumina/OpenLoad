@@ -117,7 +117,7 @@ choice 互斥选项，四选一：
 | 配置项 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
 | `OPENLOAD_ENABLE_RDP` | bool | `n` | **RDP CLI 命令（STM32 读保护）**。启用 `rdp status` / `rdp lock` 命令。L0→L1 锁住 SWD 读 flash 路径，保护 bootloader 内的公钥 / AES 密钥不被 dump（M6-1）。F1 和 F4 均支持。**L2（永久锁定）不暴露在 CLI 中——必须用 ST-LINK 外部工具烧。** |
-| `OPENLOAD_ANTI_ROLLBACK` | bool | `n` | **防回滚**。拒绝安装 `firmware_version` 低于当前运行 App 版本的镜像。`install ... force` 可绕过（用于紧急降级）。依赖于 `ENABLE_ED25519`。 |
+| `OPENLOAD_ENABLE_ANTI_ROLLBACK` | bool | `n` | **防回滚**。拒绝安装 `firmware_version` 低于当前运行 App 版本的镜像。`install ... force` 可绕过（用于紧急降级）。依赖于 `ENABLE_ED25519`。 |
 | `OPENLOAD_ENABLE_BACKUP` | bool | `n` | **备份分区 + 自动回滚**。升级前备份当前分区内容，升级失败或 App 校验失败时自动从备份恢复。需要 `partitions.def` 中定义 `backup` 分区。 |
 
 ### Image / Update（升级策略）
@@ -141,7 +141,7 @@ choice 互斥选项，四选一：
 |---|---|---|---|
 | `OPENLOAD_ENABLE_OPLOG` | bool | `n` | **持久化操作日志**。在外部 flash 维护一个只能追加的环形日志，记录最近的升级/校验操作。需要 `partitions.def` 中定义 `oplog` 分区（扇区对齐）。关掉省 ~2KB ROM。 |
 | `OPENLOAD_LOG_LEVEL` | int | `3` | **日志级别**。0=NONE（关日志），1=ERR（仅错误），2=WRN（错误+警告），3=INF（默认，信息级），4=DBG（调试，最详细）。 |
-| `OPENLOAD_LOG_COLOR` | bool | `y` | **ANSI 彩色日志**。串口终端输出带颜色的日志（对 SecureCRT / PuTTY 有效）。关掉省少许 ROM。 |
+| `OPENLOAD_ENABLE_LOG_COLOR` | bool | `y` | **ANSI 彩色日志**。串口终端输出带颜色的日志（对 SecureCRT / PuTTY 有效）。关掉省少许 ROM。 |
 
 ### CLI（命令行界面）
 

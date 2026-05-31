@@ -34,6 +34,13 @@ def emit_header(kconf, out_path):
         if sym.choice:
             continue
 
+        # invisible 符号 (depends on 未满足, 如 ESP8266=n 时的 ESP_UART_BAUD、
+        # AES_128_CTR=n 时的 AES_KEY): str_value 为空, emit 会产出无值空宏.
+        # 非 bool 的 invisible 符号直接跳过 —— 引用点都在对应 #if 块内, 不定义也
+        # 安全; bool 不受影响 (tri_value 恒 0/2), 仍 emit 0 以保持 #if 行为.
+        if sym.visibility == 0 and sym.type != BOOL:
+            continue
+
         if sym.type == BOOL:
             val = 1 if sym.tri_value == 2 else 0  # tri_value: 0=n, 1=m, 2=y
             lines.append(f'#define {sym.name} {val}')
@@ -106,13 +113,6 @@ def emit_cmake(kconf, out_path):
             continue
         val = 'ON' if sym.tri_value == 2 else 'OFF'
         lines.append(f'set({sym.name} {val} CACHE BOOL "" FORCE)')
-
-    # 特殊: OPENLOAD_ENABLE_ESP8266 同步到 port cache var (F1 + F4 双轨)
-    esp_sym = kconf.syms.get('OPENLOAD_ENABLE_ESP8266')
-    if esp_sym and esp_sym.type == BOOL:
-        val = 'ON' if esp_sym.tri_value == 2 else 'OFF'
-        lines.append(f'set(STM32F1_PORT_ENABLE_ESP8266 {val} CACHE BOOL "" FORCE)')
-        lines.append(f'set(STM32F4_PORT_ENABLE_ESP8266 {val} CACHE BOOL "" FORCE)')
 
     lines.append('')
     out_path.write_text('\n'.join(lines), encoding='utf-8')

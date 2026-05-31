@@ -181,7 +181,7 @@ void ol_vlog(ol_log_level_t lvl, const char *fmt, va_list ap)
         return;
     }
     static const char *tag[] = { "", "E", "W", "I", "D" };
-#if OPENLOAD_LOG_COLOR
+#if OPENLOAD_ENABLE_LOG_COLOR
     static const char *clr[] = { "", "\x1b[31m", "\x1b[33m", "\x1b[32m", "\x1b[36m" };
     static const char *rst   = "\x1b[0m";
 #endif
@@ -193,7 +193,7 @@ void ol_vlog(ol_log_level_t lvl, const char *fmt, va_list ap)
 
     char buf[OPENLOAD_LOG_BUF_SIZE + 16];
     int  pos = 0;
-#if OPENLOAD_LOG_COLOR
+#if OPENLOAD_ENABLE_LOG_COLOR
     const char *c = clr[lvl];
     while (*c && pos < (int)sizeof(buf)) { buf[pos++] = *c++; }
 #endif
@@ -206,7 +206,7 @@ void ol_vlog(ol_log_level_t lvl, const char *fmt, va_list ap)
     for (int i = 0; i < raw_len && pos < (int)sizeof(buf); ++i) {
         buf[pos++] = raw[i];
     }
-#if OPENLOAD_LOG_COLOR
+#if OPENLOAD_ENABLE_LOG_COLOR
     const char *r = rst;
     while (*r && pos < (int)sizeof(buf) - 2) { buf[pos++] = *r++; }
 #endif

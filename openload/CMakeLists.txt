@@ -17,6 +17,7 @@ option(OPENLOAD_ENABLE_HTTP_OTA    "Enable HTTP OTA receiver"    OFF)
 option(OPENLOAD_ENABLE_OPLOG       "Enable persistent op log"    OFF)
 option(OPENLOAD_ENABLE_AES_128_CTR "Enable AES-128-CTR"          OFF)
 option(OPENLOAD_ENABLE_SHA256      "Enable SHA-256"              OFF)
+option(OPENLOAD_ENABLE_ED25519     "Enable Ed25519 signature"    OFF)
 
 set(OPENLOAD_SOURCES
     core/sys.c

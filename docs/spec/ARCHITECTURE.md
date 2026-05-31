@@ -758,7 +758,7 @@ steps:
 /* --- Image / Update --- */
 #define OPENLOAD_IMAGE_FORMAT_VERSION       1
 #define OPENLOAD_UPGRADE_STRATEGY           OL_UPGRADE_STAGING
-#define OPENLOAD_ANTI_ROLLBACK              0
+#define OPENLOAD_ENABLE_ANTI_ROLLBACK              0
 #define OPENLOAD_BOARD_ID                   0x0001
 
 /* --- CLI --- */
@@ -770,7 +770,7 @@ steps:
 
 /* --- Logger --- */
 #define OPENLOAD_LOG_LEVEL                  OL_LOG_INF
-#define OPENLOAD_LOG_COLOR                  1
+#define OPENLOAD_ENABLE_LOG_COLOR                  1
 #define OPENLOAD_LOG_PERSISTENT             0
 
 /* --- Buffers --- */

@@ -6,7 +6,8 @@
 
 cmake_minimum_required(VERSION 3.22)
 
-option(STM32F1_PORT_ENABLE_ESP8266 "Compile UART2 + ESP8266 AT driver" OFF)
+# UART2 + ESP8266 AT 驱动是否编译, 由顶层 OPENLOAD_ENABLE_ESP8266 控制
+# (genconfig 从 .config 生成 set(... CACHE), add_subdirectory 时可见).
 
 set(STM32F1_PORT_SOURCES
     src/port_sys.c
@@ -18,7 +19,7 @@ set(STM32F1_PORT_SOURCES
     src/board_init.c
 )
 
-if(STM32F1_PORT_ENABLE_ESP8266)
+if(OPENLOAD_ENABLE_ESP8266)
     list(APPEND STM32F1_PORT_SOURCES src/port_uart2.c src/port_io_esp8266.c)
 endif()
 

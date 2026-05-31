@@ -7,302 +7,392 @@
 mainmenu "OpenLoad Bootloader Configuration"
 
 
-menu "Identity"
+# ============================================================================
+# Hardware
+# ============================================================================
 
+menu "Hardware"
+
+# 板子ID，防跨板误刷，image_tool打镜像时需匹配
 config OPENLOAD_BOARD_ID
     hex "Board ID (16-bit)"
     range 0x0001 0xFFFF
     default 0x0001
     help
-      中文: 板子ID，防跨板误刷，image_tool打镜像时需匹配
+      Unique board identifier to prevent cross-board flashing.
+      Must match the ID embedded in the image by image_tool.
+
+# 启用ESP8266 Wi-Fi模块
+config OPENLOAD_ENABLE_ESP8266
+    bool "ESP8266 AT bridge (UART2)"
+    default n
+    help
+      Enable ESP8266 Wi-Fi module for HTTP OTA updates.
+      Requires UART2 connection and AT firmware on ESP8266.
+
+# 新固件115200，老ESP-01默认9600
+config OPENLOAD_ESP_UART_BAUD
+    int "ESP8266 UART baudrate"
+    depends on OPENLOAD_ENABLE_ESP8266
+    default 115200
+    help
+      UART baudrate for ESP8266 communication.
+      Modern firmware uses 115200; older ESP-01 defaults to 9600.
 
 endmenu
 
 
-menu "Boot"
+# ============================================================================
+# Boot Behavior
+# ============================================================================
 
+menu "Boot Behavior"
+
+# 上电等待多久才跳App，范围内可按键/串口/magic进CLI
 config OPENLOAD_BOOT_DELAY_MS
     int "Boot delay (ms)"
     range 0 60000
     default 3000
     help
-      中文: 上电等待多久才跳App，范围内可按键/串口/magic进CLI
+      Time to wait after power-on before jumping to application.
+      During this window, CLI can be triggered by button/UART/magic.
 
+# 上电按住按键进CLI
 config OPENLOAD_ENTRY_TRIGGER_BUTTON
     bool "Trigger CLI by button press"
     default y
     help
-      中文: 上电按住按键进CLI
+      Enter CLI if button is held during boot delay.
 
+# 上电串口发任意字符进CLI
 config OPENLOAD_ENTRY_TRIGGER_UART
     bool "Trigger CLI by UART activity"
     default y
     help
-      中文: 上电串口发任意字符进CLI
+      Enter CLI if any character is received on UART during boot delay.
 
+# App热重启时写RAM magic值进CLI
 config OPENLOAD_ENTRY_TRIGGER_MAGIC
     bool "Trigger CLI by RAM magic"
     default y
     help
-      中文: App热重启时写RAM magic值进CLI
+      Enter CLI if application writes a magic value to RAM before reset.
+      Useful for application-initiated firmware updates.
 
 endmenu
 
 
-menu "Recovery"
+# ============================================================================
+# Update
+# ============================================================================
 
-choice
-    prompt "Recovery policy when App verify fails"
-    default OPENLOAD_RECOVERY_POLICY_CLI
-    help
-      中文: App校验失败后的恢复方式
+menu "Update"
 
-config OPENLOAD_RECOVERY_POLICY_CLI
-    bool "CLI (stay in bootloader)"
-    help
-      中文（推荐）: 停在CLI等用户操作
+# --- Protocols ---
 
-config OPENLOAD_RECOVERY_POLICY_HANG
-    bool "Hang (rely on watchdog)"
-    help
-      中文: 挂起等看门狗复位
-
-config OPENLOAD_RECOVERY_POLICY_ROLLBACK
-    bool "Auto rollback from backup"
-    depends on OPENLOAD_ENABLE_BACKUP
-    help
-      中文: 从备份分区自动恢复
-
-endchoice
-
-endmenu
-
-
-menu "Protocols"
-
+# 基础串口协议，M1基线，建议开启
 config OPENLOAD_ENABLE_XMODEM
     bool "XMODEM (128 B blocks)"
     default y
     help
-      中文: 基础串口协议，M1基线，建议开启
+      Basic serial protocol with 128-byte blocks.
+      Recommended baseline for Cortex-M1+ devices.
 
+# 比XMODEM快8倍，需对方支持
 config OPENLOAD_ENABLE_XMODEM_1K
     bool "XMODEM-1K (1024 B blocks)"
     depends on OPENLOAD_ENABLE_XMODEM
     default y
     help
-      中文: 比XMODEM快8倍，需对方支持
+      Extended XMODEM with 1024-byte blocks (8x faster).
+      Requires sender support.
 
+# 批处理协议，一次发多个文件
 config OPENLOAD_ENABLE_YMODEM
     bool "YMODEM (batch protocol)"
-    default n
+    default y
     help
-      中文: 批处理协议，一次发多个文件
+      Batch file transfer protocol.
+      More efficient than XMODEM for multiple files.
 
+# 通过ESP8266从URL拉取镜像更新
 config OPENLOAD_ENABLE_HTTP_OTA
     bool "HTTP OTA (pull via Wi-Fi)"
     depends on OPENLOAD_ENABLE_ESP8266
     default n
     help
-      中文: 通过ESP8266从URL拉取镜像更新
+      Pull firmware image from HTTP URL via ESP8266.
+      Requires OPENLOAD_ENABLE_ESP8266.
 
-endmenu
-
-
-menu "Network"
-
-config OPENLOAD_ENABLE_ESP8266
-    bool "ESP8266 AT bridge (UART2)"
-    default n
-    help
-      中文: 启用ESP8266 Wi-Fi模块
-
-config OPENLOAD_ESP_UART_BAUD
-    int "ESP UART2 baudrate"
-    depends on OPENLOAD_ENABLE_ESP8266
-    default 115200
-    help
-      中文: 新固件115200，老ESP-01默认9600
-
-endmenu
-
-
-menu "Crypto"
-
-config OPENLOAD_ENABLE_CRC32
-    bool "CRC32 image verify"
-    default y
-    help
-      中文: M1基线，验镜像完整性
-
-config OPENLOAD_ENABLE_SHA256
-    bool "SHA-256 digest verify"
-    default n
-    help
-      中文: SHA256摘要校验，Ed25519也依赖它
-
-config OPENLOAD_ENABLE_AES_128_CTR
-    bool "AES-128-CTR image decryption"
-    default n
-    help
-      中文: 解密经AES加密的镜像
-
-config OPENLOAD_AES_KEY
-    string "AES-128 key (32 hex chars = 16 bytes)"
-    depends on OPENLOAD_ENABLE_AES_128_CTR
-    default "4F70656E4C6F61642064656D6F4B6579"
-    help
-      中文: 32个hex字符，生产环境必须换
-
-config OPENLOAD_ENABLE_ED25519
-    bool "Ed25519 signature verify"
-    depends on OPENLOAD_ENABLE_SHA256
-    default n
-    help
-      中文: Ed25519签名校验，安全栈核心
-
-config OPENLOAD_ED25519_PUBKEY
-    string "Ed25519 public key (64 hex chars = 32 bytes)"
-    depends on OPENLOAD_ENABLE_ED25519
-    default "7542CE6AECF5F1E6DC809E5F49BAFEDB045883A63C931DFD2E1ECFFCC01FDB98"
-    help
-      中文: 64个hex字符，生产环境必须换
-
-endmenu
-
-
-menu "Security"
-
-config OPENLOAD_ENABLE_RDP
-    bool "RDP (STM32 Read-out Protection)"
-    default n
-    help
-      中文: 锁SWD读flash保护密钥，L2不暴露须用ST-LINK
-
-config OPENLOAD_ANTI_ROLLBACK
-    bool "Anti-rollback"
-    default n
-    help
-      中文: 拒绝装版本低于当前App的镜像
-
-config OPENLOAD_ENABLE_BACKUP
-    bool "Backup partition"
-    default n
-    help
-      中文: 升级前备份，失败时自动恢复
-
-endmenu
-
-
-menu "Image / Update"
+# --- Upgrade Strategy ---
 
 choice
     prompt "Upgrade strategy"
     default OPENLOAD_UPGRADE_STRATEGY_STAGING
     help
-      中文: 升级策略
+      Firmware upgrade strategy.
 
+# 直接写App，最简单无容错
 config OPENLOAD_UPGRADE_STRATEGY_SINGLE_BANK
-    bool "1 — SingleBank (direct write)"
+    bool "SingleBank (direct write)"
     help
-      中文: 直接写App，最简单无容错
+      Write directly to application partition.
+      Simplest but no fault tolerance.
 
+# staging暂存校验后拷贝（推荐）
 config OPENLOAD_UPGRADE_STRATEGY_STAGING
-    bool "2 — Staging (default)"
+    bool "Staging (recommended)"
     help
-      中文（推荐）: staging暂存校验后拷贝
+      Write to staging partition, verify, then copy to application.
+      Recommended for production use.
 
+# 先备份再升级，校验失败自动恢复
 config OPENLOAD_UPGRADE_STRATEGY_STAGING_BACKUP
-    bool "3 — Staging + Backup"
-    depends on OPENLOAD_ENABLE_BACKUP
+    bool "Staging + Backup"
+    select OPENLOAD_ENABLE_BACKUP
     help
-      中文: 先备份再升级，校验失败自动恢复
+      Backup current application before upgrade.
+      Auto-rollback on verification failure.
 
+# A/B双Bank切换，预留
 config OPENLOAD_UPGRADE_STRATEGY_DUAL_BANK
-    bool "4 — DualBank (M7+, unimplemented)"
+    bool "DualBank (M7+, unimplemented)"
     help
-      中文: A/B双Bank切换，预留
+      A/B dual-bank switching (reserved for STM32F7/H7).
+      Not yet implemented.
 
 endchoice
 
+# staging拷到App的RAM缓冲区大小
 config OPENLOAD_COPY_CHUNK_SIZE
     int "Copy chunk size (bytes)"
     range 64 4096
     default 512
     help
-      中文: staging拷到App的RAM缓冲区大小
+      RAM buffer size for staging-to-application copy.
+      Larger values may improve speed but consume more RAM.
 
 endmenu
 
 
-menu "Logging"
+# ============================================================================
+# Security
+# ============================================================================
 
-config OPENLOAD_ENABLE_OPLOG
-    bool "Persistent op log"
-    default n
-    help
-      中文: 外部flash环形操作日志，关省2KB
+menu "Security"
 
-config OPENLOAD_LOG_LEVEL
-    int "Log level (0=NONE 1=ERR 2=WRN 3=INF 4=DBG)"
-    range 0 4
-    default 3
-    help
-      中文: 0=关 1=错 2=警告 3=信息 4=调试
+# --- Verification ---
 
-config OPENLOAD_LOG_COLOR
-    bool "ANSI color logs"
+# M1基线，验镜像完整性
+config OPENLOAD_ENABLE_CRC32
+    bool "CRC32 image verification"
     default y
     help
-      中文: 彩色日志
+      Verify image integrity with CRC32 checksum.
+      Recommended baseline for all devices.
+
+# SHA256摘要校验，Ed25519也依赖它
+config OPENLOAD_ENABLE_SHA256
+    bool "SHA-256 digest verification"
+    default n
+    help
+      Verify image with SHA-256 hash.
+      Required for Ed25519 signature verification.
+
+# Ed25519签名校验，安全栈核心
+config OPENLOAD_ENABLE_ED25519
+    bool "Ed25519 signature verification"
+    depends on OPENLOAD_ENABLE_SHA256
+    default n
+    help
+      Verify image signature with Ed25519 public-key cryptography.
+      Core component of secure boot stack.
+
+# 64个hex字符，生产环境必须换
+config OPENLOAD_ED25519_PUBKEY
+    string "Ed25519 public key (64 hex chars = 32 bytes)"
+    depends on OPENLOAD_ENABLE_ED25519
+    default "7542CE6AECF5F1E6DC809E5F49BAFEDB045883A63C931DFD2E1ECFFCC01FDB98"
+    help
+      Ed25519 public key in hexadecimal (64 characters = 32 bytes).
+      MUST be replaced in production with your own key pair.
+
+# --- Encryption ---
+
+# 解密经AES加密的镜像
+config OPENLOAD_ENABLE_AES_128_CTR
+    bool "AES-128-CTR image decryption"
+    default n
+    help
+      Decrypt AES-128-CTR encrypted firmware images.
+      Protects intellectual property during transit.
+
+# 32个hex字符，生产环境必须换
+config OPENLOAD_AES_KEY
+    string "AES-128 key (32 hex chars = 16 bytes)"
+    depends on OPENLOAD_ENABLE_AES_128_CTR
+    default "4F70656E4C6F61642064656D6F4B6579"
+    help
+      AES-128 key in hexadecimal (32 characters = 16 bytes).
+      MUST be replaced in production with your own secret key.
+
+# --- Protection Mechanisms ---
+
+# 拒绝装版本低于当前App的镜像
+config OPENLOAD_ENABLE_ANTI_ROLLBACK
+    bool "Anti-rollback protection"
+    default n
+    help
+      Reject firmware images with version lower than current application.
+      Prevents downgrade attacks.
+
+# 升级前备份，失败时自动恢复
+config OPENLOAD_ENABLE_BACKUP
+    bool "Backup partition"
+    default n
+    help
+      Reserve flash partition for application backup.
+      Enables auto-rollback on upgrade failure.
+
+# 锁SWD读flash保护密钥，L2不暴露须用ST-LINK
+config OPENLOAD_ENABLE_RDP
+    bool "RDP (STM32 Read-out Protection)"
+    default n
+    help
+      Enable STM32 flash read-out protection.
+      Level 2 prevents SWD access; requires ST-LINK for recovery.
+
+# --- Recovery Policy ---
+
+choice
+    prompt "Recovery policy when App verification fails"
+    default OPENLOAD_RECOVERY_POLICY_CLI
+    help
+      Action to take when application verification fails.
+
+# 停在CLI等用户操作（推荐）
+config OPENLOAD_RECOVERY_POLICY_CLI
+    bool "CLI (stay in bootloader)"
+    help
+      Stay in CLI and wait for user intervention.
+      Recommended for development and production.
+
+# 挂起等看门狗复位
+config OPENLOAD_RECOVERY_POLICY_HANG
+    bool "Hang (rely on watchdog)"
+    help
+      Hang and rely on external watchdog to reset.
+      Use only if watchdog is properly configured.
+
+# 从备份分区自动恢复
+config OPENLOAD_RECOVERY_POLICY_ROLLBACK
+    bool "Auto rollback from backup"
+    depends on OPENLOAD_ENABLE_BACKUP
+    help
+      Automatically restore from backup partition.
+      Requires OPENLOAD_ENABLE_BACKUP.
+
+endchoice
 
 endmenu
 
+
+# ============================================================================
+# CLI
+# ============================================================================
 
 menu "CLI"
 
+# 关闭后无命令行，仅GPIO/协议升级
 config OPENLOAD_ENABLE_CLI
     bool "Enable interactive CLI"
     default y
     help
-      中文: 关闭后无命令行，仅GPIO/协议升级
+      Enable command-line interface over UART.
+      Disable to save flash (~4KB) if only GPIO/protocol updates are needed.
 
+# 单行最大长度，长命令可调大
 config OPENLOAD_CLI_LINE_MAX
     int "CLI line buffer (bytes)"
     range 32 1024
     default 128
     depends on OPENLOAD_ENABLE_CLI
     help
-      中文: 单行最大长度，长命令可调大
+      Maximum length of a single CLI command line.
+      Increase if you need longer commands.
 
+# 提示符，可改为如"F407> "
 config OPENLOAD_CLI_PROMPT
     string "CLI prompt"
     default "OpenLoad> "
     depends on OPENLOAD_ENABLE_CLI
     help
-      中文: 提示符，可改为如"F407> "
+      CLI prompt string (e.g., "OpenLoad> " or "F407> ").
 
+# 非空开启密码，空=无密码
 config OPENLOAD_CLI_PASSWORD
     string "CLI password (empty = no auth)"
     default ""
     depends on OPENLOAD_ENABLE_CLI
     help
-      中文: 非空开启密码，空=无密码
+      CLI password for authentication.
+      Leave empty to disable password protection.
 
+# 超限锁定防暴力破解
 config OPENLOAD_CLI_PASSWORD_MAX_ATTEMPTS
-    int "Max failed attempts"
+    int "Max failed password attempts"
     range 1 100
     default 3
     depends on OPENLOAD_ENABLE_CLI
     help
-      中文: 超限锁定防暴力破解
+      Maximum failed password attempts before lockout.
+      Prevents brute-force attacks.
 
+# 锁定持续时间，范围1秒~10分钟
 config OPENLOAD_CLI_PASSWORD_LOCKOUT_MS
     int "Lockout duration (ms)"
     range 1000 600000
     default 30000
     depends on OPENLOAD_ENABLE_CLI
     help
-      中文: 锁定持续时间，范围1秒~10分钟
+      Lockout duration after max failed attempts (1s ~ 10min).
+
+endmenu
+
+
+# ============================================================================
+# Logging
+# ============================================================================
+
+menu "Logging"
+
+# 外部flash环形操作日志，关省2KB
+config OPENLOAD_ENABLE_OPLOG
+    bool "Persistent operation log"
+    default n
+    help
+      Enable persistent operation log in external flash (ring buffer).
+      Disable to save ~2KB flash.
+
+# 0=关 1=错 2=警告 3=信息 4=调试
+config OPENLOAD_LOG_LEVEL
+    int "Log level (0=NONE 1=ERR 2=WRN 3=INF 4=DBG)"
+    range 0 4
+    default 3
+    help
+      Runtime log verbosity:
+        0 = NONE (no logs)
+        1 = ERROR (errors only)
+        2 = WARNING (errors + warnings)
+        3 = INFO (errors + warnings + info)
+        4 = DEBUG (all messages)
+
+# 彩色日志
+config OPENLOAD_ENABLE_LOG_COLOR
+    bool "ANSI color logs"
+    default y
+    help
+      Enable ANSI color codes in log output.
+      Improves readability on terminals that support colors.
 
 endmenu
